@@ -1,0 +1,27 @@
+stages:
+  - test
+  - build
+  - deploy
+
+default:
+  image: eclipse-temurin:21-jdk-jammy
+
+test_core:
+  stage: test
+  script:
+    - echo "Running Core Backend tests (Placeholder)"
+
+test_middleware:
+  stage: test
+  script:
+    - echo "Running Middleware tests (Placeholder)"
+
+build_core:
+  stage: build
+  script:
+    - echo "Building Core Backend (Placeholder)"
+
+build_middleware:
+  stage: build
+  script:
+    - echo "Building Middleware (Placeholder)"

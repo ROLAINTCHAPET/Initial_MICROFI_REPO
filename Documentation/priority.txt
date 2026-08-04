@@ -1,0 +1,2278 @@
+BUSINESS ANALYSIS & REQUIREMENTS SPECIFICATION
+PK Fokam Research Center | ENSPY 4GI
+
+MICROFI
+Digital Platform for Itinerant Collection
+and Management of Microfinance Institutions
+
+AUTHOR
+
+FRAMEWORK & VERSION
+
+Rolain Tchapet
+
+Research & Innovation Hub
+
+ENSPY 4GI
+
+Version 3.1 | July 2026
+
+Application Zone: CEMAC (Cameroon, Chad, CAR, etc.) | Category 1 & 2 MFIs
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Table of Contents
+
+0. Contents
+
+1. Strategic Framework & Business Environment · · · · · · · · · · · · · · · · · · · · · · · · · · · · · 1
+1.1 Institutional Context (PK Fokam Research Center & MFIs), , , , , , , , , , , , , , , , , , , 1
+1.2 Stakeholder Mapping (Stakeholders Analysis & RACI Matrix) , , , , , , , , , , , , , , , , 1
+1.3 Business Risk Analysis & Regulatory Constraints (COBAC / CEMAC) , , , , , , , , , , 1
+
+2. Analysis of the Existing Process (AS-IS) · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · 2
+2.1 Mapping of the Manual Field Collection Process , , , , , , , , , , , , , , , , , , , , , , , , , ,
+2.2 Modeling of the “As-Is” Process (Actors & Flows) , , , , , , , , , , , , , , , , , , , , , , , , , ,
+2.3 Diagnosis of Dysfunctions & Bottlenecks , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,
+2.4 Competitive Technology Landscape , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,
+2.5 MICROFI’s Unique Positioning (Value Proposition) , , , , , , , , , , , , , , , , , , , , , , , , , ,
+
+2
+2
+3
+3
+4
+
+3. Definition of the Target Process (TO-BE) · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · 5
+3.1 Vision of the Digitized Process , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,
+3.2 Modeling of the “To-Be” Process (Digital Workflow) , , , , , , , , , , , , , , , , , , , , , , , ,
+3.3 Impact Matrix of Changes per Actor , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,
+3.4 Definition of Business Rules , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,
+
+5
+5
+6
+6
+
+4. Business & Technical Requirements Specification · · · · · · · · · · · · · · · · · · · · · · · · · 8
+4.1 Detailed Functional Requirements (FR) , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , 8
+4.2 User Stories & Use Cases , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , 11
+4.3 Detailed Non-Functional Requirements (NFR) , , , , , , , , , , , , , , , , , , , , , , , , , , , , , 27
+4.4 Operational RACI Matrix of the System , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , 28
+4.5 Feature Priority Matrix & MVP Derivation , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , 28
+4.6 Resulting Scope: MVP (V1.0) vs Fast-Follow (V1.1) vs Backlog (V2) , , , , , , , , , , , 31
+4.7 Alignment with the Institution’s S.M.A.R.T. Objectives , , , , , , , , , , , , , , , , , , , , , , , 32
+
+5. Conclusion · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · 32
+
+Confidential — Internal Working Document
+
+Page i / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+1. Strategic Framework & Business Environment
+
+Institutional Context (PK Fokam Research Center & MFIs)
+The MICROFI project is developed under the aegis of the PK Fokam Research Center in
+partnership with Microfinance Institutions (MFIs) across the CEMAC zone. The strategic
+objective is to design a standardized, modular, and agnostic technology infrastructure to
+address the challenges of rural and semi-urban financial inclusion.
+The CEMAC zone is characterized by a strong duality in the microfinance sector:
+CATEGORY 1 — Cooperatives & Mutual Networks
+
+MC² / MUFFA networks, village cooperatives, and GICs, historically operating on decentralized foundations with a heavy reliance on paper and infrastructure constraints (intermittent
+connectivity, rural remoteness).
+CATEGORY 2 — Corporations & Centralized MFIs
+
+Regulated commercial MFIs equipped with centralized Information Systems (Sopra Amplitude, Kovara, Asengo) but suffering from rigidity in expanding their proximity collection
+channels.
+
+Stakeholder Mapping (Stakeholders Analysis & RACI Matrix)
+The success of the project depends on rigorous coordination among the various internal and
+external actors of the financial ecosystem.
+RACI legend: R = Responsible (executes the task), A = Accountable (validates / accountable), C = Consulted (provides
+expertise), I = Informed (kept up to date).
+
+Business Risk Analysis & Regulatory Constraints (COBAC / CEMAC)
+Proximity collection activity in the CEMAC zone is governed by strict requirements set out by
+COBAC and BEAC regarding anti-money laundering, fund security, and customer protection.
+CASH TRACEABILITY
+
+Obligation to link every physical collection to an identified client and to ensure rigorous
+traceability of banknote denominations (BEAC).
+CASH-HANDLING EXPOSURE CEILINGS
+
+High exposure of field agents to physical assault and cash theft.
+COBAC COMPLIANCE
+
+Requirement for daily accounting reconciliation and a formal ban on holding unrecorded
+funds at the end of the day.
+
+Confidential — Internal Working Document
+
+Page 1 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Stakeholder
+
+Role & main responsibility
+
+RACI
+
+Collection Agent (TPU)
+
+Field operator covering markets and counters. Records deposits, enters denomination breakdowns, prints thermal receipts.
+
+A/R
+
+Branch Cashier
+
+Sedentary agent managing the branch’s physical cash. Opens
+sessions, performs end-of-day reconciliation (OFJ), validates
+deposits.
+
+A/R
+
+Branch Manager / Director
+
+Responsible for operational performance and security. Geolocated tracking of routes, approval of escrow ceilings, granting
+of grace extensions (Bouton Prolonger).
+
+A/C
+
+System Administrator
+
+Central technical team (MFI IT). Manages access rights, enrolls
+terminals, configures schedule profiles.
+
+R/C/A
+
+Regulator (COBAC / BEAC)
+
+Monetary and banking supervisory authority. Regulatory compliance, adherence to prudential standards, and flow traceability.
+
+I
+
+Client (Member / Merchant)
+
+End-user of the proximity collection service. Activates and renews digital profile (tokenized booklet), consults personal profile, account balance and contribution history via the mobile
+application or USSD.
+
+I/R
+
+Table 1: Stakeholders and RACI Matrix
+
+2. Analysis of the Existing Process (AS-IS)
+
+Mapping of the Manual Field Collection Process
+The current operating model (AS-IS) relies almost exclusively on paper media and cumbersome
+physical processes, broken down into three chronological phases:
+★ MORNING
+
+★ FIELD
+
+★ EVENING
+
+The agent reports to the
+branch to collect their counterfoil receipt book, receive
+manual instructions, and
+check their route history on
+paper.
+
+The agent covers market
+stalls, collects cash from
+merchants, manually writes
+a carbon-copy receipt, tears
+it off, and stamps the client’s
+passbook.
+
+The agent returns to the
+branch with their bag of
+cash. The cashier manually counts all the cash and
+cross-checks it against the
+passbooks (duration: 1.5 to
+2.5 hours of congestion).
+
+Modeling of the “As-Is” Process (Actors & Flows)
+The text diagram below formalizes the interactions and friction points of the legacy model:
+
+Confidential — Internal Working Document
+
+Page 2 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Client (Merchant) → Hands over cash and presents their paper passbook → Field Agent
+→ Fills out and signs a carbon-copy receipt.
+Field Agent (Evening) → Returns to the branch with the cash bags → Branch Cashier
+→ Tedious manual counting + cross-checking of passbooks.
+Outcome: Delays, disputes over counterfeit notes, unexplained variances, and accounting
+entries deferred to the next day.
+
+Diagnosis of Dysfunctions & Bottlenecks
+An audit of current practices reveals five major systemic failures:
+• Opacity of collection & “cavalerie” risk — In the absence of immediate digital traceability, some agents use funds collected from Client B to cover a late payment or unauthorized
+disbursement owed by Client A (a form of check-kiting / rolling shortfall).
+• Slow Evening reconciliation / cash counting — Manual counting of heterogeneous masses
+of banknotes by cashiers creates enormous queues and human summation errors.
+• Counterfeit notes and disputes — When a counterfeit note is detected in the evening at the
+branch, it is impossible to attribute it to a specific client, creating financial disputes and tension
+directed at the agent.
+• Lack of GPS visibility and escrow overruns — Agents often collect beyond their actual financial guarantee without automated control, exposing the MFI to outright losses in the event of
+misappropriation or theft.
+• Information asymmetry — Client account balances on the Core Banking System (CBS) remain
+stale throughout the entire day of field operations.
+
+Competitive Technology Landscape
+To strategically position MICROFI within the microfinance landscape of Cameroon and the
+CEMAC zone, this section presents a comparative analysis of the technologies currently
+used in the field, followed by MICROFI’s unique positioning.
+The proximity-collection market today relies on three major technology families.
+A — Dedicated Payment Terminals (POS / Portable POS)
+
+Standalone physical devices distributed to agents (e.g., traditional pre-smartphone solutions).
+Advantages: Very robust physically; natively integrate a thermal printer to deliver an immediate paper receipt (a major trust factor for older or illiterate merchants).
+Disadvantages: Very high acquisition and hardware-maintenance cost for the MFI; limited
+functionality; absolute dependence on a data SIM card; no advanced GPS tracking.
+
+Confidential — Internal Working Document
+
+Page 3 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+B — Local Fintech Smartphone Apps (e.g., Smobilpay, Blucash)
+
+Android mobile applications connected to Bluetooth mini-printers.
+Advantages: Flexible and field-adapted (offline mode often available); reduced hardware
+cost (the agent can use their own smartphone).
+Disadvantages: Often disconnected from the MFI’s accounting system (requires catch-up
+data entry); escrow management still very manual or limited to a single banking partner.
+C — Direct USSD Channels from Telecom Operators (Push & Pull / Mobile Money)
+
+The client saves on their own by dialing a code (e.g., *126# or *150#) from their own
+phone.
+Advantages: Zero risk of physical cash theft; no field-agent logistics required; 24/7 availability.
+Disadvantages: High transaction fees charged by operators (MTN/Orange) that discourage
+small daily savings; dehumanization of the relationship (market merchants prefer the daily
+visit of a trusted human collector).
+Summary Comparison
+
+Technology
+
+Cost for MFI
+
+Cash Security
+
+Customer Experience
+
+Medium
+POS
+
+High
+
+Excellent
+
+(cash transported)
+
+(paper)
+
+Medium
+
+Good
+
+Mobile
+Apps
+
+Fintech
+
+Low
+
+(cash transported)
+
+(SMS + Bluetooth)
+
+Partial
+
+Medium
+
+Absolute
+
+Weak
+
+USSD /
+Money
+
+Mobile
+
+Good
+
+(fees)
+
+(0 cash)
+
+(complex/isolated)
+
+(API)
+
+Dedicated
+Terminal
+
+System Integration
+Limited
+
+Table 2: Comparative Summary of Current Collection Technologies
+
+MICROFI’s Unique Positioning (Value Proposition)
+The PK Fokam Research Center’s solution positions itself as a third-generation hybrid
+platform. It does not choose between the human touch and digital efficiency — it merges
+the best of all three worlds.
+
+Confidential — Internal Working Document
+
+Page 4 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+USSD / Mobile Money
+Cash Security
+
+YOUR POSITIONING: MICROFI
+Human + Security + Multi-Bank
+
+Dedicated
+POS Terminals
+Paper-Based Trust
+
+Mobile Fintech Apps
+Android Flexibility
+
+Your competitive advantage rests on three pillars of disruption:
+PILLAR 1
+
+“Zero-Cash” for the Institution via the Universal Escrow Wallet — Unlike classic fintechs
+that merely digitize the receipt, MICROFI uses the GIMAC switch and partner banks to lock
+guarantees in a fully digital way. The MFI is covered against fraud before the agent even
+begins their route.
+PILLAR 2
+
+Total Agnosticism (Multi-Tenant & Multi-Bank) — The solution is not locked into a single
+operator or bank. It offers a standardized technical layer sellable to any MFI (Category 1 or
+2), guaranteeing the institution’s full sovereignty over its data.
+PILLAR 3
+
+Absolute Operational Control (Strict Tracking & Denomination Breakdown) — By natively integrating intelligent GPS tracking (NFR-09) and a mandatory full denomination
+breakdown from 500 XAF upward (FR-08), MICROFI gives risk managers a level of control never achieved by competing solutions.
+
+3. Definition of the Target Process (TO-BE)
+
+Vision of the Digitized Process
+The target process (TO-BE) introduces the MICROFI platform, built around secure mobile
+terminals (TPU) and a centralized Back-Office portal. The objective is to eliminate paper,
+automate cash controls, and interface field operations in real time with the MFI’s central
+system.
+
+Modeling of the “To-Be” Process (Digital Workflow)
+The collection cycle is fully secured and streamlined:
+
+Confidential — Internal Working Document
+
+Page 5 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+★ MORNING
+
+Biometric or PIN login by the agent on the TPU. Automatic verification of the digital escrow
+(Digital Escrow Engine). If the escrow ceiling has been reached, the terminal blocks any new
+collection until a deposit has been made.
+★ FIELD
+
+Client QR-code scan or instant lookup. Entry of the amount and mandatory denomination
+breakdown (BEAC breakdown: 10k, 5k, 2k, 1k, 500F, and coins). Immediate printing of the
+thermal receipt via Bluetooth.
+★ EVENING — DIGITAL CASH DESK / OFJ
+
+Data synchronization. The cashier enters the physical amounts counted by denomination;
+the system instantly calculates the variance (∆ = Physical − Digital). One-click validation
+and automatic posting into the CBS.
+
+Impact Matrix of Changes per Actor
+
+Actor
+
+Impact on daily work (As-Is → To-Be)
+
+Main gain
+
+Collection Agent
+
+Replacement of the paper passbook with
+a rugged Android terminal. Mandatory
+structured data entry.
+
+Elimination of calculation errors, speed,
+and offline autonomy.
+
+Branch Cashier
+
+End of blind counting and manual passbook reconciliation. Batch digital validation.
+
+Reduction of end-of-day closing time
+from several hours to some few minutes.
+
+Branch Manager
+
+Live tracking of routes via geolocation
+and oversight of outstanding escrow balances.
+
+Complete control over fraud risk and
+mandate overruns.
+
+Client (Member)
+
+Paper passbook replaced by digital profile + QR card. Can consult balance and
+contribution history on smartphone (or
+USSD). Annual digital booklet renewal
+via agent.
+
+Real-time visibility of savings, elimination
+of lost/damaged paper booklets, continuous proof of deposits.
+
+Table 3: Change Impact Matrix
+
+Definition of Business Rules
+BR-01
+
+Cash Variance Calculation / Digital Cash Desk — The variance ∆ is calculated automatically by the system during the evening reconciliation. Any negative variance (∆ < 0) blocks
+session closing and immediately generates an audit ticket for internal control.
+
+Confidential — Internal Working Document
+
+Page 6 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+BR-02
+
+Denomination Breakdown Rules — Entry of the denomination breakdown (10,000, 5,000,
+2,000, 1,000, 500 XAF, and coins) is mandatory for any deposit above a defined threshold.
+The sum of the breakdown must strictly match the total amount entered.
+BR-04
+
+Digital Booklet Tokenization & Agent-Sponsored Activation — Existing MFI members
+shall activate their mobile profile using a temporary Activation ID issued by the Core Banking
+System. Activation (and annual renewal) requires sponsorship by a registered Field Agent
+and payment of a configurable fee that is automatically split between the agent (commission)
+and the MFI. The resulting digital access token is valid for 365 days. Upon expiry the mobile
+profile enters a read-only state (balances remain visible; transactional operations are locked)
+until renewed. The system shall never create new customer records inside the Core Banking
+System.
+BR-05
+
+Mandatory GPS for Collection — No collection transaction shall be initiated or validated if
+the agent terminal does not have an active GPS/location service providing a current fix. If
+GPS is disabled, denied by the operating system, or unable to produce a valid position, the
+mobile application shall block the collection flow and display a clear message requiring the
+agent to enable location services. Network-based approximate location alone is not sufficient
+to authorize a new collection.
+
+Confidential — Internal Working Document
+
+Page 7 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+4. Business & Technical Requirements Specification
+
+Detailed Functional Requirements (FR)
+The matrix below details the complete set of functional requirements identified for the
+MICROFI platform, organized by functional module. All requirements are listed here in
+full; MVP scoping and release prioritization will be addressed separately in a subsequent,
+dedicated feature-priority matrix.
+
+MODULE 1 — Profile Management & Access Security
+
+FR-01
+
+Single Sign-On Authentication — The system shall authenticate the field agent via a unique
+identifier tied to the hardware address (IMEI) of their smartphone.
+FR-02
+
+Admin Enrollment — The MFI administrator shall be able to create, modify, suspend, or
+delete an agent’s profile from the central console.
+
+MODULE 2 — Escrow & Financial Lock Management
+
+FR-03
+
+Multi-Bank Top-Up — The system shall allow the agent’s escrow Wallet to be topped up via
+Mobile Money (Orange/MTN) or interbank transfer (GIMAC).
+FR-04
+
+Dynamic Lockout — The system shall automatically block entry of new transactions as soon
+as the cumulative cash collected reaches the active escrow amount.
+FR-05
+
+Exceptional Adjustment — The administrator shall be able to temporarily modify an agent’s
+collection ceiling remotely during the course of the day.
+
+MODULE 3 — Collection Operations & Proof of Deposit
+
+Confidential — Internal Working Document
+
+Page 8 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+FR-06
+
+Multi-Method Client Identification — The agent shall be able to identify a client through
+all supported identification channels defined by the business process: QR-Code scanning
+from the membership card/passbook, manual entry of the client identifier, search by registered phone number, and assisted search using client information available in the customer
+registry (name or reference data). The system shall return a unique client profile before any
+collection transaction is initiated.
+FR-07
+
+Offline Mode — The mobile application shall allow secure local recording of collections in
+areas without network coverage.
+FR-08
+
+Full Denomination Breakdown — The system shall require the agent to enter the physical breakdown of all BEAC denominations without exception (500, 1,000, 2,000, 5,000,
+10,000 XAF), plus a single aggregate entry line for coins.
+FR-09
+
+Multi-Channel Notification — Upon validation, the system shall trigger a Flash SMS to the
+client and allow printing of a receipt via a Bluetooth printer.
+
+MODULE 4 — Field Tracking & Security
+
+FR-10
+
+Real-Time Geolocation — The system shall capture and send the agent’s GPS coordinates
+to the MFI Back-Office at regular intervals (e.g., every 5 minutes) while the application is
+active.
+FR-11
+
+Route Mapping — The administrator Back-Office shall display each agent’s historical daily
+route on a dynamic map to verify actual coverage of assigned markets.
+FR-12
+
+Transaction Timestamping & Mandatory Geotagging — For each deposit collected, the
+system shall invisibly record the precise GPS coordinates and UTC timestamp of the transaction location. Collection is forbidden unless GPS/location services are active and a valid
+fix is available (see BR-05). The geotag is non-editable by the agent.
+FR-13
+
+Active Geofencing Alert — The system shall generate an immediate visual alert on the
+administrator console if an agent conducts a transaction or moves outside their assigned
+perimeter (market/district).
+
+Confidential — Internal Working Document
+
+Page 9 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+FR-14
+
+Distress / SOS Button — The mobile application shall include a discreet emergency button
+allowing the agent, in case of assault, to instantly send their exact GPS position via SMS and
+Internet to their branch administrator.
+
+MODULE 5 — End-of-Day Closing (OFJ) & Reporting
+
+FR-15
+
+Dynamic Schedule Management — The administrator shall be able to configure session
+opening and closing time windows tailored to each branch.
+FR-16
+
+End-of-Day Reconciliation — The system shall provide a reconciliation interface between
+the physical cash declared via denomination breakdown and the application’s accounting
+total.
+FR-17
+
+Variance Regularization — The system shall allow the administrator to record a cash variance as an “agent debt” on their profile.
+FR-18
+
+Core Banking Export — The system shall generate a daily entries file compatible with major
+Core Banking software (Amplitude, FinanSoft).
+
+MODULE 6 — Client Digital Activation, Profile & Self-Service (Digital Booklet)
+
+FR-19
+
+Tokenized Digital Activation & Annual Renewal (Digital Booklet) — The system shall
+enable existing MFI members to activate (and annually renew) their mobile profile using a
+temporary Activation ID issued by the Core Banking System. Activation requires sponsorship
+by a registered Field Agent and payment of a configurable fee that is automatically split
+between the agent (commission) and the MFI. Upon successful payment the system issues
+a digital access token valid for 365 days. When the token expires the profile enters a readonly state (balances remain visible; transactional operations from the mobile application are
+locked) until a new agent-sponsored renewal occurs. The system shall never create new
+customer records inside the Core Banking System; non-members are redirected to physical
+branch/agent registration.
+FR-20
+
+Client Profile Consultation — Once activated, the client shall be able to view and consult
+his/her personal profile on the mobile application: full name, membership number, photo (if
+available), registered phone number, assigned branch, activation/renewal status and token
+
+Confidential — Internal Working Document
+
+Page 10 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+expiry date.
+FR-21
+
+Account Balance & Summary — The client shall be able to consult in real time (or last
+synchronized) the current balance of his/her savings account(s), the cumulative amount
+collected year-to-date, and a high-level account summary. Balance visibility remains available even when the digital token is expired (read-only mode).
+FR-22
+
+Contribution History & Mini-Statement — The client shall be able to consult the chronological history of his/her contributions (date, amount, agent reference, location if available)
+with filtering by period. A short mini-statement of the last N transactions shall also be accessible via USSD or Flash SMS for clients using basic feature phones.
+
+User Stories & Use Cases
+For each functional requirement, a corresponding user story (in standard Agile format)
+and a structured use-case description are provided below. Use cases follow a consistent
+template: ID, Name, Actors, Objectives, Preconditions, Postconditions, Nominal Scenario, Alternative Scenarios, and Business Rules.
+
+MODULE 1 — Profile Management & Access Security
+
+FR-01 — Single Sign-On Authentication
+User Story (US-01): As a Collection Agent, I want to authenticate on the TPU using a unique
+identifier bound to the device IMEI so that only authorized terminals can access collection functions and unauthorized devices are blocked.
+UC-01
+
+Name: Agent Authentication via IMEI-bound SSO
+Actors: Collection Agent (primary), System
+Objectives: Authenticate the agent securely and bind the session to the enrolled hardware
+terminal.
+Preconditions: The agent’s profile has been enrolled by an Administrator; the device IMEI
+is registered; the agent has a valid PIN or biometric credential.
+Postconditions: A secure session is opened; the agent can access authorized modules; an
+audit log entry is created.
+Nominal Scenario:
+1. Agent launches the MICROFI mobile application.
+2. System reads the device IMEI and prompts for PIN/biometric.
+3. Agent enters credentials.
+
+Confidential — Internal Working Document
+
+Page 11 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+4. System validates IMEI against the enrolled terminal and credentials against the agent
+profile.
+5. System opens a session and displays the main collection dashboard.
+Alternative Scenarios:
+• A1 — Unknown IMEI: System rejects login and displays “Device not enrolled”. Agent
+contacts Administrator.
+• A2 — Invalid credentials: After 3 failed attempts the account is temporarily locked; Administrator is notified.
+• A3 — Offline authentication: System validates against locally cached credentials (encrypted) and marks the session for later online verification.
+Business Rules: BR-Auth-01: Session lifetime is limited to the configured working window (see FR-15). BR-Auth-02: IMEI binding is mandatory; no soft-login without hardware
+association.
+FR-02 — Admin Enrollment
+User Story (US-02): As a System Administrator, I want to create, modify, suspend or delete
+agent profiles from the central console so that only authorized personnel can operate collection
+terminals.
+UC-02
+
+Name: Agent Profile Enrollment & Lifecycle Management
+Actors: System Administrator (primary), Branch Manager (secondary)
+Objectives: Maintain an accurate and secure registry of collection agents and their assigned
+terminals.
+Preconditions: Administrator is authenticated on the Back-Office; the target branch exists.
+Postconditions: Agent profile is created/updated/suspended; associated terminal (IMEI) is
+linked or unlinked; change is audited.
+Nominal Scenario:
+1. Administrator navigates to Agent Management.
+2. Administrator fills agent identity, role, branch assignment, escrow guarantee reference
+and device IMEI.
+3. System validates uniqueness of identifier and IMEI.
+4. Administrator confirms; system creates the profile and activates the terminal.
+5. Confirmation notification is sent to the agent (optional SMS).
+Alternative Scenarios:
+• A1 — Duplicate IMEI: System rejects and displays existing assignment; Administrator
+must first unbind the previous agent.
+• A2 — Suspension: Administrator selects “Suspend”; system immediately invalidates active
+sessions on that terminal.
+• A3 — Deletion: Soft-delete only; historical transactions remain linked for audit.
+Business Rules: BR-Enroll-01: Only Administrators with “Agent Management” privilege can
+perform CRUD. BR-Enroll-02: An agent cannot be deleted while open sessions or unresolved
+variances exist.
+
+Confidential — Internal Working Document
+
+Page 12 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+MODULE 2 — Escrow & Financial Lock Management
+
+FR-03 — Multi-Bank Top-Up
+User Story (US-03): As a Collection Agent (or Administrator), I want to top up my digital escrow
+wallet via Mobile Money or interbank transfer so that I can increase my authorized collection
+ceiling without returning to the branch.
+UC-03
+
+Name: Escrow Wallet Top-Up (Multi-Channel)
+Actors: Collection Agent, Administrator, Payment Gateway (GIMAC / Mobile Money)
+Objectives: Increase the agent’s available escrow balance securely and in near real-time.
+Preconditions: Agent profile is active; at least one payment channel is configured for the
+MFI.
+Postconditions: Escrow balance is increased; lockout threshold is updated; transaction is
+logged and visible on Back-Office.
+Nominal Scenario:
+1. Agent (or Admin) initiates top-up from the Wallet screen.
+2. Agent selects channel (Orange Money, MTN MoMo, or GIMAC transfer) and enters
+amount.
+3. System generates a payment reference and redirects or displays USSD/instructions.
+4. Payment provider confirms the transfer.
+5. System credits the escrow wallet and raises the collection ceiling.
+Alternative Scenarios:
+• A1 — Payment failure: System leaves balance unchanged and notifies the agent; retry is
+possible.
+• A2 — Offline initiation: Request is queued; credit is applied only after successful online
+confirmation.
+• A3 — Manual cashier top-up (MVP fallback): Cashier records a physical deposit; Administrator validates and credits the wallet.
+Business Rules: BR-Escrow-01: Top-up amounts must be positive and within configured
+limits. BR-Escrow-02: Full multi-bank automation is backlog; MVP supports single-channel
++ manual recording.
+FR-04 — Dynamic Escrow Lockout
+User Story (US-04): As a Risk Manager / System, I want the terminal to automatically block new
+collections once the cumulative cash reaches the active escrow amount so that the MFI is never
+exposed beyond the agent’s guarantee.
+UC-04
+
+Name: Automatic Collection Lockout on Escrow Exhaustion
+Actors: System (primary), Collection Agent
+
+Confidential — Internal Working Document
+
+Page 13 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Objectives: Prevent collection beyond the agent’s financial guarantee in real time.
+Preconditions: Agent is authenticated; an active escrow balance exists; a collection transaction is being initiated.
+Postconditions: If cumulative cash ≥ escrow, further collections are blocked until a deposit
+or top-up occurs; agent is notified.
+Nominal Scenario:
+1. Agent attempts to start a new collection.
+2. System calculates current cumulative collected amount for the day.
+3. System compares against remaining escrow balance.
+4. If remaining escrow > 0, collection proceeds; otherwise system displays lockout message
+and disables the collection button.
+Alternative Scenarios:
+• A1 — Partial remaining balance: System allows collection only up to the residual escrow
+amount.
+• A2 — Concurrent top-up: If a top-up is confirmed while locked, the lock is released automatically.
+Business Rules: BR-03 (from main document) applies. BR-Lock-01: Lockout is enforced
+both online and offline using the last synchronized escrow value.
+FR-05 — Exceptional Ceiling Adjustment
+User Story (US-05): As a Branch Manager or Administrator, I want to temporarily raise an agent’s
+collection ceiling remotely so that exceptional high-volume days can be handled without forcing
+the agent to interrupt the route.
+UC-05
+
+Name: Remote Temporary Escrow Ceiling Override
+Actors: Branch Manager / Administrator (primary), System
+Objectives: Grant a temporary, audited increase of the collection ceiling.
+Preconditions: Manager has the privilege; agent is active; justification can be recorded.
+Postconditions: Temporary ceiling is applied for the current day (or configured duration);
+original ceiling is restored automatically; change is fully audited.
+Nominal Scenario:
+1. Manager opens the agent’s live status on the Back-Office.
+2. Manager selects “Adjust Ceiling”, enters new temporary amount and reason.
+3. System validates privilege and records the override.
+4. New ceiling is pushed to the agent’s terminal (or applied on next sync).
+5. Agent receives a notification that the ceiling has been raised.
+Alternative Scenarios:
+• A1 — Insufficient privilege: Request is rejected; only Risk Director or designated roles can
+approve large increases.
+
+Confidential — Internal Working Document
+
+Page 14 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+• A2 — Expiry: At end of configured window the original ceiling is restored and any excess
+is locked.
+Business Rules: BR-Adj-01: Every override must carry a free-text justification. BR-Adj-02:
+Maximum temporary increase is limited by MFI policy (configurable).
+
+MODULE 3 — Collection Operations & Proof of Deposit
+
+FR-06 — Multi-Method Client Identification
+User Story (US-06): As a Collection Agent, I want to identify a client by QR code, client ID,
+phone number or name search so that I can quickly and accurately select the correct account
+even when the client has no physical card.
+UC-06
+
+Name: Multi-Channel Client Lookup
+Actors: Collection Agent (primary), System
+Objectives: Retrieve a unique, verified client profile before any collection is recorded.
+Preconditions: Agent is authenticated; client registry is available (online or cached).
+Postconditions: A single client profile is selected and locked for the transaction; any ambiguity is resolved before amount entry.
+Nominal Scenario:
+1. Agent chooses identification method (QR scan, manual ID, phone, or name search).
+2. System queries the registry (local cache first if offline).
+3. System returns matching profile(s).
+4. Agent confirms the unique client; system proceeds to amount entry.
+Alternative Scenarios:
+• A1 — Multiple matches: System displays a disambiguation list (name + phone + photo if
+available); agent must select one.
+• A2 — No match: System allows creation of a provisional client record (if policy permits)
+or aborts the collection.
+• A3 — Offline incomplete registry: System searches only the locally cached subset and
+warns that results may be incomplete.
+Business Rules: BR-ID-01: A collection cannot be validated without a resolved unique
+client. BR-ID-02: All identification attempts are logged for audit.
+FR-07 — Offline Collection Mode
+User Story (US-07): As a Collection Agent, I want to record collections securely even when there
+is no network coverage so that market operations are never interrupted by connectivity issues.
+UC-07
+
+Name: Secure Offline Collection Recording
+Actors: Collection Agent, System (local encrypted store)
+
+Confidential — Internal Working Document
+
+Page 15 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Objectives: Persist collection data locally with integrity and confidentiality until connectivity is restored.
+Preconditions: Agent is authenticated; local encrypted storage is initialized; sufficient device storage remains; GPS/location services are enabled and a valid fix is available (BR05).
+Postconditions: Transaction is stored encrypted on device; marked as “pending sync”; appears in the agent’s local history.
+Nominal Scenario:
+1. Agent performs a collection while offline.
+2. System writes the full transaction (client, amount, denomination breakdown, GPS, timestamp) to the encrypted local store.
+3. System updates local cumulative totals and remaining escrow.
+4. Agent receives visual confirmation that the transaction is saved offline.
+Alternative Scenarios:
+• A1 — Storage full: System refuses new offline transactions and prompts the agent to
+move to a coverage area to sync.
+• A2 — GPS disabled or no fix: System blocks the collection flow and requires the agent to
+enable location services (BR-05); no offline record is written.
+• A3 — Connectivity restored: Background sync uploads pending transactions in chronological order; conflicts are flagged for Administrator review.
+Business Rules: NFR-01 (AES-256) applies. BR-05 (mandatory GPS). BR-Off-01: Offline
+transactions inherit the last known escrow ceiling. BR-Off-02: Sync is automatic and nonblocking (NFR-08).
+FR-08 — Full Denomination Breakdown
+User Story (US-08): As a Collection Agent / Risk Officer, I want every deposit above the threshold
+to require a complete BEAC denomination breakdown so that counterfeit notes can be traced and
+cash variance is minimized.
+UC-08
+
+Name: Mandatory Denomination Breakdown Entry
+Actors: Collection Agent (primary), System
+Objectives: Capture the exact physical composition of the cash received.
+Preconditions: Client is identified; amount to collect is known; amount exceeds the configured threshold.
+Postconditions: Breakdown is recorded; sum of denominations equals the declared total;
+transaction can proceed to validation.
+Nominal Scenario:
+1. System presents the denomination grid (10 000, 5 000, 2 000, 1 000, 500 XAF + coins
+aggregate).
+2. Agent enters quantity for each denomination.
+3. System calculates the implied total in real time.
+
+Confidential — Internal Working Document
+
+Page 16 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+4. Agent confirms; system verifies equality with the declared amount and stores the breakdown.
+Alternative Scenarios:
+• A1 — Sum mismatch: System blocks validation and highlights the discrepancy until corrected.
+• A2 — Below threshold: Breakdown is optional; agent may skip.
+Business Rules: BR-02 (main document) applies. BR-Denom-01: Coins are entered as a
+single aggregate value. BR-Denom-02: Breakdown is mandatory for BEAC traceability.
+FR-09 — Multi-Channel Notification
+User Story (US-09): As a Client / Collection Agent, I want an immediate Flash SMS and an
+optional Bluetooth thermal receipt after each validated deposit so that both parties have instant
+proof of the transaction.
+UC-09
+
+Name: Post-Validation Multi-Channel Notification
+Actors: System, SMS Gateway, Bluetooth Printer, Client, Collection Agent
+Objectives: Deliver instantaneous, multi-channel confirmation of a successful collection.
+Preconditions: Transaction has been validated; client phone number is known (for SMS);
+printer is paired (for paper).
+Postconditions: SMS is queued/sent; receipt is printed (if requested); notification status is
+logged.
+Nominal Scenario:
+1. Transaction is validated.
+2. System composes Flash SMS with amount, date, agent reference and new balance (if
+available).
+3. System sends SMS via gateway and, if printer is available, formats and prints the thermal
+receipt.
+4. Agent and client receive confirmation.
+Alternative Scenarios:
+• A1 — SMS failure: Transaction remains valid; SMS is retried later; agent is informed.
+• A2 — No printer: Only SMS is sent; agent can later reprint from history.
+• A3 — Offline: Notifications are queued and dispatched on next successful sync.
+Business Rules: NFR-05 (15 s latency target) applies when online. BR-Notif-01: Receipt
+content must include mandatory legal mentions (MFI name, amount, date, agent ID).
+
+Confidential — Internal Working Document
+
+Page 17 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+MODULE 4 — Field Tracking & Security
+
+FR-10 — Real-Time Geolocation
+User Story (US-10): As a Branch Manager, I want the agent’s GPS position to be sent at regular intervals while the application is active so that I can monitor field coverage and react to
+anomalies.
+UC-10
+
+Name: Periodic GPS Position Reporting
+Actors: System (mobile), Back-Office, Branch Manager
+Objectives: Maintain an up-to-date location trail of active agents.
+Preconditions: Agent session is open; location permissions granted; tracking is within configured service hours (NFR-10).
+Postconditions: Position points are stored and visible on the Back-Office map; historical
+trail is available.
+Nominal Scenario:
+1. While the app is in foreground (or allowed background), the system samples GPS/GSM
+location every 5 minutes.
+2. Location + timestamp + agent ID are sent to the server (or queued offline).
+3. Back-Office updates the agent’s live marker.
+Alternative Scenarios:
+• A1 — Location services disabled: System prompts the agent and may restrict further collections according to policy.
+• A2 — Outside service hours: Tracking is automatically suspended (NFR-10).
+Business Rules: NFR-09 (battery optimization) and NFR-10 apply. BR-Geo-01: Sampling
+interval is configurable per MFI.
+FR-11 — Route Mapping
+User Story (US-11): As a Branch Manager, I want to view each agent’s historical daily route on
+a dynamic map so that I can verify that assigned markets were actually covered.
+UC-11
+
+Name: Historical Route Visualization Dashboard
+Actors: Branch Manager / Administrator (primary), System
+Objectives: Reconstruct and display the chronological path followed by an agent on a given
+day.
+Preconditions: Geolocation points have been recorded for the selected agent and date.
+Postconditions: Map is rendered with the route polyline, transaction markers and time
+stamps.
+Nominal Scenario:
+1. Manager selects agent and date on the Tracking dashboard.
+2. System retrieves ordered GPS points and associated transactions.
+
+Confidential — Internal Working Document
+
+Page 18 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+3. Map displays the route; clicking a point shows time and nearby transactions.
+Alternative Scenarios:
+• A1 — Sparse data: System interpolates or warns that coverage is incomplete.
+• A2 — No data: Message “No tracking data for this period” is shown.
+Business Rules: BR-Route-01: Only managers of the agent’s branch (or higher) can view
+the route. Data retention follows MFI policy.
+FR-12 — Transaction Timestamping & Geotagging
+User Story (US-12): As a Risk Officer / Auditor, I want every deposit to be possible only when
+GPS is active and to be invisibly stamped with precise coordinates and timestamp so that fraudulent or unlocated collections cannot occur.
+UC-12
+
+Name: Mandatory GPS Gate & Invisible Transaction Geotagging
+Actors: System (automatic), Collection Agent
+Objectives: Ensure every collection is authorized only when GPS is active, and attach immutable location and time metadata to every validated deposit.
+Preconditions: Agent attempts to start or validate a collection; GPS/location services must
+be enabled with a valid current fix (BR-05).
+Postconditions: Either the collection is blocked with a clear GPS-required message, or the
+transaction record contains GPS coordinates (lat/lon), accuracy radius and UTC timestamp
+and is stored for sync.
+Nominal Scenario:
+1. Before collection entry (or at validation), the system verifies that location services are ON
+and a valid GPS fix is available.
+2. At validation the system captures the current GPS fix and UTC timestamp.
+3. Coordinates and timestamp are written into the transaction payload (non-editable by the
+agent).
+4. Data is stored locally (encrypted) and later synced.
+Alternative Scenarios:
+• A1 — GPS disabled / permission denied / no fix: System blocks the collection; no amount,
+denomination or client step proceeds until GPS is activated and a valid fix is obtained.
+• A2 — Fix coarse but valid: Collection is allowed; accuracy is stored and may be flagged if
+worse than the configured threshold (e.g. 50 m).
+Business Rules: BR-05 (mandatory GPS for collection). BR-GeoTag-01: Geotag is mandatory and non-editable by the agent. BR-GeoTag-02: Accuracy better than 50 m is preferred;
+coarser but valid fixes are accepted and marked.
+FR-13 — Active Geofencing Alert
+User Story (US-13): As a Branch Manager, I want an immediate visual alert when an agent
+conducts a transaction or moves outside the assigned market/district perimeter so that I can
+intervene quickly.
+
+Confidential — Internal Working Document
+
+Page 19 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+UC-13
+
+Name: Real-Time Geofence Breach Alert
+Actors: System, Branch Manager
+Objectives: Detect and notify out-of-zone activity in near real time.
+Preconditions: Agent has an assigned geofence (market/district polygon); tracking is active.
+Postconditions: Alert appears on the Administrator console; event is logged; optional
+SMS/push to Manager.
+Nominal Scenario:
+1. System continuously evaluates agent position against the assigned polygon.
+2. On exit (or on transaction outside the zone) an alert event is generated.
+3. Back-Office displays a prominent visual alert with agent name, time and map snapshot.
+Alternative Scenarios:
+• A1 — Brief excursion: Configurable grace period (e.g. 2 min) before alert is raised.
+• A2 — Agent returns: Alert is auto-cleared or marked as resolved.
+Business Rules: BR-Fence-01: Geofences are defined per agent or per route by the Administrator. BR-Fence-02: Alerts are retained for audit even after resolution.
+FR-14 — Distress / SOS Button
+User Story (US-14): As a Collection Agent, I want a discreet emergency button that instantly
+sends my exact GPS position to the branch administrator so that help can be dispatched in case
+of assault or threat.
+UC-14
+
+Name: Emergency SOS Activation
+Actors: Collection Agent (primary), Branch Manager / Administrator, System
+Objectives: Transmit an immediate, high-priority location alert without attracting attention.
+Preconditions: Agent is authenticated; SOS contacts are configured.
+Postconditions: SOS event with GPS is sent via SMS and Internet; Administrator receives
+visual + audible alert; event is logged as critical.
+Nominal Scenario:
+1. Agent activates the SOS control (long-press or discrete gesture).
+2. System immediately captures current GPS and device status.
+3. System sends SMS to predefined numbers and posts an urgent event to the Back-Office.
+4. Administrator console flashes a red SOS alert with map and contact options.
+Alternative Scenarios:
+• A1 — No network: SMS is still attempted (cellular); Internet event is queued.
+• A2 — False activation: Administrator can mark the alert as false positive; agent can cancel
+within a short window if the UI allows.
+Business Rules: BR-SOS-01: SOS cannot be disabled by the agent. BR-SOS-02: Activation
+is always logged, even if later cancelled.
+
+Confidential — Internal Working Document
+
+Page 20 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+MODULE 5 — End-of-Day Closing (OFJ) & Reporting
+
+FR-15 — Dynamic Schedule Management
+User Story (US-15): As a Branch Manager, I want to configure session opening and closing time
+windows per branch so that agents can only operate during authorized hours and GPS tracking
+respects privacy rules.
+UC-15
+
+Name: Branch Working-Hours Configuration
+Actors: Branch Manager / Administrator
+Objectives: Define and enforce the temporal boundaries of collection activity.
+Preconditions: Administrator has schedule-management privilege.
+Postconditions: Opening/closing times are stored; mobile app enforces the window; GPS
+tracking is automatically disabled outside the window (NFR-10).
+Nominal Scenario:
+1. Administrator opens Schedule Configuration for the branch.
+2. Administrator sets opening time, closing time and optional grace period.
+3. System saves the profile and pushes it to all agents of the branch.
+4. Outside the window the mobile app refuses new collections and stops tracking.
+Alternative Scenarios:
+• A1 — Agent attempts late collection: System blocks and displays “Outside authorized
+hours”.
+• A2 — Emergency override: Privileged role can temporarily extend the window for a specific agent.
+Business Rules: BR-Sched-01: Changes take effect on the next agent login or forced sync.
+BR-Sched-02: Historical schedule changes are retained for audit.
+FR-16 — End-of-Day Reconciliation
+User Story (US-16): As a Branch Cashier, I want a digital reconciliation interface that compares
+the physical cash I count (by denomination) with the application’s accounting total so that endof-day closing is fast, accurate and auditable.
+UC-16
+
+Name: Digital Cash Desk / OFJ Reconciliation
+Actors: Branch Cashier (primary), Collection Agent, System
+Objectives: Compute the variance between physical cash and digital records and close the
+day.
+Preconditions: All agents of the branch have synchronized their offline transactions; cashier
+is authenticated.
+Postconditions: Variance ∆ is calculated and displayed; session is closed if ∆ = 0 or after
+regularization; CBS export can be triggered.
+Nominal Scenario:
+
+Confidential — Internal Working Document
+
+Page 21 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+1. Cashier selects the agent (or branch aggregate) and opens the OFJ screen.
+2. System displays the digital total and expected denomination breakdown.
+3. Cashier enters the physical counts by denomination.
+4. System computes ∆ = Physical − Digital and highlights any difference.
+5. If ∆ = 0, cashier validates; system closes the session and prepares the accounting export.
+Alternative Scenarios:
+• A1 — Negative variance: System blocks automatic close and opens a variance ticket (links
+to FR-17).
+• A2 — Positive variance: System allows close with a surplus note; Manager is notified.
+Business Rules: BR-01 (main document) applies. BR-OFJ-01: Closing is impossible while
+pending offline transactions remain unsynchronized.
+FR-17 — Variance Regularization
+User Story (US-17): As a Branch Manager / Administrator, I want to record a cash variance as
+an “agent debt” on the agent’s profile so that shortages are tracked and can be recovered later.
+UC-17
+
+Name: Cash Variance Recording as Agent Debt
+Actors: Branch Manager / Administrator, System
+Objectives: Formalize and persist a shortage against the responsible agent.
+Preconditions: An OFJ reconciliation has produced a non-zero variance; Manager has regularization privilege.
+Postconditions: Debt amount is posted on the agent’s profile; OFJ can be closed; debt appears in subsequent reports until cleared.
+Nominal Scenario:
+1. From the OFJ screen the Manager selects “Record as Agent Debt”.
+2. System pre-fills the variance amount; Manager adds a comment and confirms.
+3. Debt is attached to the agent profile and the OFJ is allowed to close.
+4. Agent is notified (optional) of the recorded debt.
+Alternative Scenarios:
+• A1 — Partial recovery: Later, when the agent reimburses, a complementary transaction
+reduces the outstanding debt.
+• A2 — Write-off: Privileged role can write off the debt after formal approval workflow.
+Business Rules: BR-Var-01: Only negative variances (shortages) can be recorded as agent
+debt. BR-Var-02: Every debt entry is immutable and fully audited.
+FR-18 — Core Banking Export
+User Story (US-18): As a Branch Cashier / Accountant, I want the system to generate a daily
+entries file compatible with major Core Banking systems (Amplitude, FinanSoft, . . . ) so that
+collections are automatically posted without manual re-keying.
+
+Confidential — Internal Working Document
+
+Page 22 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+UC-18
+
+Name: Daily Accounting Export Generation
+Actors: Branch Cashier / System Administrator, System, Core Banking System
+Objectives: Produce a structured file (or API payload) containing all validated collections of
+the day ready for CBS import.
+Preconditions: OFJ for the day (or branch) has been successfully closed; export format is
+configured for the target CBS.
+Postconditions: Export file is generated and available for download or automatic transmission; export is logged.
+Nominal Scenario:
+1. After successful OFJ close, Cashier (or automated job) triggers “Generate CBS Export”.
+2. System aggregates all validated transactions, applies mapping rules, and produces the
+file (CSV, XML or proprietary format).
+3. File is stored in a secure download area or pushed via API.
+4. Cashier confirms receipt / successful import on the CBS side.
+Alternative Scenarios:
+• A1 — Mapping error: System aborts generation and lists the problematic records for
+correction.
+• A2 — Partial day export: Administrator can generate an interim export before final close
+(if policy allows).
+Business Rules: BR-Export-01: Only closed and validated sessions are included. BR-Export02: Export format is selectable per MFI tenant (multi-tenant architecture).
+
+MODULE 6 — Client Digital Activation & Tokenization (Digital Booklet)
+
+FR-19 — Tokenized Digital Activation & Annual Renewal
+User Story (US-19a — Field Agent): As a Field Agent, I want to sponsor the activation (or
+annual renewal) of an existing client’s digital profile by scanning my agent code and triggering
+the fee split, so that I receive my commission instantly and remain financially incentivized to
+migrate and retain clients on the mobile platform.
+User Story (US-19b — Existing Client): As an existing MFI member, I want to activate my
+mobile profile using the temporary Activation ID received at account opening and, after paying
+the digital booklet fee via an agent, obtain a one-year access token, so that I can stop relying on
+paper booklets while keeping my money fully accessible at the branch.
+UC-19
+
+Name: Tokenized Client Activation / Annual Renewal (Digital Booklet)
+Actors: Existing Client (primary), Field Agent (sponsor), System, Core Banking System
+Objectives: Securely migrate an existing paper-based member into the digital ecosystem,
+issue a time-limited access token, reward the sponsoring agent, and generate recurring revenue for the MFI while never creating new CBS records.
+
+Confidential — Internal Working Document
+
+Page 23 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Preconditions: Client possesses a valid temporary Activation ID issued by the CBS; Field
+Agent is authenticated on a registered terminal; activation/renewal fee amount is configured.
+Postconditions: Client profile is Active with a 365-day access token; fee is split (agent commission + MFI revenue) inside the CBS; temporary Activation ID is invalidated; audit trail
+is complete.
+Nominal Scenario (First Activation):
+1. Client installs the app and enters the temporary Activation ID received from the CBS.
+2. System queries the CBS; ID is valid. Client is prompted to create permanent credentials
+(PIN / password / biometric).
+3. Profile state is set to Inactive (Token Required). System displays the activation fee screen
+and requests Field Agent sponsorship.
+4. Field Agent scans the client’s device QR or enters Agent ID on the client’s screen.
+5. Client authorizes the fee (cash to agent, Mobile Money, or direct debit from savings with
+PIN confirmation).
+6. System sends split instruction to CBS: commission credited to Agent wallet, remainder to
+MFI Digital Operations account.
+7. System issues a 365-day cryptographic access token, toggles profile to Active, and displays
+success confirmation. Client can now use full mobile features.
+Nominal Scenario (Annual Renewal):
+1. On day 366 (or after grace period) the token expires. App enters read-only mode:
+balances remain visible; transactional operations are locked. Message: “Votre carnet
+numérique annuel est arrivé à expiration. Votre argent reste en sécurité. Veuillez contacter votre agent de collecte de confiance pour renouveler votre accès de proximité.”
+2. Client meets Field Agent; Agent sponsors the renewal fee (same split mechanism).
+3. System issues a new 365-day token and restores full transactional access.
+Alternative Scenarios:
+• A1 — Activation ID not found / invalid / expired: System displays “ID introuvable. Vous
+n’êtes pas encore inscrit dans nos registres. Veuillez vous rapprocher d’une agence ou
+d’un agent de collecte pour ouvrir votre compte.” No profile is created. User is returned
+to landing screen.
+• A2 — Profile already Active: System bypasses fee and redirects to normal login.
+• A3 — Grace period (days 366–380): Warning banner is shown but full features remain
+available; Agent is notified during market visits.
+• A4 — Payment failure: Activation remains blocked; fee is not split; client and agent are
+informed; retry is possible.
+• A5 — Agent not authenticated / invalid Agent ID: Sponsorship is rejected; activation cannot
+proceed.
+Business Rules: BR-04 applies in full. BR-Token-01: Money is never locked — only mobile transactional inputs are restricted. BR-Token-02: Renewal fee may be deducted from
+the client’s own savings after PIN confirmation (zero out-of-pocket option). BR-Token-03:
+Temporary Activation ID is single-use and destroyed after credential creation. BR-Token-04:
+Token validity and fee amounts are configurable per MFI tenant.
+
+Confidential — Internal Working Document
+
+Page 24 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+FR-20 — Client Profile Consultation
+User Story (US-20): As an activated Client, I want to consult my personal profile (name, membership number, phone, branch, token status and expiry) so that I always know the state of my
+digital booklet and can prove my membership when needed.
+UC-20
+
+Name: Client Profile Self-Service View
+Actors: Client (primary), System
+Objectives: Provide the client with a clear, always-available view of his/her identity and
+digital-booklet status.
+Preconditions: Client is authenticated (or in read-only mode after token expiry); profile has
+been activated at least once.
+Postconditions: Profile data is displayed; no modification is performed (consultation only).
+Nominal Scenario:
+1. Client opens the mobile application and authenticates (or lands in read-only mode).
+2. Client navigates to the “My Profile” / “Mon Profil” section.
+3. System retrieves and displays: full name, membership ID, registered phone, assigned
+branch, activation date, current token status and expiry date.
+4. Client can return to the dashboard or other self-service screens.
+Alternative Scenarios:
+• A1 — Offline: System displays last synchronized profile snapshot and clearly indicates
+that data may not be up to date.
+• A2 — Token expired: Profile remains fully visible; a prominent banner indicates that
+renewal is required for transactional features.
+Business Rules: BR-Client-01: Profile data is read-only for the client; only the MFI Administrator can modify identity attributes. BR-Token-01 still applies (money never locked).
+FR-21 — Account Balance & Summary
+User Story (US-21): As an activated Client, I want to see my current savings balance and yearto-date cumulative contributions so that I have continuous confidence that my money is safe and
+correctly recorded.
+UC-21
+
+Name: Client Account Balance & Summary Consultation
+Actors: Client (primary), System, Core Banking System (for live balance)
+Objectives: Give the client real-time (or near-real-time) visibility of his/her financial position.
+Preconditions: Client is authenticated or in read-only mode; at least one account is linked
+to the digital profile.
+Postconditions: Balance and summary figures are displayed; no debit or credit is performed.
+Nominal Scenario:
+1. Client opens the “My Account” / “Mon Compte” section.
+2. System queries the platform cache and, when online, the Core Banking System for the
+
+Confidential — Internal Working Document
+
+Page 25 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+current balance.
+3. System displays: current balance, cumulative deposits YTD, number of contributions, last
+contribution date and amount.
+4. Client can pull-to-refresh to force a live query when connectivity is available.
+Alternative Scenarios:
+• A1 — Offline: Last known balance is shown with a clear “Dernière synchronisation” timestamp.
+• A2 — Token expired: Balance remains visible (read-only). Transactional buttons are disabled.
+• A3 — CBS unreachable: System falls back to cached balance and notifies the client.
+Business Rules: BR-Client-02: Balance visibility is never blocked by token expiry. BR-Client03: Only positive, non-sensitive summary data is shown; full ledger remains on the MFI side.
+FR-22 — Contribution History & Mini-Statement
+User Story (US-22): As an activated Client, I want to consult the full history of my contributions
+(and receive a short mini-statement by USSD or SMS) so that I can replace the paper booklet
+pages with a reliable digital record.
+UC-22
+
+Name: Contribution History & Mini-Statement
+Actors: Client (primary), System
+Objectives: Reproduce and improve the proof-of-deposit function of the physical booklet.
+Preconditions: Client is authenticated or in read-only mode; contribution records exist.
+Postconditions: History list or mini-statement is displayed / sent; no data is modified.
+Nominal Scenario (Mobile App):
+1. Client opens the “History” / “Historique” section.
+2. System presents a chronological list of contributions (date, amount, agent code, optional
+location).
+3. Client can filter by period (last 7 / 30 / 90 days or custom range) and export or share a
+simple PDF/image summary if desired.
+Nominal Scenario (USSD / Feature Phone):
+1. Client dials the short code (e.g. *XXX#).
+2. System authenticates via registered phone number + optional PIN.
+3. System returns the last 5 contributions as a concise USSD menu or Flash SMS.
+Alternative Scenarios:
+• A1 — No history yet: Friendly empty-state message is shown.
+• A2 — Offline (app): Cached history is displayed with sync timestamp.
+• A3 — Token expired: Full history remains consultable; only new deposits are blocked.
+Business Rules: BR-Client-04: History is append-only from the client perspective. BR-Client05: USSD/SMS mini-statement is limited to the last N transactions (configurable, default 5)
+to respect message size and cost.
+
+Confidential — Internal Working Document
+
+Page 26 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+The user stories and use cases above are fully aligned with the functional requirements
+FR-01 to FR-22 and with the business rules already defined (BR-01 to BR-05) and the
+non-functional constraints (NFR-01 to NFR-12). They constitute the detailed behavioral
+specification that will guide both development and acceptance testing of the MICROFI
+MVP and subsequent releases. The Client Module (FR-19 to FR-22) elevates MICROFI
+from a pure agent collection tool to a complete digital booklet ecosystem that preserves
+agent incentives while giving members continuous visibility and proof of their savings.
+
+Detailed Non-Functional Requirements (NFR)
+SECURITY & REGULATORY COMPLIANCE
+
+NFR-01
+
+Data Encryption — All data stored locally on the agent’s smartphone in Offline mode shall
+be encrypted to the AES-256 standard.
+NFR-02
+
+COBAC & BEAC Compliance — The architecture shall comply with anti-money laundering
+(AML) and counter-terrorism financing (CFT) directives.
+NFR-03
+
+Personal Data Protection — The system shall store data in accordance with data protection
+legislation (secure hosting, restricted access).
+
+PERFORMANCE & USABILITY
+
+NFR-04
+
+Field Entry Time — The collection interface shall be optimized so that a complete transaction (identification + denomination breakdown) takes less than 30 seconds.
+NFR-05
+
+SMS Latency — The SMS gateway shall deliver the client notification within a maximum of
+15 seconds after validation (in a connected area).
+NFR-06
+
+Inclusive Visual Interface — The mobile application shall use clear color coding and explicit
+icons to remain usable by users with low literacy levels.
+
+Confidential — Internal Working Document
+
+Page 27 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+ROBUSTNESS & AVAILABILITY
+
+NFR-07
+
+Server Availability — The central Back-Office hosted in the Cloud shall maintain an availability rate of 99.9%.
+NFR-08
+
+Post-Outage Synchronization — Upon restoration of internet connectivity, the mobile application shall synchronize pending transactions transparently in the background, without
+blocking the agent.
+NFR-09
+
+Battery & GPS Optimization — The tracking module shall use a hybrid algorithm (GPS /
+GSM triangulation) to limit energy consumption and guarantee at least 8 continuous hours
+of field autonomy.
+NFR-10
+
+Privacy / Off-Duty Compliance — The agent’s GPS tracking shall technically and automatically deactivate outside the service hours configured by the MFI administrator.
+
+SCALABILITY & INTEROPERABILITY
+
+NFR-11
+
+Multi-Tenant Architecture — The platform shall be capable of hosting multiple MFIs in
+complete, fully partitioned isolation from one another.
+NFR-12
+
+API Agnosticism — The system shall provide an open API layer to easily interface with any
+payment aggregator or Core Banking system on the market.
+
+Operational RACI Matrix of the System
+This matrix defines governance and accountability within each MFI for the execution of the critical modules configured in the application.
+Legend: R = Responsible for the action, A = Approves (final accountable party), C = Consulted, I = Informed.
+
+Feature Priority Matrix & MVP Derivation
+With a hard production window of six (6) weeks, MICROFI cannot launch with all 18
+functional requirements at once. Rather than cutting scope subjectively, each FR is scored
+against four weighted criteria to produce an objective, defensible MVP boundary.
+
+Confidential — Internal Working Document
+
+Page 28 / 36
+
+MICROFI | Business Analysis v3.1
+
+Operational Activity
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Branch
+Manager
+(Admin)
+
+Collection
+Agent
+
+Risk Director
+/ CEO
+
+Technical
+Support (PK
+Fokam Ctr.)
+
+Agent profile creation & validation
+
+A/R
+
+I
+
+C
+
+C
+
+Dynamic schedule & OFJ configuration
+
+R
+
+I
+
+A
+
+C
+
+Collection ceiling modification
+
+R
+
+I
+
+A
+
+C
+
+Tracking alert handling (SOS / Out-of-Zone)
+
+A/R
+
+I
+
+C
+
+I
+
+Physical cash handover validation
+
+A/R
+
+R
+
+I
+
+I
+
+I
+
+I
+
+I
+
+A/R
+
+Corrective maintenance & API evolution
+
+Table 4: Operational RACI Matrix — System Modules
+Scoring Criteria & Weights
+• Criticality(C) (35%) — Business/risk impact if the feature is missing. 1 = nice-to-have; 5 =
+blocking or core to the value proposition.
+• Regulatory & Compliance Urgency(R) (15%) — Direct link to COBAC/BEAC obligations
+(traceability, LBA/FT, daily reconciliation). 1 = no regulatory link; 5 = directly mandated.
+• Development Speed(S) (30%) — Inverse of estimated effort. Given the 6-week ceiling, speed
+is weighted almost as heavily as criticality. 1 = >5 dev-days / multi-system integration; 5 =
+≤2 dev-days, self-contained.
+• Cost Efficiency() (20%) — Inverse of financial expenditure (external fees, licensing, gateways). 1 = high recurring external cost; 5 = negligible cost.
+Weighted Score = 0.35×Criticality+0.15×Compliance+0.30×Dev Speed+0.20×Cost Efficiency,
+each criterion rated 1–5.
+Decision Thresholds
+• Score ≥ 3.9 — MVP (V1.0), built within the 6-week window.
+• Score 3.0 – 3.89 — Fast-Follow (V1.1), immediately after MVP launch.
+• Score < 3.0 — Backlog (V2), revisited in a later release.
+Scored Requirements Matrix
+Effort is estimated in person-days for a single full-stack developer; C = Criticality, R = Regulatory Urgency, S = Dev
+Speed, $ = Cost Efficiency (all rated 1–5).
+
+ID
+
+Feature
+
+Effort
+
+C
+
+R
+
+S
+
+$
+
+Score
+
+Decision
+
+(days)
+
+FR-01
+
+Single Sign-On Authentication
+
+3
+
+5
+
+4
+
+4
+
+5
+
+4.55
+
+MVP
+
+FR-02
+
+Admin Enrollment (Agent
+CRUD)
+
+2
+
+5
+
+3
+
+5
+
+5
+
+4.70
+
+MVP
+
+Confidential — Internal Working Document
+
+Page 29 / 36
+
+MICROFI | Business Analysis v3.1
+
+ID
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Feature
+
+Effort
+
+C
+
+R
+
+S
+
+$
+
+Score
+
+Decision
+
+(days)
+
+FR-03
+
+Multi-Bank Top-Up
+
+6
+
+3
+
+2
+
+1
+
+2
+
+2.05
+
+Backlog*
+
+FR-04
+
+Dynamic Escrow Lockout
+
+2
+
+5
+
+4
+
+5
+
+5
+
+4.85
+
+MVP
+
+FR-05
+
+Exceptional Ceiling Adjustment
+
+2
+
+3
+
+2
+
+5
+
+5
+
+3.85
+
+Fast-Follow
+
+FR-06
+
+Multi-Method Client Identification (QR, ID, phone,
+registry search)
+
+3
+
+5
+
+4
+
+4
+
+5
+
+4.55
+
+MVP
+
+FR-07
+
+Offline Collection Mode
+
+5
+
+5
+
+3
+
+2
+
+4
+
+3.60†
+
+MVP†
+
+FR-08
+
+Full Denomination Breakdown
+
+3
+
+5
+
+5
+
+4
+
+5
+
+4.70
+
+MVP
+
+FR-09
+
+Multi-Channel Notification
+
+4
+
+4
+
+3
+
+3
+
+3
+
+3.35
+
+Fast-Follow
+MVP
+
+FR-10
+
+Real-Time Geolocation
+
+1
+
+4
+
+3
+
+5
+
+4
+
+4.15‡
+
+FR-11
+
+Route Mapping Dashboard
+
+4
+
+3
+
+2
+
+3
+
+3
+
+2.85
+
+Backlog
+
+FR-12
+
+Mandatory GPS + Geotagging
+
+1
+
+5
+
+5
+
+5
+
+5
+
+5.00
+
+MVP
+
+FR-13
+
+Active Geofencing Alert
+
+4
+
+3
+
+3
+
+3
+
+3
+
+3.00
+
+Fast-Follow
+
+FR-14
+
+Distress / SOS Button
+
+2
+
+5
+
+2
+
+5
+
+4
+
+4.35
+
+MVP
+
+FR-15
+
+Dynamic Schedule Management
+
+3
+
+4
+
+2
+
+4
+
+5
+
+3.90
+
+MVP
+
+FR-16
+
+End-of-Day Reconciliation
+
+4
+
+5
+
+5
+
+3
+
+4
+
+4.20
+
+MVP
+
+FR-17
+
+Variance Regularization
+
+2
+
+4
+
+3
+
+5
+
+5
+
+4.35
+
+MVP
+
+FR-18
+
+Core Banking Export
+
+3
+
+5
+
+4
+
+4
+
+4
+
+4.35
+
+MVP
+
+FR-19
+
+Tokenized Digital Activation (Digital Booklet)
+
+6
+
+5
+
+3
+
+2
+
+3
+
+3.40
+
+Fast-Follow
+
+FR-20
+
+Client Profile Consultation
+
+2
+
+4
+
+2
+
+5
+
+5
+
+4.05
+
+MVP
+
+FR-21
+
+Account Balance & Summary
+
+3
+
+5
+
+2
+
+4
+
+4
+
+4.05
+
+MVP
+
+FR-22
+
+Contribution History
+Mini-Statement
+
+3
+
+4
+
+2
+
+4
+
+4
+
+3.70
+
+Fast-Follow
+
+&
+
+Table 5: Feature Priority Matrix — All 22 Functional Requirements Scored
+
+*FR-03 backlog rating applies to the full multi-bank/interbank (GIMAC) automation. A minimal single-channel,
+cashier-recorded top-up ships bundled inside FR-04 at negligible extra cost, so escrow remains usable in V1.0.
+†
+
+FR-07 is promoted to MVP by architecture-dependency override, not by raw score alone — see note below.
+
+‡
+
+FR-10’s 1-day estimate covers basic periodic capture-and-send via native platform APIs (FusedLocationProviderClient /
+
+CLLocationManager) while the app is active. Hardening it to survive 8 hours of background execution across OEM battery
+restrictions is scoped under NFR-09 and refined post-launch.
+
+Confidential — Internal Working Document
+
+Page 30 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+ANALYST OVERRIDE NOTE
+
+FR-07 (Offline Collection Mode) scores below the 3.9 MVP threshold once Development
+Speed is factored in, because building reliable local encrypted storage and background sync
+takes real engineering time. However, offline capability is the architectural foundation the
+entire platform is built on — collection genuinely happens in low-connectivity markets, and
+FR-06 (all client identification channels), FR-08, and FR-12 all assume it. A purely mechanical score cannot be allowed to cut a load-bearing dependency; FR-07 is therefore forceincluded in MVP regardless of its numeric ranking. This is the one deliberate exception to
+the scoring model in this release.
+
+Resulting Scope: MVP (V1.0) vs Fast-Follow (V1.1) vs Backlog (V2)
+✓ MVP SCOPE — V1.0 (WEEKS 1–6)
+
+FR-01, FR-02, FR-04, FR-06, FR-07† , FR-08, FR-10‡ , FR-12, FR-14, FR-15, FR-16, FR-17,
+FR-18, FR-20, FR-21
+Single sign-on, agent enrollment, escrow-based lockout, multi-method client identification, offline
+mode, full denomination breakdown, basic real-time GPS, transaction geotagging, SOS button,
+schedule management, end-of-day reconciliation, variance regularization, Core Banking export, plus
+Client Profile consultation and Account Balance view — the complete Digital Cash Desk loop with
+essential client self-service visibility.
+✍ FAST-FOLLOW — V1.1 (IMMEDIATELY POST-LAUNCH)
+
+FR-05, FR-09, FR-13, FR-19, FR-22
+Remote ceiling override, SMS/Bluetooth notification polish, active geofencing alerts, Tokenized Digital Activation / Digital Booklet (agent-sponsored activation + annual renewal + commission split),
+and Contribution History / USSD mini-statement. Also includes the NFR-09 hardening pass for 8hour background GPS tracking. These features complete the client digital booklet experience and
+strengthen agent incentives.
+✗ BACKLOG — V2
+
+FR-03 (full multi-bank/interbank top-up automation), FR-11 (route-mapping dashboard)
+Consistent with the earlier out-of-scope items already identified (real-time Mobile Money gateways,
+predictive ML fraud detection, dedicated client app, automated multi-switch GIMAC integration).
+
+Capacity check: The MVP scope represents approximately 33 person-days of functional
+development, plus an estimated 8–10 person-days for baseline security and compliance
+implementation (NFR-01–03, treated as non-negotiable regardless of scoring), integration, and quality assurance.
+The project is executed by a single full-stack developer supported by AI-assisted development tools, automated code generation, and productivity-enhancement workflows.
+Over a 6-week development window, this approach provides an estimated effective capacity of around 60 person-days, allowing coverage of the approximately 41–43 person-day
+MVP effort while maintaining a reasonable buffer for testing, debugging, integration challenges, and technical adjustments.
+
+Confidential — Internal Working Document
+
+Page 31 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Alignment with the Institution’s S.M.A.R.T. Objectives
+The adoption of the MICROFI platform allows partner MFIs to achieve precise, measurable objectives:
+• Specific — Fully digitize the proximity collection cycle and branch-level reconciliation.
+• Measurable — Reduce counterfeit-note disputes by 90% and bring the end-of-day reconciliation time down to under 15 minutes.
+• Achievable — Through a hybrid (offline-first) architecture adapted to the realities of
+both Category 1 and Category 2 networks.
+• Realistic — Designed specifically for the regulatory and operational context of the
+CEMAC zone.
+• Time-bound — MVP built within a 6-week production window and deployed in a pilot
+phase before broader rollout.
+
+5. Conclusion
+The analysis conducted in this document has highlighted the major limitations of the current
+proximity collection process used by microfinance institutions: strong dependence on manual operations, data entry errors, difficulties in end-of-day reconciliation, lack of transaction traceability,
+and limited operational visibility over field agents’ activities.
+In response to these challenges, the proposed MICROFI solution provides an approach adapted
+to the operational realities of microfinance institutions in the CEMAC region. By relying on a
+digital-first and offline-first approach, the platform ensures business continuity even in environments characterized by limited connectivity. The transformation from the AS-IS process to the
+TO-BE process therefore introduces a higher level of control, security, and efficiency.
+The integration of features such as secure agent enrollment, guarantee and collateral management, transaction geolocation, real-time collection monitoring, automated reconciliation, and
+export capabilities toward existing banking systems addresses the main business requirements
+identified. The solution also improves governance through a clear definition of responsibilities
+among stakeholders according to a RACI approach.
+The decision to adopt an incremental development strategy through an MVP makes it possible
+to control project risks while delivering operational value quickly to partner institutions. This first
+version provides an evolutionary foundation capable of supporting future advanced features such
+as intelligent fraud detection using machine learning, complete integration with Mobile Money
+networks, and predictive analysis of agent performance.
+Therefore, MICROFI is not merely a collection digitization tool, but a true operational transformation platform enabling microfinance institutions to improve efficiency, strengthen customer
+trust, and achieve better risk management.
+
+Confidential — Internal Working Document
+
+Page 32 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+5. Glossary
+Alphabetical list of abbreviations and key terms used in the Business Analysis and in the System
+Architecture and Software Design Document.
+ACID Atomicity, Consistency, Isolation, Durability. Set of properties that guarantee reliable database
+transactions (used for financial ledger modules via Spring Data JPA).
+AES Advanced Encryption Standard. Symmetric encryption algorithm; MICROFI uses AES-256
+for offline local storage on agent terminals (NFR-01).
+AML Anti-Money Laundering. Legal and operational measures to prevent financial institutions
+from being used for money laundering.
+AMQP Advanced Message Queuing Protocol. Messaging protocol used by RabbitMQ to decouple
+the Core Backend from the CBS Middleware.
+API Application Programming Interface. Rules and protocols allowing software systems to communicate and exchange data.
+AS-IS Representation of the current state of a business process before transformation (existing
+practices, workflows and limitations).
+BEAC Bank of Central African States. Central bank for monetary policy and financial regulation
+in the CEMAC region.
+BOLA Broken Object-Level Authorization. Access-control flaw where a caller can access or modify
+objects belonging to another user or branch; addressed by server-side branch scoping.
+BR Business Rule. Constraint or policy that the system must enforce (e.g. BR-01 OFJ delta, BR-03
+escrow lock, BR-04 digital booklet token, BR-05 mandatory GPS).
+Branch Cashier Staff member responsible for physical cash at the branch, counting, reconciliation and validation of daily collections.
+CBS Core Banking System. Central system managing customer accounts, ledgers and financial
+operations (e.g. Amplitude, FinanSoft).
+CEMAC Economic and Monetary Community of Central Africa. Regional community with shared
+monetary and financial regulations.
+CFT Counter-Terrorism Financing. Measures to prevent financing of terrorism through the financial system.
+COBAC Central African Banking Commission. Supervisory authority for banking regulation and
+prudential control in CEMAC.
+CRUD Create, Read, Update, Delete. The four basic operations on data entities.
+DDL Data Definition Language. SQL statements that define schema objects (tables, indexes, constraints).
+Digital Cash Desk Digital process that replaces manual cash reconciliation by comparing recorded
+collections with physical cash (OFJ).
+Confidential — Internal Working Document
+
+Page 33 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Digital Escrow Electronic financial guarantee that limits the volume of cash an agent may carry
+before a top-up is required.
+DTO Data Transfer Object. Object used to carry data across process or service boundaries without
+exposing internal entities.
+FK Foreign Key. Database constraint linking a column to the primary key of another table.
+FR Functional Requirement. Requirement describing a function or service the system must provide (FR-01 to FR-22).
+Geofencing Location-based control that defines virtual geographic boundaries and raises alerts
+when a device enters or leaves them.
+Geolocation Identification of the geographic position of a device or transaction (GPS, networkbased, etc.).
+GIMAC Groupement Interbancaire Monétique de l’Afrique Centrale. Regional interbank payment
+network in the CEMAC zone.
+GPS Global Positioning System. Satellite positioning used for agent tracking and transaction geotagging.
+Guarantee / Collateral Financial or contractual mechanism covering potential losses from funds
+entrusted to a collection agent.
+HMI Human–Machine Interface. Design of interactive interfaces (agent app, client app, backoffice).
+IMEI International Mobile Equipment Identity. Unique device identifier used to bind an agent
+session to an enrolled terminal (FR-01).
+JPA Jakarta Persistence API (formerly Java Persistence API). Standard for object–relational mapping; used with Spring Data JPA for ACID financial modules.
+JSON / JSONB JavaScript Object Notation / binary JSON in PostgreSQL. Structured payload and
+storage format (e.g. denomination details, outbox jobs).
+JWT JSON Web Token. Signed token used for stateless authentication of agents, clients and backoffice users after login.
+LBA/FT Lutte contre le Blanchiment d’Argent et le Financement du Terrorisme. French CEMAC
+terminology equivalent to AML/CFT.
+LTS Long-Term Support. Designation for a stable software release line with extended maintenance
+(e.g. Java 21 LTS).
+MC² Mutuelle Communautaire de Croissance. Community-based microfinance model in Cameroon.
+MFI / IMF Microfinance Institution. Institution providing savings, credit and related services to
+underserved populations.
+MICROFI Name of the mobile microfinance collection and digital booklet platform specified in
+this documentation.
+MVP Minimum Viable Product. First operational release containing only the features required for
+pilot deployment and validation.
+Confidential — Internal Working Document
+
+Page 34 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+mTLS Mutual Transport Layer Security. TLS mode in which both client and server authenticate
+with certificates.
+NFR Non-Functional Requirement. Requirement on quality attributes (security, performance,
+availability, etc.).
+OFJ Opération de Fin de Journée. End-of-day closing: reconciliation of digital totals with physical
+cash and recording of variances.
+Offline-first Design approach where the edge application works without continuous connectivity
+and synchronises when the network returns.
+OTLP OpenTelemetry Protocol. Standard protocol used to export traces (and metrics/logs) to
+backends such as Tempo.
+PII Personally Identifiable Information. Data that can identify an individual (name, phone, membership number, etc.).
+PIN Personal Identification Number. Secret numeric code used by agents or clients to authorize
+sensitive actions.
+POS Point of Sale. Physical payment terminal for transactions and receipt printing.
+QR Code Quick Response Code. Two-dimensional barcode scanned to identify clients or resources.
+RACI Responsible, Accountable, Consulted, Informed. Framework clarifying stakeholder roles on
+each activity.
+RBAC Role-Based Access Control. Authorization model granting permissions according to assigned
+roles (admin, cashier, manager).
+Reconciliation Comparison of system-recorded transactions with physical cash to detect and
+resolve discrepancies (∆).
+REST Representational State Transfer. Architectural style for HTTP APIs used by the Core Backend
+and Middleware surfaces.
+SAD System Architecture and Software Design Document. Technical design document that realises
+the Business Analysis requirements.
+SMS Short Message Service. Short text notifications to mobile users (e.g. deposit confirmation).
+SOS Emergency alert function that sends the agent’s location and distress signal to predefined
+contacts and the back-office (FR-14).
+SSO Single Sign-On. Authentication mechanism providing access after one credential verification
+(agent IMEI-bound SSO).
+STRIDE Threat-modelling framework: Spoofing, Tampering, Repudiation, Information disclosure,
+Denial of service, Elevation of privilege.
+TLS Transport Layer Security. Cryptographic protocol securing data in transit (API Gateway, service links, brokers).
+TO-BE Target state of a process after improvement (expected future operating model).
+TPU Terminal Portable Utilisateur. Secure portable terminal assigned to a field collection agent.
+
+Confidential — Internal Working Document
+
+Page 35 / 36
+
+MICROFI | Business Analysis v3.1
+
+PK FOKAM RESEARCH CENTER | ENSPY 4GI
+
+Traceability Ability to retain a complete history of transactions, actions and events for audit and
+monitoring.
+TTL Time To Live. Validity duration of a token, cache entry or session before expiry.
+UC Use Case. Structured description of an interaction between actors and the system to achieve
+a goal (UC-01 to UC-22).
+US User Story. Short requirement form “As a [role], I want [goal] so that [benefit]”.
+USSD Unstructured Supplementary Service Data. GSM protocol for menu-driven services via short
+codes without Internet data.
+UUID Universally Unique Identifier. 128-bit identifier used as primary key type in the MICROFI
+schema.
+Wallet Digital account or store holding funds, guarantees or transactional balances (e.g. agent
+escrow wallet).
+XAF Central African CFA franc. Currency used for all monetary amounts in MICROFI (stored as
+integer minor units).
+
+Confidential — Internal Working Document
+
+Page 36 / 36
+
+

@@ -1,0 +1,734 @@
+PK FOKAM RESEARCH CENTER
+
+MICROFI — Use Case Specifications
+
+PK FOKAM RESEARCH CENTER
+MICROFI PROJECT — SPECIFICATIONS
+Textual Use Case Document — Subsystems 1 & 2
+
+Produced by:
+Supervised by:
+
+Tchapet Rolain
+Mr. Adrien Monthe
+
+Date:
+Version:
+
+July 2026
+2.0
+
+Abstract
+This document presents the official, fully articulated textual specifications for all 13 Use Cases of the
+MICROFI System (Microfinance Collection and Management System), developed for PK FOKAM
+RESEARCH CENTER.
+
+Contents
+1 Subsystem 1: Mobile App (TPU)
+1.1 UC01 – Authenticate . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.2 UC02 – Register Client Deposit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.3 UC03 – Check Transaction Limit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.4 UC04 – Print Deposit Receipt . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.5 UC05 – Manual Synchronisation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+2
+2
+3
+4
+4
+5
+
+2 Subsystem 2: Back-Office
+6
+2.1 UC06 – Connect . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2.2 UC07 – Affect Terminal to Agent . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2.3 UC08 – Geolocalise Agent . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.4 UC09 – Open Agent Session . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.5 UC10 – Transaction Validation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2.6 UC11 – Consult Account . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+2.7 UC12 – Consult Flagged Transactions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+2.8 UC13 – Create Account (Generic Case) . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+2.9 UC14 – Create Terminal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+
+Page 1
+
+PK FOKAM RESEARCH CENTER
+
+1
+
+Subsystem 1: Mobile App (TPU)
+
+1.1
+
+UC01 – Authenticate
+UC01
+
+Identifier
+
+Authenticate
+
+Name
+
+Collection Agent
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+MICROFI — Use Case Specifications
+
+Scenar-
+
+Business Rules
+
+Authenticate the Collection Agent on the mobile terminal to grant access to
+field collection features.
+Terminal powered on, MICROFI application launched, active agent
+account.
+Agent authenticated, local session established, access token generated.
+1. The agent reaches the login screen of the mobile application.
+2. The system displays the credentials form (User ID / PIN code).
+3. The agent enters credentials.
+4. The system validates credentials (locally offline or against the server if
+online).
+5. The system loads the agent’s profile and parameters.
+6. The system displays the main collection dashboard.
+4a: Invalid credentials: System displays ”Invalid User ID or PIN”, attempt
+counter +1, returns to step 3.
+4b: Locked account: System displays ”Account locked, contact your
+manager”.
+• Account locked after 3 consecutive failed attempts.
+• Confidential PIN code (4 to 6 digits).
+• Offline authentication backed by an encrypted local key.
+
+Page 2
+
+PK FOKAM RESEARCH CENTER
+
+1.2
+
+MICROFI — Use Case Specifications
+
+UC02 – Register Client Deposit
+UC02
+
+Identifier
+
+Register Client Deposit
+
+Name
+
+Collection Agent
+
+Actor(s)
+
+Record a cash deposit made by a client to the collection agent on the field.
+
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Agent authenticated, collection session active.
+Transaction saved in local database, physical receipt printed,
+synchronization initiated if network is available.
+1. The agent navigates to ”New Deposit”.
+2. The system displays the transaction form.
+3. The agent inputs the client’s account number and deposit amount.
+4. The system automatically includes limit checking (UC03: Check
+Transaction Limit).
+5. The agent validates the transaction.
+6. The system saves the transaction into local terminal storage.
+7. The system automatically includes receipt printing (UC04: Print
+Deposit Receipt).
+8. The system displays ”Deposit registered successfully”.
+4a: Limit exceeded: System displays an error message and blocks
+validation.
+8a: Network available: System triggers UC05 (Manual Synchronisation)
+to push pending transactions to the backend.
+• Client account identifier and amount are mandatory.
+• Automatic timestamping and GPS tagging of each transaction.
+• Validated transactions cannot be modified or deleted locally.
+
+Page 3
+
+PK FOKAM RESEARCH CENTER
+
+1.3
+
+UC03 – Check Transaction Limit
+UC03
+
+Identifier
+
+Check Transaction Limit
+
+Name
+
+System / Mobile App (Included by Register Client Deposit)
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+1.4
+
+MICROFI — Use Case Specifications
+
+Verify that the transaction amount complies with individual transaction
+limits and the agent’s daily threshold.
+Deposit amount entered by the agent.
+Transaction authorized or rejected.
+1. System retrieves the entered deposit amount.
+2. System reads the agent’s configured limit parameters.
+3. System computes the total accumulated deposits for the current day.
+4. System checks if Amount ≤ Single Limit AND
+Daily T otal + Amount ≤ Daily Limit.
+5. System validates controls and allows deposit processing.
+4a: Single limit exceeded: System returns refusal ”Amount exceeds
+single transaction limit”.
+4b: Daily limit exceeded: System returns refusal ”Agent daily limit
+reached”.
+• Limits are set by the Branch Manager during session opening.
+• Enforcement performed locally without requiring network connection.
+
+UC04 – Print Deposit Receipt
+UC04
+
+Identifier
+
+Print Deposit Receipt
+
+Name
+
+System / Thermal Printer (Included by Register Client Deposit)
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Issue a physical printed receipt to give to the client following a validated
+deposit.
+Deposit successfully validated and saved locally.
+Physical receipt printed.
+1. System generates receipt layout (Date, Time, Agent ID, Masked
+Account No, Amount, Encrypted Tx ID).
+2. System sends print stream to integrated Bluetooth/Thermal printer.
+3. Printer outputs the paper receipt.
+4. System confirms successful printing.
+3a: Out of paper / Printer offline: System displays ”Printing error”,
+enables ”Reprint receipt” once printer is ready.
+• Systematic printing for every validated deposit.
+• Printed receipt must include a unique encrypted security hash.
+
+Page 4
+
+PK FOKAM RESEARCH CENTER
+
+1.5
+
+MICROFI — Use Case Specifications
+
+UC05 – Manual Synchronisation
+UC05
+
+Identifier
+
+Manual Synchronisation
+
+Name
+
+Collection Agent
+
+Actor(s)
+
+Transmit locally stored offline transactions to the Back-Office database.
+
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Agent authenticated, offline transactions pending, network connection
+available.
+Transactions uploaded, validated by server, and marked as ”Synchronized”
+on the terminal.
+1. The agent clicks ”Synchronize”.
+2. System checks network connectivity.
+3. System bundles un-synchronized local transactions into an encrypted
+payload.
+4. System sends payload to the Back-Office Middleware.
+5. System receives server acknowledgment (ACK).
+6. System updates local transaction statuses and displays
+”Synchronization successful”.
+2a: No network: System displays ”Network unavailable, try again later”.
+5a: Transmission failure: System resends unconfirmed batches.
+• Data retained locally until server acknowledgment is confirmed.
+• Encrypted batch processing.
+
+Page 5
+
+PK FOKAM RESEARCH CENTER
+
+2
+
+Subsystem 2: Back-Office
+
+2.1
+
+UC06 – Connect
+UC06
+
+Identifier
+
+Connect
+
+Name
+
+User (Branch Manager, Cashier, System Administrator )
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+2.2
+
+MICROFI — Use Case Specifications
+
+Authenticate Back-Office users to grant role-based access to management
+interfaces.
+User account active in Back-Office system.
+User authenticated, active web session established.
+1. User navigates to the Back-Office portal.
+2. System presents authentication form.
+3. User enters username and password.
+4. System validates credentials and role permissions.
+5. System redirects user to their designated dashboard based on role.
+4a: Invalid credentials: System displays ”Invalid username or password”.
+• Single Sign-On (SSO) compatible.
+• Session timeout after 15 minutes of inactivity.
+
+UC07 – Affect Terminal to Agent
+UC07
+
+Identifier
+
+Affect Terminal to Agent
+
+Name
+
+Branch Manager
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Assign a hardware TPU terminal to a specific Collection Agent for field
+operations.
+Branch Manager connected, Terminal created (UC14), Agent account
+active (UC13a).
+Terminal bound to the specified Collection Agent.
+1. Manager selects ”Terminal Management”.
+2. System lists available terminals and active agents.
+3. Manager selects a terminal IMEI/Serial and assigns it to an agent.
+4. System updates binding records in the database.
+5. System displays ”Terminal successfully assigned”.
+3a: Terminal already assigned: System prompts ”Reassign terminal to
+new agent?”.
+• One active agent per terminal at any given time.
+
+Page 6
+
+PK FOKAM RESEARCH CENTER
+
+2.3
+
+UC08 – Geolocalise Agent
+UC08
+
+Identifier
+
+Geolocalise Agent
+
+Name
+
+Branch Manager, Mobile APP MICROFI (Secondary System Actor )
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+2.4
+
+MICROFI — Use Case Specifications
+
+Track agent geographic positions and field routes on the Back-Office map
+dashboard.
+Branch Manager connected, GPS coordinates emitted by Mobile APP
+MICROFI.
+Real-time coordinates and historical routes displayed on map.
+1. Branch Manager accesses ”Field Supervision Map”.
+2. System fetches latest coordinates provided by Mobile APP MICROFI.
+3. System renders agent positions on interactive map interface.
+4. Manager selects an agent marker to view session details (last deposit
+time, battery level).
+2a: GPS signal lost: System displays last known position with alert
+”Signal lost”.
+• Coordinates refreshed periodically (every 5–10 minutes).
+
+UC09 – Open Agent Session
+UC09
+
+Identifier
+
+Open Agent Session
+
+Name
+
+Cashier, Branch Manager
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Open an agent’s daily collection session, assigning operational limits and
+initial floats.
+Cashier/Manager connected to Back-Office.
+Agent session active and authorized for field collection.
+1. Cashier opens ”Agent Session Management”.
+2. System lists branch collection agents.
+3. Cashier selects an agent and clicks ”Open Session”.
+4. Cashier defines session parameters (daily limit, starting balance).
+5. Cashier validates session opening.
+6. System stores session state and generates security tokens for terminal
+sync.
+3a: Session already open: System warns ”Agent already has an active
+session”.
+4a: Extension Choose Transaction: Cashier selects pre-assigned
+transaction templates via UC09a.
+• Only one active collection session per agent at a time.
+
+Page 7
+
+PK FOKAM RESEARCH CENTER
+
+MICROFI — Use Case Specifications
+
+UC09a – Choose Transaction (Extends UC09)
+Optionally allows Cashier/Manager to select specific transaction types or pre-allocated client lists assigned to an agent’s session during setup.
+
+2.5
+
+UC10 – Transaction Validation
+UC10
+
+Identifier
+
+Transaction Validation
+
+Name
+
+Cashier, CBS (Core Banking System)
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Validate collected funds, reconcile physical cash with digital logs, and post
+entries to the CBS.
+Agent returned from field, session synchronized.
+Session closed, variances computed, accounting entries posted to CBS.
+1. Cashier selects an agent’s session to close.
+2. System includes physical cash counting (UC10b: Bill Breakdown).
+3. System includes automatic reconciliation (UC10a: Calculate
+Cash-Digital Difference).
+4. Cashier confirms session closure.
+5. System transmits validated entries to the CBS for posting.
+6. CBS returns confirmation acknowledgment.
+7. System updates session status to ”Closed & Validated”.
+3a: Variance detected: System executes extension UC10c (Flag
+Suspicious Transaction).
+5a: CBS timeout: System queues entries and notifies Cashier.
+• Bill breakdown mandatory for session closure.
+• Unresolved variances exceeding tolerance threshold must be flagged.
+
+Sub-components for UC10:
+• UC10a – Calculate Cash-Digital Difference (Included): Computes variance: V ariance = P hysicalCash−
+DigitalT otal.
+• UC10b – Bill Breakdown (Included): Captures physical banknote and coin counts by denomination
+(10 000, 5 000, 2 000 FCFA, etc.).
+• UC10c – Flag Suspicious Transaction (Extends): Marks session/transaction for audit if variance
+exceeds threshold.
+
+Page 8
+
+PK FOKAM RESEARCH CENTER
+
+2.6
+
+UC11 – Consult Account
+UC11
+
+Identifier
+
+Consult Account
+
+Name
+
+System Administrator, Branch Manager, Cashier
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+2.7
+
+MICROFI — Use Case Specifications
+
+View client account balances, transaction histories, and account statuses
+within the Back-Office.
+Authorized Back-Office user connected.
+Client account details displayed.
+1. User navigates to ”Account Inquiry”.
+2. User enters account number or client name.
+3. System fetches record from database.
+4. System displays balance, recent collection history, and status.
+3a: Account not found: System displays ”No account found matching
+search criteria”.
+• Restricted to Back-Office users to guarantee data privacy on field
+terminals.
+
+UC12 – Consult Flagged Transactions
+UC12
+
+Identifier
+
+Consult Flagged Transactions
+
+Name
+
+System Administrator, Branch Manager
+
+Actor(s)
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+Review transactions or sessions flagged for anomalies, cash shortages, or
+compliance audits.
+Administrator or Manager connected.
+Flagged transaction reports reviewed and audit decisions logged.
+1. User opens ”Audit & Flagged Transactions”.
+2. System displays list of flagged items with variance reasons.
+3. User selects an entry to inspect detailed logs (GPS, receipts, bill
+breakdown).
+4. User records audit decision (Approve adjustment, Reject, Escalated).
+2a: No flagged items: System displays ”No pending flagged transactions”.
+• Audit decisions logged permanently for compliance tracing.
+
+Page 9
+
+PK FOKAM RESEARCH CENTER
+
+2.8
+
+MICROFI — Use Case Specifications
+
+UC13 – Create Account (Generic Case)
+UC13
+
+Identifier
+
+Create Account (Generic Case)
+
+Name
+
+System Administrator
+
+Actor(s)
+
+Provision new user accounts in the Back-Office platform.
+
+Objective
+
+Generic Use Case. Specialized by UC13a, UC13b, and UC13c.
+
+Note
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+System Administrator connected.
+User account created and credentials generated.
+1. Administrator accesses ”User Management”.
+2. System presents user creation form.
+3. Administrator inputs primary user info (Name, Email, Phone).
+4. System verifies uniqueness of username/email.
+5. System creates base account and generates temporary password.
+4a: Duplicate user: System displays ”User already exists”, returns to step
+3.
+• Mandatory password change upon first login.
+• Email/Username must be globally unique.
+
+Specializations of UC13:
+• UC13a – Create Agent Account: Assigns unique Agent Code, branch binding, default limits, and
+mobile PIN.
+• UC13b – Create Cashier Account: Assigns cashier desk/vault, validation rights, and CBS Cashier
+ID.
+• UC13c – Create Branch Manager Account: Grants branch supervision, tracking, and audit access.
+
+Page 10
+
+PK FOKAM RESEARCH CENTER
+
+2.9
+
+MICROFI — Use Case Specifications
+
+UC14 – Create Terminal
+UC14
+
+Identifier
+
+Create Terminal
+
+Name
+
+System Administrator
+
+Actor(s)
+
+Register new TPU hardware terminals into the system inventory.
+
+Objective
+Pre-conditions
+Post-conditions
+Nominal Scenario
+
+Alternative
+ios
+
+Scenar-
+
+Business Rules
+
+System Administrator connected.
+Terminal hardware registered and ready for agent allocation (UC07).
+1. Administrator accesses ”Terminal Inventory”.
+2. System displays terminal registration form.
+3. Administrator enters Serial Number, IMEI, model, and MAC address.
+4. System validates uniqueness of Serial/IMEI.
+5. System saves terminal into active inventory.
+4a: Duplicate IMEI/Serial: System displays ”Terminal hardware already
+registered”.
+• Unique Serial Number and IMEI per hardware unit.
+
+Page 11
+
+

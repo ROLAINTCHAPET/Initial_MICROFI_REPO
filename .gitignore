@@ -1,0 +1,14 @@
+# Local session / tooling state — not shared project content
+.claude/
+
+# LibreOffice lock files
+.~lock.*#
+
+# Maven build output (module-level .gitignore already covers this, kept here as a root-level catch-all)
+target/
+
+# OS/editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.iml

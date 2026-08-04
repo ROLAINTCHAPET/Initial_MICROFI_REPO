@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: microfi_postgres
+    environment:
+      POSTGRES_USER: microfi
+      POSTGRES_PASSWORD: microfi_password
+      POSTGRES_DB: microfi
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: microfi_redis
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: microfi_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: microfi
+      RABBITMQ_DEFAULT_PASS: microfi_password
+    ports:
+      - "15673:5672"
+      - "25672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  microfi-core:
+    build:
+      context: ./microfi-core
+      dockerfile: Dockerfile
+    container_name: microfi_core
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/microfi
+      - SPRING_DATASOURCE_USERNAME=microfi
+      - SPRING_DATASOURCE_PASSWORD=microfi_password
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES=true
+      - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
+      # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
+      # Change these before any real deployment.
+      - ADMIN_BOOTSTRAP_LOGIN=admin
+      - ADMIN_BOOTSTRAP_PASSWORD=ChangeMe123!
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - microfi-middleware
+
+  microfi-middleware:
+    build:
+      context: ./microfi-middleware
+      dockerfile: Dockerfile
+    container_name: microfi_middleware
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/microfi
+      - SPRING_DATASOURCE_USERNAME=microfi
+      - SPRING_DATASOURCE_PASSWORD=microfi_password
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES=true
+      - CBS_VENDOR=mock
+      - CBS_ENDPOINT=
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - rabbitmq
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
