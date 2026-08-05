@@ -6,6 +6,7 @@ import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.OfjAgentLineResponse;
@@ -49,6 +50,9 @@ class OfjControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     private final UUID branchId = UUID.randomUUID();
 

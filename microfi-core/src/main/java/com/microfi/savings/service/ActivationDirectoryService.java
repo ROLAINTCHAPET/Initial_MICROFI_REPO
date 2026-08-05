@@ -1,0 +1,40 @@
+package com.microfi.savings.service;
+
+import com.microfi.savings.domain.ActivationRequestStatus;
+import com.microfi.savings.repository.ActivationPaymentRepository;
+import com.microfi.savings.repository.ActivationRequestRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * {@code savings}'s public contract for other modules that need to read agent-side activation
+ * state without reaching into {@link ActivationPaymentRepository}/{@link ActivationRequestRepository}
+ * directly — e.g. {@code transactions.CollectionService} folding activation-fee cash into the same
+ * escrow-ceiling check (BR-03) regular collections use, and blocking new cash intake while an agent
+ * has an unresolved activation gate open. Mirrors {@link ClientDirectoryService}'s pattern for
+ * cross-module reads.
+ */
+@Service
+@RequiredArgsConstructor
+public class ActivationDirectoryService {
+
+    private final ActivationPaymentRepository activationPaymentRepository;
+    private final ActivationRequestRepository activationRequestRepository;
+
+    public long sumAmountByAgentAndWindow(UUID agentId, Instant start, Instant end) {
+        return activationPaymentRepository.sumAmountByAgentAndWindow(agentId, start, end);
+    }
+
+    /**
+     * True if the agent has registered cash for an activation the client hasn't confirmed yet (or
+     * vice versa) — until that gate closes, the agent's cash-in-hand for that client is invisible
+     * to escrow-ceiling accounting (it isn't a finalized {@code ActivationPayment} yet), so no
+     * further cash of any kind should be accepted from them in the meantime.
+     */
+    public boolean hasPendingActivation(UUID agentId) {
+        return activationRequestRepository.existsByAgentIdAndStatus(agentId, ActivationRequestStatus.PENDING);
+    }
+}

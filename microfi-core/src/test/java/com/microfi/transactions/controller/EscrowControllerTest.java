@@ -2,6 +2,7 @@ package com.microfi.transactions.controller;
 
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.transactions.service.EscrowService;
@@ -44,6 +45,9 @@ class EscrowControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     @Test
     @WithMockUser

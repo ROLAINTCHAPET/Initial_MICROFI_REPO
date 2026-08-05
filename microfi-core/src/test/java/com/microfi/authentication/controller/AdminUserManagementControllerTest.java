@@ -7,6 +7,7 @@ import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.repository.AdminUserRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ class AdminUserManagementControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     private final UUID branchId = UUID.randomUUID();
 

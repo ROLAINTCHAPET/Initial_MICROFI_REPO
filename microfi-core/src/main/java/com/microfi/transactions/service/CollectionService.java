@@ -1,10 +1,9 @@
 package com.microfi.transactions.service;
 
-import com.microfi.transactions.domain.ClientProfile;
-import com.microfi.transactions.domain.ClientStatus;
+import com.microfi.savings.service.ActivationDirectoryService;
+import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.DenominationLine;
-import com.microfi.transactions.repository.ClientProfileRepository;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.DenominationLineRepository;
 import com.microfi.shared.dto.CollectionRequest;
@@ -31,6 +30,8 @@ import java.util.UUID;
  * Takes the agent's id directly (resolved by the caller from the authenticated principal) rather
  * than looking it up itself — {@code transactions} has no business reaching into
  * {@code authentication}'s repository; modules communicate only through public service interfaces.
+ * Client existence/status is likewise validated via {@code savings}'s public
+ * {@link ClientDirectoryService} rather than a direct repository dependency.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,8 +40,9 @@ public class CollectionService {
 
     private final CollectionRepository collectionRepository;
     private final DenominationLineRepository denominationLineRepository;
-    private final ClientProfileRepository clientProfileRepository;
+    private final ClientDirectoryService clientDirectoryService;
     private final EscrowService escrowService;
+    private final ActivationDirectoryService activationDirectoryService;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
@@ -51,11 +53,8 @@ public class CollectionService {
             return toResponse(existing.get(), true);
         }
 
-        ClientProfile client = clientProfileRepository.findById(request.getClientId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + request.getClientId()));
-        if (client.getStatus() != ClientStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Client is not active: " + request.getClientId());
-        }
+        clientDirectoryService.requireActiveClient(request.getClientId());
+        requireNoPendingActivation(agentId);
 
         validateDenominationBreakdown(request);
         enforceEscrowCeiling(agentId, request.getAmountXaf());
@@ -105,16 +104,37 @@ public class CollectionService {
         }
     }
 
-    private void enforceEscrowCeiling(UUID agentId, long amountXaf) {
+    /**
+     * BR-03: an agent's cumulative cash-in-hand for the day — regular collections plus any
+     * agent-collected payments tagged elsewhere (e.g. activation fees, see
+     * {@code savings.ActivationPayment}) — must never exceed their effective escrow ceiling.
+     * Public so other modules whose agents physically receive cash (not just {@code Collection}
+     * rows) can enforce the same lockout before accepting it.
+     */
+    public void enforceEscrowCeiling(UUID agentId, long amountXaf) {
         EscrowResponse escrow = escrowService.getStatus(agentId);
         Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
         Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
-        long cumulativeToday = collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
+        long cumulativeToday = collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc)
+                + activationDirectoryService.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
 
         if (cumulativeToday + amountXaf > escrow.getEffectiveCeilingXaf()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Collection would exceed escrow ceiling (BR-03): cumulative " + cumulativeToday
+                    "Would exceed escrow ceiling (BR-03): cumulative " + cumulativeToday
                             + " + " + amountXaf + " > ceiling " + escrow.getEffectiveCeilingXaf());
+        }
+    }
+
+    /**
+     * An agent-registered activation payment isn't a finalized {@code ActivationPayment} (and so
+     * isn't counted by {@link #enforceEscrowCeiling}) until the client also confirms it — so while
+     * one is pending, the agent's true cash-in-hand is invisible to ceiling accounting. Blocking
+     * all new cash intake until it resolves closes that gap instead of trying to estimate it.
+     */
+    public void requireNoPendingActivation(UUID agentId) {
+        if (activationDirectoryService.hasPendingActivation(agentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "You have a pending client activation payment awaiting confirmation — resolve it before collecting more cash");
         }
     }
 

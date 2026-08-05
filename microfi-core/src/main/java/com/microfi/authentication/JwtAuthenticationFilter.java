@@ -3,6 +3,7 @@ package com.microfi.authentication;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.savings.service.ClientDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Component
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class JwtAuthenticationFilter implements WebFilter {
     private final JwtService jwtService;
     private final AgentDetailsService agentDetailsService;
     private final AdminUserDetailsService adminUserDetailsService;
+    private final ClientDetailsService clientDetailsService;
 
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -46,9 +49,17 @@ public class JwtAuthenticationFilter implements WebFilter {
             return exchange.getResponse().setComplete();
         }
 
-        Mono<UserDetails> principalLookup = JwtService.PRINCIPAL_TYPE_ADMIN_USER.equals(principalType)
-                ? adminUserDetailsService.findByUsername(username)
-                : agentDetailsService.findByUsername(username);
+        Mono<UserDetails> principalLookup;
+        if (JwtService.PRINCIPAL_TYPE_ADMIN_USER.equals(principalType)) {
+            principalLookup = adminUserDetailsService.findByUsername(username);
+        } else if (JwtService.PRINCIPAL_TYPE_CLIENT.equals(principalType)) {
+            // savings is a JPA/blocking-engine module, so ClientDetailsService.findByUsername is a
+            // plain blocking call — wrap it here rather than making the service reactive.
+            principalLookup = Mono.fromCallable(() -> clientDetailsService.findByUsername(username))
+                    .subscribeOn(Schedulers.boundedElastic());
+        } else {
+            principalLookup = agentDetailsService.findByUsername(username);
+        }
 
         return principalLookup
                 .flatMap(userDetails -> {

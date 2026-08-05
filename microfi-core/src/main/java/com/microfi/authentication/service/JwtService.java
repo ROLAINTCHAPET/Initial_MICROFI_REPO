@@ -21,6 +21,7 @@ public class JwtService {
     public static final String PRINCIPAL_TYPE_CLAIM = "principalType";
     public static final String PRINCIPAL_TYPE_AGENT = "AGENT";
     public static final String PRINCIPAL_TYPE_ADMIN_USER = "ADMIN_USER";
+    public static final String PRINCIPAL_TYPE_CLIENT = "CLIENT";
 
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;

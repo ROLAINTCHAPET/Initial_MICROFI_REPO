@@ -5,6 +5,7 @@ import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.CollectionResponse;
@@ -49,6 +50,9 @@ class CollectionControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID clientId = UUID.randomUUID();

@@ -1,19 +1,19 @@
 package com.microfi.transactions.service;
 
+import com.microfi.savings.service.ActivationDirectoryService;
+import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.CollectionRequest;
 import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.EscrowResponse;
-import com.microfi.transactions.domain.ClientProfile;
-import com.microfi.transactions.domain.ClientStatus;
 import com.microfi.transactions.domain.Collection;
-import com.microfi.transactions.repository.ClientProfileRepository;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.DenominationLineRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -25,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 class CollectionServiceTest {
@@ -34,9 +35,11 @@ class CollectionServiceTest {
     @Mock
     private DenominationLineRepository denominationLineRepository;
     @Mock
-    private ClientProfileRepository clientProfileRepository;
+    private ClientDirectoryService clientDirectoryService;
     @Mock
     private EscrowService escrowService;
+    @Mock
+    private ActivationDirectoryService activationDirectoryService;
 
     private CollectionService collectionService;
 
@@ -46,7 +49,7 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientProfileRepository, escrowService);
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
     }
@@ -70,15 +73,10 @@ class CollectionServiceTest {
         return dto;
     }
 
-    private ClientProfile activeClient() {
-        return ClientProfile.builder().id(clientId).mfiMemberNo("M1").fullName("Client 1").status(ClientStatus.ACTIVE).build();
-    }
-
     @Test
     void recordsCollectionSuccessfully() {
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activeClient()));
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
         when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
 
@@ -104,7 +102,8 @@ class CollectionServiceTest {
     @Test
     void rejectsUnknownClient() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.empty());
+        doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + clientId))
+                .when(clientDirectoryService).requireActiveClient(clientId);
 
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
                 .isInstanceOf(ResponseStatusException.class)
@@ -113,9 +112,19 @@ class CollectionServiceTest {
 
     @Test
     void rejectsInactiveClient() {
-        ClientProfile inactive = ClientProfile.builder().id(clientId).mfiMemberNo("M1").fullName("Client 1").status(ClientStatus.INACTIVE).build();
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(inactive));
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Client is not active: " + clientId))
+                .when(clientDirectoryService).requireActiveClient(clientId);
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void rejectsWhenAgentHasPendingActivation() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(activationDirectoryService.hasPendingActivation(agentId)).thenReturn(true);
 
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
                 .isInstanceOf(ResponseStatusException.class)
@@ -125,7 +134,6 @@ class CollectionServiceTest {
     @Test
     void rejectsMissingDenominationBreakdownWhenRequired() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activeClient()));
 
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, null)))
                 .isInstanceOf(ResponseStatusException.class)
@@ -135,7 +143,6 @@ class CollectionServiceTest {
     @Test
     void rejectsDenominationSumMismatch() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activeClient()));
 
         // 1x1000 = 1000, but declared amount is 5000
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(1000, 1)))))
@@ -146,7 +153,6 @@ class CollectionServiceTest {
     @Test
     void rejectsCollectionExceedingEscrowCeiling() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activeClient()));
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(3000).build());
         when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
 
@@ -159,7 +165,6 @@ class CollectionServiceTest {
     void allowsDenominationOptionalBelowThreshold() {
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 1000L);
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activeClient()));
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
         when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
 

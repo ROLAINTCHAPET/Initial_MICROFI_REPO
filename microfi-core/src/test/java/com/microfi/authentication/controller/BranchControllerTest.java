@@ -8,6 +8,7 @@ import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,9 @@ class BranchControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     private Authentication adminAuthentication(AdminRole role) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")

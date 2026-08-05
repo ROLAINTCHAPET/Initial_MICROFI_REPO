@@ -78,7 +78,7 @@ services:
       - CBS_VENDOR=mock
       - CBS_ENDPOINT=
     ports:
-      - "8081:8081"
+      - "18081:8081"
     restart: unless-stopped
     depends_on:
       - postgres

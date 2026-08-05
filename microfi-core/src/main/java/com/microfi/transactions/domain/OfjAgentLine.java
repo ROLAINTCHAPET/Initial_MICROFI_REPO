@@ -11,7 +11,13 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/** Per-agent reconciliation line within an {@link OfjSession}. Delta = physical - digital (BR-01). */
+/**
+ * Per-agent reconciliation line within an {@link OfjSession}. Delta = physical - digital (BR-01).
+ * {@code digitalTotalXaf} is the sum of {@code collectionsTotalXaf} (regular deposits) and
+ * {@code activationsTotalXaf} (client booklet activation fees collected in cash) — both cash
+ * sources an agent can be holding at end of day, kept as separate fields so the two are visible
+ * independently rather than only ever appearing as one merged number.
+ */
 @Entity
 @Table(name = "ofj_agent_line", schema = "core")
 @Data
@@ -31,6 +37,17 @@ public class OfjAgentLine {
 
     @Column(nullable = false)
     private long digitalTotalXaf;
+
+    // Boxed, not primitive: Hibernate infers NOT NULL for primitive long fields regardless of the
+    // @Column annotation, and ddl-auto=update can't backfill a NOT NULL ALTER TABLE against a
+    // table that already has rows (Postgres rejects it outright). The Java-level @Builder.Default
+    // still keeps every row this app writes non-null; only pre-migration rows can read back null,
+    // handled as 0 in OfjService#toLineResponse.
+    @Builder.Default
+    private Long collectionsTotalXaf = 0L;
+
+    @Builder.Default
+    private Long activationsTotalXaf = 0L;
 
     @Column(nullable = false)
     private long physicalTotalXaf;

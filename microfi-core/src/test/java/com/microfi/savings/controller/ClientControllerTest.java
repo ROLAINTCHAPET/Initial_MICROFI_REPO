@@ -1,4 +1,4 @@
-package com.microfi.transactions.controller;
+package com.microfi.savings.controller;
 
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
@@ -8,8 +8,9 @@ import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
-import com.microfi.transactions.domain.ClientProfile;
-import com.microfi.transactions.repository.ClientProfileRepository;
+import com.microfi.savings.domain.ClientProfile;
+import com.microfi.savings.repository.ClientProfileRepository;
+import com.microfi.savings.service.ClientDetailsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
@@ -48,6 +49,9 @@ class ClientControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     private Authentication adminAuthentication(AdminRole role) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")

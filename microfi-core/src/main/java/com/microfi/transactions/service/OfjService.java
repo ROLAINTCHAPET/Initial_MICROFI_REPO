@@ -2,6 +2,7 @@ package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
+import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
@@ -57,6 +58,7 @@ public class OfjService {
     private final CollectionRepository collectionRepository;
     private final CbsClientService cbsClientService;
     private final AgentDirectoryService agentDirectoryService;
+    private final ActivationDirectoryService activationDirectoryService;
 
     public OfjSummaryResponse getSummary(UUID branchId) {
         return toSummary(getOrCreateSession(branchId));
@@ -68,7 +70,9 @@ public class OfjService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "OFJ session already closed for this branch/day");
         }
 
-        long digitalTotal = sumDigitalTotalForAgentToday(request.getAgentId());
+        long collectionsTotal = sumCollectionsForAgentToday(request.getAgentId());
+        long activationsTotal = sumActivationsForAgentToday(request.getAgentId());
+        long digitalTotal = collectionsTotal + activationsTotal;
         long physicalTotal = request.getPhysicalDenominationLines().stream()
                 .mapToLong(line -> line.getFaceValueXaf() * line.getQuantity())
                 .sum();
@@ -77,6 +81,8 @@ public class OfjService {
         OfjAgentLine line = ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), request.getAgentId())
                 .orElseGet(() -> OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(request.getAgentId()).build());
         line.setDigitalTotalXaf(digitalTotal);
+        line.setCollectionsTotalXaf(collectionsTotal);
+        line.setActivationsTotalXaf(activationsTotal);
         line.setPhysicalTotalXaf(physicalTotal);
         line.setDeltaXaf(delta);
         ofjAgentLineRepository.save(line);
@@ -188,10 +194,17 @@ public class OfjService {
         return line.getDeltaXaf() >= 0 || varianceDebtRepository.findByOfjAgentLineId(line.getId()).isPresent();
     }
 
-    private long sumDigitalTotalForAgentToday(UUID agentId) {
+    private long sumCollectionsForAgentToday(UUID agentId) {
         Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
         Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
         return collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
+    }
+
+    /** FR-19 activation fees collected in cash also count as digital totals the agent must reconcile against. */
+    private long sumActivationsForAgentToday(UUID agentId) {
+        Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
+        return activationDirectoryService.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
     }
 
     private OfjSummaryResponse toSummary(OfjSession session) {
@@ -212,6 +225,10 @@ public class OfjService {
                 .id(line.getId())
                 .agentId(line.getAgentId())
                 .digitalTotalXaf(line.getDigitalTotalXaf())
+                // Boxed on the entity so the column could migrate onto existing rows (see
+                // OfjAgentLine) — null only for pre-migration rows never reconciled again.
+                .collectionsTotalXaf(line.getCollectionsTotalXaf() == null ? 0 : line.getCollectionsTotalXaf())
+                .activationsTotalXaf(line.getActivationsTotalXaf() == null ? 0 : line.getActivationsTotalXaf())
                 .physicalTotalXaf(line.getPhysicalTotalXaf())
                 .deltaXaf(line.getDeltaXaf())
                 .resolved(isResolved(line))

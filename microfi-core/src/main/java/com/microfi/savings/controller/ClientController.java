@@ -1,9 +1,9 @@
-package com.microfi.transactions.controller;
+package com.microfi.savings.controller;
 
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.domain.AdminRole;
-import com.microfi.transactions.domain.ClientProfile;
-import com.microfi.transactions.repository.ClientProfileRepository;
+import com.microfi.savings.domain.ClientProfile;
+import com.microfi.savings.repository.ClientProfileRepository;
 import com.microfi.shared.dto.ClientResponse;
 import com.microfi.shared.dto.CreateClientRequest;
 import io.swagger.v3.oas.annotations.Operation;

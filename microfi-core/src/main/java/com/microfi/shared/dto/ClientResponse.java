@@ -1,6 +1,6 @@
 package com.microfi.shared.dto;
 
-import com.microfi.transactions.domain.ClientStatus;
+import com.microfi.savings.domain.ClientStatus;
 import lombok.Builder;
 import lombok.Data;
 

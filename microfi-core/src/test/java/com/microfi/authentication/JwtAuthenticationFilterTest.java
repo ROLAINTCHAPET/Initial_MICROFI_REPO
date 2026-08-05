@@ -5,6 +5,7 @@ import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.savings.service.ClientDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -33,6 +34,7 @@ class JwtAuthenticationFilterTest {
     private JwtService jwtService;
     private AgentDetailsService agentDetailsService;
     private AdminUserDetailsService adminUserDetailsService;
+    private ClientDetailsService clientDetailsService;
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
@@ -40,7 +42,8 @@ class JwtAuthenticationFilterTest {
         jwtService = mock(JwtService.class);
         agentDetailsService = mock(AgentDetailsService.class);
         adminUserDetailsService = mock(AdminUserDetailsService.class);
-        filter = new JwtAuthenticationFilter(jwtService, agentDetailsService, adminUserDetailsService);
+        clientDetailsService = mock(ClientDetailsService.class);
+        filter = new JwtAuthenticationFilter(jwtService, agentDetailsService, adminUserDetailsService, clientDetailsService);
     }
 
     @Test

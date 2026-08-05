@@ -2,6 +2,7 @@ package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
+import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.ExportRequest;
 import com.microfi.shared.dto.MiddlewareExportAck;
@@ -58,6 +59,8 @@ class OfjServiceTest {
     private CbsClientService cbsClientService;
     @Mock
     private AgentDirectoryService agentDirectoryService;
+    @Mock
+    private ActivationDirectoryService activationDirectoryService;
 
     private OfjService ofjService;
 
@@ -69,7 +72,8 @@ class OfjServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         ofjService = new OfjService(ofjSessionRepository, ofjAgentLineRepository, ofjPhysicalDenomRepository,
-                varianceDebtRepository, exportBatchRepository, collectionRepository, cbsClientService, agentDirectoryService);
+                varianceDebtRepository, exportBatchRepository, collectionRepository, cbsClientService, agentDirectoryService,
+                activationDirectoryService);
         when(ofjSessionRepository.save(any(OfjSession.class))).thenAnswer(inv -> inv.getArgument(0));
         when(ofjAgentLineRepository.save(any(OfjAgentLine.class))).thenAnswer(inv -> inv.getArgument(0));
         when(varianceDebtRepository.save(any(VarianceDebt.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -114,6 +118,23 @@ class OfjServiceTest {
         assertThat(response.getPhysicalTotalXaf()).isEqualTo(5000);
         assertThat(response.getDeltaXaf()).isEqualTo(1000);
         assertThat(response.isResolved()).isTrue();
+    }
+
+    @Test
+    void reconcileSeparatesCollectionsFromActivationsInDigitalTotal() {
+        OfjSession session = openSession();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(3000L);
+        when(activationDirectoryService.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(1000L);
+        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
+
+        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(4000, 1));
+
+        assertThat(response.getCollectionsTotalXaf()).isEqualTo(3000);
+        assertThat(response.getActivationsTotalXaf()).isEqualTo(1000);
+        assertThat(response.getDigitalTotalXaf()).isEqualTo(4000);
+        assertThat(response.getDeltaXaf()).isEqualTo(0);
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.AuthRequest;
@@ -43,6 +44,9 @@ class AuthenticationControllerTest {
 
     @MockitoBean
     private AdminUserDetailsService adminUserDetailsService;
+
+    @MockitoBean
+    private ClientDetailsService clientDetailsService;
 
     @MockitoBean
     private JwtService jwtService;
