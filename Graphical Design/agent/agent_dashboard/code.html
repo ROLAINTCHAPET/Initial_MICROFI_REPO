@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Agent Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#002019",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "on-surface-variant": "#43474d",
+                        "tertiary-fixed": "#ffdea8",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#e0e3e6",
+                        "on-tertiary-fixed": "#271900",
+                        "primary-container": "#0a2540",
+                        "on-primary-container": "#768dad",
+                        "surface-container-highest": "#e0e3e6",
+                        "on-secondary-fixed-variant": "#005142",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#e5e8eb",
+                        "surface-bright": "#f7fafd",
+                        "on-background": "#181c1e",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#000f22",
+                        "inverse-on-surface": "#eef1f4",
+                        "inverse-surface": "#2d3133",
+                        "secondary-fixed-dim": "#27dfbc",
+                        "on-tertiary-container": "#b68200",
+                        "surface-tint": "#49607e",
+                        "on-surface": "#181c1e",
+                        "secondary-container": "#55fcd8",
+                        "tertiary": "#170d00",
+                        "on-primary-fixed": "#001c37",
+                        "surface-container-low": "#f1f4f7",
+                        "primary-fixed-dim": "#b0c8eb",
+                        "outline": "#74777e",
+                        "outline-variant": "#c4c6ce",
+                        "tertiary-container": "#322100",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d7dadd",
+                        "background": "#f7fafd",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "secondary": "#006b59",
+                        "on-secondary-container": "#00725f",
+                        "primary-fixed": "#d2e4ff",
+                        "surface-container": "#ebeef1",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#b0c8eb",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#55fcd8",
+                        "on-primary-fixed-variant": "#314865",
+                        "surface": "#f7fafd"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-lg": "24px",
+                        "stack-sm": "8px",
+                        "touch-target": "48px"
+                    },
+                    "fontFamily": {
+                        "label-bold": ["Inter"],
+                        "body": ["Inter"],
+                        "caption": ["Inter"],
+                        "h2": ["Inter"],
+                        "h1": ["Inter"],
+                        "display": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-bold": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body": ["15px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "h2": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "h1": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body w-full min-h-screen flex flex-col pt-[72px] pb-[80px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-[72px] bg-primary text-on-primary border-b border-outline shadow-none">
+<button class="flex items-center justify-center w-12 h-12 hover:bg-primary-fixed-dim/10 active:scale-95 duration-75">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display text-display text-on-primary">Microfi</h1>
+<button class="flex items-center justify-center w-12 h-12 hover:bg-primary-fixed-dim/10 active:scale-95 duration-75 text-secondary-fixed">
+<span class="material-symbols-outlined" data-icon="signal_wifi_4_bar">signal_wifi_4_bar</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col w-full px-margin-mobile gap-stack-lg max-w-[600px] mx-auto">
+<!-- Agent Header -->
+<div class="flex items-center gap-4 py-4 mt-2">
+<div class="w-[60px] h-[60px] rounded-full bg-surface-container-high border-2 border-primary flex items-center justify-center overflow-hidden flex-shrink-0">
+<img alt="Agent Profile Picture" class="w-full h-full object-cover" data-alt="A highly detailed close-up portrait of an African field agent wearing a pristine navy uniform, looking confident and professional. The lighting is high-key and soft, suggesting an outdoor daytime setting with clear weather. The background is slightly blurred but implies a bustling urban African street. The overall aesthetic is sharp, corporate, and reliable, conveying institutional stability and trust." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_nXTu1hn6gThXMpWmgkidq09P_fZhL27N6YjqdFgNNbjknPnE36CK1Ebqp8ZcMotQMyxPL-tGXVaPdWZji16b7irjwI_6drrJkbCkJabxE3T-kRD2OpsY12GsaGrkqzfgCRA1WtYGZWhuG154goPpAV39JWPH709GBipjvEeI4f3K-MPj_WWJDlL8tEALU3Lj2TkH-4LUXH-lqCS1Y6N-FuRPSZc2sfnDOjnu-u4PCJOaNDut3ivU"/>
+</div>
+<div class="flex-1">
+<h2 class="font-h1 text-h1 text-primary">Agent 402</h2>
+<p class="font-body text-body text-on-surface-variant">Douala Sector</p>
+</div>
+<div class="flex items-center gap-2 bg-secondary/10 px-3 py-1 rounded-full border border-secondary">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="font-label-bold text-label-bold text-secondary">Online</span>
+</div>
+</div>
+<!-- Escrow Wallet Gauge (Bento Card 1) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col gap-4 shadow-sm relative overflow-hidden">
+<div class="flex justify-between items-end">
+<div>
+<p class="font-label-bold text-label-bold text-on-surface-variant uppercase">Escrow Wallet Balance</p>
+<h3 class="font-display text-display text-primary mt-1">250,000 <span class="font-h2 text-h2 text-primary-container">XAF</span></h3>
+</div>
+<div class="text-right">
+<p class="font-caption text-caption text-on-surface-variant">Ceiling</p>
+<p class="font-label-bold text-label-bold text-primary">500,000 XAF</p>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-surface-container-high h-4 rounded-full overflow-hidden border border-outline-variant/50">
+<div class="bg-primary h-full rounded-full w-[50%] transition-all duration-500 ease-in-out relative">
+<div class="absolute inset-0 bg-white/20 w-full h-full" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"></div>
+</div>
+</div>
+<p class="font-caption text-caption text-outline text-center mt-1">50% capacity reached. Safe to continue collections.</p>
+</section>
+<!-- Quick Actions Grid -->
+<section class="grid grid-cols-2 gap-gutter">
+<!-- Action: New Collection -->
+<button class="bg-primary text-on-primary rounded-xl h-[120px] flex flex-col items-center justify-center gap-3 p-4 border border-transparent hover:bg-primary/90 active:scale-95 transition-transform shadow-sm col-span-2">
+<span class="material-symbols-outlined text-[32px]" data-icon="add_circle">add_circle</span>
+<span class="font-h2 text-h2 text-center w-full">New Collection</span>
+</button>
+<!-- Action: My Route -->
+<button class="bg-surface-container-lowest text-primary border border-outline-variant rounded-xl h-[100px] flex flex-col items-center justify-center gap-2 p-2 hover:bg-surface-container-low active:bg-surface-variant transition-colors shadow-sm focus:border-primary focus:border-2 outline-none">
+<span class="material-symbols-outlined text-[28px]" data-icon="map">map</span>
+<span class="font-label-bold text-label-bold text-center w-full">My Route</span>
+</button>
+<!-- Action: Sync History -->
+<button class="bg-surface-container-lowest text-primary border border-outline-variant rounded-xl h-[100px] flex flex-col items-center justify-center gap-2 p-2 hover:bg-surface-container-low active:bg-surface-variant transition-colors shadow-sm focus:border-primary focus:border-2 outline-none">
+<span class="material-symbols-outlined text-[28px]" data-icon="sync">sync</span>
+<span class="font-label-bold text-label-bold text-center w-full">Sync History</span>
+</button>
+</section>
+<!-- Recent Activity Summary -->
+<section class="flex flex-col gap-3 mt-4">
+<h3 class="font-h2 text-h2 text-primary border-b border-outline-variant pb-2">Recent Collections</h3>
+<div class="flex items-center justify-between py-3 border-b border-outline-variant/50 min-h-[64px]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-primary">Shop 14A - Market</p>
+<p class="font-caption text-caption text-on-surface-variant">10:45 AM • Cash</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h2 text-h2 text-secondary">+15,000 XAF</p>
+</div>
+</div>
+<div class="flex items-center justify-between py-3 border-b border-outline-variant/50 min-h-[64px]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-primary">Kiosk B - Main Rd</p>
+<p class="font-caption text-caption text-on-surface-variant">09:12 AM • Cash</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h2 text-h2 text-secondary">+8,500 XAF</p>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface border-t border-outline-variant h-[80px]">
+<!-- Home (Active) -->
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full h-[48px] w-full mx-1 hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="home" data-weight="fill" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-bold text-label-bold mt-1">Home</span>
+</button>
+<!-- History (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-xl">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-bold text-label-bold mt-1">History</span>
+</button>
+<!-- Wallet (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-xl">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-bold text-label-bold mt-1">Wallet</span>
+</button>
+<!-- Emergency (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-xl">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-label-bold text-label-bold mt-1">Emergency</span>
+</button>
+</nav>
+</body></html>

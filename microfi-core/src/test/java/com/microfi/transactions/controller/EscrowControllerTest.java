@@ -1,7 +1,12 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
+import com.microfi.authentication.domain.AdminRole;
+import com.microfi.authentication.domain.AdminUser;
+import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
@@ -12,6 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -35,6 +43,9 @@ class EscrowControllerTest {
     @MockitoBean
     private EscrowService escrowService;
 
+    @MockitoBean
+    private AgentDirectoryService agentDirectoryService;
+
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.
     @MockitoBean
@@ -48,6 +59,17 @@ class EscrowControllerTest {
 
     @MockitoBean
     private ClientDetailsService clientDetailsService;
+
+    private Authentication adminAuthentication(AdminRole role) {
+        return adminAuthentication(role, null);
+    }
+
+    private Authentication adminAuthentication(AdminRole role, UUID branchId) {
+        AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")
+                .role(role).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        AdminUserDetails details = new AdminUserDetails(adminUser);
+        return new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
+    }
 
     @Test
     @WithMockUser
@@ -78,15 +100,16 @@ class EscrowControllerTest {
     }
 
     @Test
-    @WithMockUser
     void testTopUpSuccess() {
         UUID agentId = UUID.randomUUID();
         EscrowResponse response = EscrowResponse.builder()
                 .agentId(agentId).balanceXaf(20_000).baseCeilingXaf(20_000).effectiveCeilingXaf(20_000)
                 .updatedAt(Instant.now()).build();
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(UUID.randomUUID());
         when(escrowService.topUp(eq(agentId), anyLong(), anyString())).thenReturn(response);
 
-        webTestClient.post()
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
@@ -97,11 +120,59 @@ class EscrowControllerTest {
     }
 
     @Test
-    @WithMockUser
+    void testTopUpByOwnBranchManagerSucceeds() {
+        UUID agentId = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        EscrowResponse response = EscrowResponse.builder()
+                .agentId(agentId).balanceXaf(20_000).baseCeilingXaf(20_000).effectiveCeilingXaf(20_000)
+                .updatedAt(Instant.now()).build();
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(branchId);
+        when(escrowService.topUp(eq(agentId), anyLong(), anyString())).thenReturn(response);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .post()
+                .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void testTopUpByOtherBranchManagerForbidden() {
+        UUID agentId = UUID.randomUUID();
+        UUID agentBranchId = UUID.randomUUID();
+        UUID callerBranchId = UUID.randomUUID();
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(agentBranchId);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, callerBranchId)))
+                .post()
+                .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testTopUpByCashierForbidden() {
+        UUID agentId = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .post()
+                .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
     void testTopUpRejectsNonPositiveAmount() {
         UUID agentId = UUID.randomUUID();
 
-        webTestClient.post()
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{\"amountXaf\":0}")

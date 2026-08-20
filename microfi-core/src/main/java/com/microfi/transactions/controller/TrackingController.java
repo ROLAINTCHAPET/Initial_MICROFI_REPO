@@ -1,6 +1,8 @@
 package com.microfi.transactions.controller;
 
 import com.microfi.authentication.AgentDetails;
+import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.shared.dto.AgentSyncStatusRequest;
 import com.microfi.shared.dto.LocationPingRequest;
 import com.microfi.shared.dto.LocationPingResponse;
 import com.microfi.shared.dto.SosRequest;
@@ -12,10 +14,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
@@ -38,6 +42,7 @@ import java.util.UUID;
 public class TrackingController {
 
     private final TrackingService trackingService;
+    private final AgentDirectoryService agentDirectoryService;
 
     @PostMapping("/location")
     @Operation(summary = "GPS Ping", description = "Periodic location sample while an agent's session is open (UC-10, FR-10). Sampling cadence and the schedule-window stop are the mobile client's responsibility (NFR-09/10).")
@@ -53,6 +58,16 @@ public class TrackingController {
         return requireSelf(agentId, authenticationMono)
                 .then(Mono.fromCallable(() -> trackingService.raiseSos(agentId, request))
                         .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/sync-status")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Report Local Sync Queue", description = "UC-16 §6.1: self-reports how many collections are queued locally, not yet synced. The branch's OFJ session cannot close while any agent reports a nonzero count, regardless of reconciliation state — the server has no way to know about a collection until this (or an actual sync) tells it about one.")
+    public Mono<Void> reportSyncStatus(@PathVariable("id") UUID agentId, @Valid @RequestBody AgentSyncStatusRequest request, Mono<Authentication> authenticationMono) {
+        return requireSelf(agentId, authenticationMono)
+                .then(Mono.fromRunnable(() -> agentDirectoryService.updateSyncStatus(agentId, request.getPendingCount()))
+                        .subscribeOn(Schedulers.boundedElastic()))
+                .then();
     }
 
     private Mono<Void> requireSelf(UUID pathAgentId, Mono<Authentication> authenticationMono) {

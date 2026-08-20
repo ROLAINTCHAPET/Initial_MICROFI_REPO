@@ -53,6 +53,20 @@ services:
       # Change these before any real deployment.
       - ADMIN_BOOTSTRAP_LOGIN=admin
       - ADMIN_BOOTSTRAP_PASSWORD=ChangeMe123!
+      # UC-09/FR-09 SMS gateway (POST /collections/{id}/notify). Unset client id/secret = every
+      # send fails gracefully (logged as FAILED) rather than the app failing to start.
+      - SMS_VENDOR=orange
+      # - ORANGE_SMS_CLIENT_ID=
+      # - ORANGE_SMS_CLIENT_SECRET=
+      # - ORANGE_SMS_SENDER_ADDRESS=
+      # - MTN_SMS_CLIENT_ID=
+      # - MTN_SMS_CLIENT_SECRET=
+      # - MTN_SMS_SENDER_ADDRESS=
+      # Compliance-gated registration document uploads (DocumentStorageService) — local disk,
+      # matching the rest of this self-hosted stack rather than S3/MinIO.
+      - REGISTRATION_DOCUMENTS_STORAGE_PATH=/data/registration-documents
+    volumes:
+      - registration_documents:/data/registration-documents
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -84,7 +98,36 @@ services:
       - postgres
       - rabbitmq
 
+  kong:
+    image: kong:3.7
+    container_name: microfi_kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_SSL_CERT: /kong/certs/dev-cert.pem
+      KONG_SSL_CERT_KEY: /kong/certs/dev-key.pem
+      # Dev-only self-signed cert (kong/certs/dev-cert.pem) — TLS termination happens here per
+      # architecture.txt section 3.3, but replace with a real CA-signed cert before any real
+      # deployment; self-signed is fine for local/demo HTTPS testing only.
+    volumes:
+      - ./kong/kong.yml:/kong/declarative/kong.yml:ro
+      - ./kong/certs:/kong/certs:ro
+    ports:
+      - "8000:8000"   # public proxy (HTTP) — the actual API entrypoint clients should use
+      - "8443:8443"   # public proxy (HTTPS, self-signed dev cert)
+      # Admin API: loopback-only. It has no auth (Kong OSS has no RBAC) and can leak the JWT
+      # signing secret in plaintext via GET /consumers/{id}/jwt — binding 0.0.0.0 here would let
+      # anyone who can reach the host forge admin JWTs or rewrite the gateway's own config.
+      - "127.0.0.1:8001:8001"
+    restart: unless-stopped
+    depends_on:
+      - microfi-core
+      - redis
+
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  registration_documents:

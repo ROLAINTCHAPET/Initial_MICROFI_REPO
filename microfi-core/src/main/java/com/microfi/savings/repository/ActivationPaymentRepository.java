@@ -19,4 +19,7 @@ public interface ActivationPaymentRepository extends JpaRepository<ActivationPay
     @Query("SELECT COALESCE(SUM(p.amountXaf), 0) FROM ActivationPayment p "
             + "WHERE p.agentId = :agentId AND p.paidAt >= :start AND p.paidAt < :end")
     long sumAmountByAgentAndWindow(@Param("agentId") UUID agentId, @Param("start") Instant start, @Param("end") Instant end);
+
+    /** UC-16/18: gathers a branch's activation-fee cash for the day so it can be posted to the CBS on export, same as Collection. */
+    List<ActivationPayment> findByAgentIdInAndPaidAtBetween(List<UUID> agentIds, Instant start, Instant end);
 }

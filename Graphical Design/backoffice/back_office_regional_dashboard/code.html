@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Regional Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-tint": "#49607e",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed-dim": "#b0c8eb",
+                      "on-secondary-fixed-variant": "#005142",
+                      "inverse-on-surface": "#eef1f4",
+                      "tertiary-fixed": "#ffdea8",
+                      "surface": "#f7fafd",
+                      "surface-dim": "#d7dadd",
+                      "secondary-fixed-dim": "#27dfbc",
+                      "on-primary-fixed": "#001c37",
+                      "on-tertiary": "#ffffff",
+                      "surface-variant": "#e0e3e6",
+                      "inverse-primary": "#b0c8eb",
+                      "on-error": "#ffffff",
+                      "on-secondary-fixed": "#002019",
+                      "on-primary-container": "#768dad",
+                      "tertiary": "#170d00",
+                      "on-surface-variant": "#43474d",
+                      "tertiary-fixed-dim": "#ffba20",
+                      "on-primary": "#ffffff",
+                      "background": "#f7fafd",
+                      "inverse-surface": "#2d3133",
+                      "error-container": "#ffdad6",
+                      "surface-container-low": "#f1f4f7",
+                      "secondary": "#006b59",
+                      "on-primary-fixed-variant": "#314865",
+                      "secondary-fixed": "#55fcd8",
+                      "tertiary-container": "#322100",
+                      "primary-container": "#0a2540",
+                      "surface-container": "#ebeef1",
+                      "surface-bright": "#f7fafd",
+                      "on-surface": "#181c1e",
+                      "outline-variant": "#c4c6ce",
+                      "on-tertiary-container": "#b68200",
+                      "on-secondary-container": "#00725f",
+                      "on-background": "#181c1e",
+                      "primary": "#000f22",
+                      "secondary-container": "#55fcd8",
+                      "on-secondary": "#ffffff",
+                      "surface-container-highest": "#e0e3e6",
+                      "on-tertiary-fixed": "#271900",
+                      "primary-fixed": "#d2e4ff",
+                      "outline": "#74777e",
+                      "error": "#ba1a1a",
+                      "on-tertiary-fixed-variant": "#5e4200",
+                      "on-error-container": "#93000a",
+                      "surface-container-high": "#e5e8eb"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "touch-target": "48px",
+                      "gutter": "16px",
+                      "margin-mobile": "20px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px",
+                      "stack-sm": "8px"
+              },
+              "fontFamily": {
+                      "label-bold": ["Inter"],
+                      "body": ["Inter"],
+                      "h1": ["Inter"],
+                      "display": ["Inter"],
+                      "caption": ["Inter"],
+                      "h2": ["Inter"]
+              },
+              "fontSize": {
+                      "label-bold": ["13px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "body": ["15px", {"lineHeight": "22px", "fontWeight": "400"}],
+                      "h1": ["22px", {"lineHeight": "28px", "fontWeight": "700"}],
+                      "display": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "h2": ["18px", {"lineHeight": "24px", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for alerts feed */
+        .alerts-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .alerts-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .alerts-scroll::-webkit-scrollbar-thumb {
+            background: #c4c6ce;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="h-full bg-background font-body text-body text-on-surface antialiased overflow-hidden">
+<!-- TopNavBar {{DATA:COMPONENTS:COMPONENTS_3}} -->
+<nav class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface-container-lowest dark:bg-surface-dim text-primary dark:text-primary-fixed border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-gutter ml-64 z-20">
+<div class="flex items-center gap-4">
+<span class="font-display text-display text-primary dark:text-primary-fixed">Microfi Back-office</span>
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded focus:border-primary focus:ring-1 focus:ring-primary h-[48px] w-64 font-body text-body text-on-surface" placeholder="Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<button class="h-[48px] w-[48px] flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors cursor-pointer text-on-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="h-[48px] w-[48px] flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors cursor-pointer text-on-surface-variant">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+<button class="flex items-center gap-2 hover:bg-surface-container-low px-3 py-1 rounded transition-colors h-[48px] cursor-pointer text-primary font-bold border-b-2 border-primary pb-1">
+<img alt="User Avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByayExPn4rBAA9Wycgilr10wEP6z75i-g5MgfbD9fag-7--Qe1oFaoT33kVXfYBjvUFLNYrts4k3NZYymm-YWh3wYhxaRSDykPjIExByclVADg11t3CvK7WFeXOs9gRnThzW1HkxzMPRvXWcCEp-2wZVMUYi1Kgte-n3m6npyL3_OZq7DHOgbaalq85wfQoPxmDuraMZ2Myr-aSwFlYK16-S7JTl6uI6UHy0lzEGd7n9BFlbOzq5tj"/>
+<span class="font-label-bold text-label-bold hidden sm:block">Profile</span>
+</button>
+</div>
+</nav>
+<!-- SideNavBar {{DATA:COMPONENTS:COMPONENTS_3}} -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-primary-container dark:bg-primary-container border-r border-outline-variant dark:border-outline-variant z-30">
+<div class="flex flex-col h-full py-6">
+<!-- Header -->
+<div class="px-6 mb-8 flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-surface-container-lowest flex items-center justify-center text-primary-container font-bold text-lg">M</div>
+<div>
+<h1 class="text-h1 font-h1 text-surface-container-lowest dark:text-surface-container-lowest">Microfi Admin</h1>
+<p class="font-caption text-caption text-secondary-fixed dark:text-secondary-fixed-dim">Regional Operations</p>
+</div>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-4 mb-6">
+<button class="w-full h-[48px] bg-secondary text-on-secondary font-label-bold text-label-bold rounded flex items-center justify-center gap-2 hover:bg-opacity-90 active:opacity-80 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+                    Collect Cash
+                </button>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 flex flex-col gap-1 px-2 overflow-y-auto font-body text-body">
+<!-- Active Tab -->
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container-lowest/10 text-secondary-fixed border-l-4 border-secondary-fixed cursor-pointer transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                    Dashboard
+                </a>
+<!-- Inactive Tabs -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">groups</span>
+                    Agents
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+                    Branches
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">assessment</span>
+                    Reports
+                </a>
+</nav>
+<!-- Footer Tabs -->
+<div class="mt-auto flex flex-col gap-1 px-2 border-t border-surface-container-lowest/10 pt-4 font-body text-body">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Support
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 mt-16 p-stack-lg h-[calc(100vh-64px)] overflow-y-auto bg-surface relative z-10">
+<!-- Dashboard Header -->
+<div class="flex justify-between items-end mb-stack-lg">
+<div>
+<h2 class="font-h1 text-h1 text-primary">Regional Overview</h2>
+<p class="font-body text-body text-on-surface-variant">CEMAC Region Performance Metrics</p>
+</div>
+<div class="flex gap-2">
+<button class="h-[48px] px-4 border-2 border-primary text-primary font-label-bold text-label-bold rounded flex items-center gap-2 hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">download</span>
+                    Export
+                </button>
+</div>
+</div>
+<!-- 1. Executive Summary Cards (Bento Grid Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-md mb-stack-lg">
+<!-- Card 1: Total Volume -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col justify-between hover:border-primary transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<div class="h-10 w-10 rounded-full bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<span class="bg-secondary-fixed/20 text-on-secondary-container px-2 py-1 rounded-full font-caption text-caption font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +12.4%
+                    </span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-1">Total Network Volume</p>
+<h3 class="font-display text-display text-primary">48.2M <span class="text-h2 font-h2 text-on-surface-variant">XAF</span></h3>
+</div>
+</div>
+<!-- Card 2: Active Agents -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col justify-between hover:border-primary transition-colors">
+<div class="flex justify-between items-start mb-4">
+<div class="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">groups</span>
+</div>
+<span class="bg-surface-container px-2 py-1 rounded-full font-caption text-caption text-on-surface-variant flex items-center gap-1">
+                        Online
+                    </span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-1">Active Agent Count</p>
+<div class="flex items-baseline gap-2">
+<h3 class="font-display text-display text-primary">1,248</h3>
+<span class="font-body text-body text-on-surface-variant">/ 1,300</span>
+</div>
+</div>
+</div>
+<!-- Card 3: Branch Liquidity -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col justify-between hover:border-primary transition-colors">
+<div class="flex justify-between items-start mb-4">
+<div class="h-10 w-10 rounded-full bg-tertiary-fixed-dim/20 flex items-center justify-center text-on-tertiary-container">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+<span class="bg-tertiary-fixed-dim/20 text-on-tertiary-container px-2 py-1 rounded-full font-caption text-caption font-bold flex items-center gap-1">
+                        Optimal
+                    </span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-1">Branch Liquidity Avg</p>
+<h3 class="font-display text-display text-primary">82%</h3>
+<div class="w-full bg-surface-container h-2 rounded-full mt-2 overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[82%]"></div>
+</div>
+</div>
+</div>
+<!-- Card 4: Escrow Risk -->
+<div class="bg-error-container/30 border border-error/20 rounded-lg p-stack-md flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<div class="h-10 w-10 rounded-full bg-error/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined">warning</span>
+</div>
+<span class="bg-error text-on-error px-2 py-1 rounded-full font-caption text-caption font-bold animate-pulse">
+                        Elevated
+                    </span>
+</div>
+<div>
+<p class="font-caption text-caption text-error uppercase tracking-wider mb-1">Escrow Risk Level</p>
+<h3 class="font-display text-display text-on-error-container">Amber</h3>
+<p class="font-caption text-caption text-error mt-1">3 branches near ceiling</p>
+</div>
+</div>
+</div>
+<!-- Middle Section: Map & Alerts -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-stack-lg mb-stack-lg h-[400px]">
+<!-- 2. Regional Performance Map -->
+<div class="lg:col-span-2 bg-surface-container-lowest border border-outline-variant rounded-lg flex flex-col overflow-hidden relative">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest z-10">
+<h3 class="font-h2 text-h2 text-primary">Agent Density &amp; Activity</h3>
+<div class="flex gap-2">
+<span class="px-3 py-1 bg-surface-container rounded-full font-caption text-caption text-on-surface-variant">Douala</span>
+<span class="px-3 py-1 bg-surface-container rounded-full font-caption text-caption text-on-surface-variant">Yaoundé</span>
+<span class="px-3 py-1 bg-surface-container rounded-full font-caption text-caption text-on-surface-variant">Bafoussam</span>
+</div>
+</div>
+<!-- Map Visualization Area -->
+<div class="flex-1 relative bg-surface-container-low" data-location="Cameroon" style="">
+<!-- Placeholder for Map Visualization (using gradient/pattern instead of base64) -->
+<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-surface-variant to-surface-container-low opacity-50"></div>
+<div class="absolute inset-0" style="background-image: radial-gradient(#c4c6ce 1px, transparent 1px); background-size: 20px 20px; opacity: 0.2;"></div>
+<!-- Simulated Map Nodes -->
+<div class="absolute top-[40%] left-[30%] group">
+<div class="w-4 h-4 bg-secondary rounded-full border-2 border-surface-container-lowest shadow-[0_0_10px_rgba(0,107,89,0.5)] animate-ping absolute opacity-75"></div>
+<div class="w-4 h-4 bg-secondary rounded-full border-2 border-surface-container-lowest relative z-10 cursor-pointer"></div>
+<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-primary-container text-surface-container-lowest px-3 py-2 rounded text-caption font-caption whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+<strong class="block text-secondary-fixed">Douala Central</strong>
+                            Activity: High<br/>Agents: 450
+                        </div>
+</div>
+<div class="absolute top-[30%] left-[50%] group">
+<div class="w-3 h-3 bg-tertiary-fixed-dim rounded-full border-2 border-surface-container-lowest relative z-10 cursor-pointer"></div>
+<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-primary-container text-surface-container-lowest px-3 py-2 rounded text-caption font-caption whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+<strong class="block text-tertiary-fixed-dim">Yaoundé North</strong>
+                            Activity: Moderate<br/>Agents: 320
+                        </div>
+</div>
+<div class="absolute top-[60%] left-[20%] group">
+<div class="w-5 h-5 bg-error rounded-full border-2 border-surface-container-lowest relative z-10 cursor-pointer"></div>
+<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-primary-container text-surface-container-lowest px-3 py-2 rounded text-caption font-caption whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+<strong class="block text-error-container">Bafoussam West</strong>
+                            Activity: Critical<br/>Agents: 180
+                        </div>
+</div>
+</div>
+</div>
+<!-- 4. Alerts & Notifications Feed -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg flex flex-col overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-h2 text-h2 text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-error">campaign</span>
+                        Critical Alerts
+                    </h3>
+<span class="bg-error text-on-error px-2 py-0.5 rounded-full font-caption text-caption">2 New</span>
+</div>
+<div class="flex-1 p-stack-md overflow-y-auto alerts-scroll bg-surface-container-low/30">
+<div class="flex flex-col gap-3">
+<!-- Alert Item 1 -->
+<div class="bg-surface-container-lowest border-l-4 border-error p-3 rounded shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-bold text-label-bold text-error">Ceiling Breach</span>
+<span class="font-caption text-caption text-on-surface-variant">Just now</span>
+</div>
+<p class="font-body text-body text-primary text-sm mb-2">AGT-8821 exceeded collection limit (1.5M XAF).</p>
+<button class="h-[32px] px-3 bg-surface-container text-primary font-label-bold text-[11px] rounded flex items-center hover:bg-surface-variant transition-colors">
+                                Review Escrow
+                            </button>
+</div>
+<!-- Alert Item 2 -->
+<div class="bg-surface-container-lowest border-l-4 border-tertiary-fixed-dim p-3 rounded shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-bold text-label-bold text-on-tertiary-container">System Downtime</span>
+<span class="font-caption text-caption text-on-surface-variant">12m ago</span>
+</div>
+<p class="font-body text-body text-primary text-sm mb-2">Bafoussam West reporting connectivity issues.</p>
+<button class="h-[32px] px-3 bg-surface-container text-primary font-label-bold text-[11px] rounded flex items-center hover:bg-surface-variant transition-colors">
+                                Ping Branch
+                            </button>
+</div>
+<!-- Alert Item 3 -->
+<div class="bg-surface-container-lowest border-l-4 border-outline-variant p-3 rounded shadow-sm opacity-70">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-bold text-label-bold text-on-surface-variant">Reconciliation Delayed</span>
+<span class="font-caption text-caption text-on-surface-variant">1h ago</span>
+</div>
+<p class="font-body text-body text-primary text-sm">Yaoundé Central batch #492 pending manual review.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Top Performing Branches Table -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-h2 text-h2 text-primary">Top Performing Branches</h3>
+<button class="text-secondary font-label-bold text-label-bold hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant font-caption text-caption text-on-surface-variant uppercase tracking-wider">
+<th class="p-4 font-normal">Branch Name</th>
+<th class="p-4 font-normal">Total Collections (XAF)</th>
+<th class="p-4 font-normal">Agent Count</th>
+<th class="p-4 font-normal">Reconciliation Status</th>
+<th class="p-4 font-normal text-right">Action</th>
+</tr>
+</thead>
+<tbody class="font-body text-body">
+<tr class="border-b border-outline-variant/50 hover:bg-surface-container-low/50 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container text-surface-container-lowest flex items-center justify-center font-bold">DC</div>
+<span class="font-label-bold text-primary">Douala Central</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-primary">12.4M</td>
+<td class="p-4 text-on-surface-variant">450</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/10 text-secondary font-caption text-caption font-bold">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Cleared
+                                </span>
+</td>
+<td class="p-4 text-right">
+<button class="h-[48px] px-4 border border-outline-variant rounded text-primary hover:border-primary transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    Details
+                                </button>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/50 hover:bg-surface-container-low/50 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container text-surface-container-lowest flex items-center justify-center font-bold">YN</div>
+<span class="font-label-bold text-primary">Yaoundé North</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-primary">8.1M</td>
+<td class="p-4 text-on-surface-variant">320</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-tertiary-fixed-dim/20 text-on-tertiary-container font-caption text-caption font-bold">
+<span class="material-symbols-outlined text-[14px]">sync</span> Processing
+                                </span>
+</td>
+<td class="p-4 text-right">
+<button class="h-[48px] px-4 border border-outline-variant rounded text-primary hover:border-primary transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    Details
+                                </button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container text-surface-container-lowest flex items-center justify-center font-bold">BW</div>
+<span class="font-label-bold text-primary">Bafoussam West</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-primary">5.2M</td>
+<td class="p-4 text-on-surface-variant">180</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-error/10 text-error font-caption text-caption font-bold">
+<span class="material-symbols-outlined text-[14px]">error</span> Pending
+                                </span>
+</td>
+<td class="p-4 text-right">
+<button class="h-[48px] px-4 border border-outline-variant rounded text-primary hover:border-primary transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    Details
+                                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+</body></html>

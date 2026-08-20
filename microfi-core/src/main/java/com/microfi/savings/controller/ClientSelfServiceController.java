@@ -6,6 +6,7 @@ import com.microfi.savings.service.ClientSelfService;
 import com.microfi.shared.dto.ClientBalanceResponse;
 import com.microfi.shared.dto.ClientHistoryEntryResponse;
 import com.microfi.shared.dto.ClientProfileSelfResponse;
+import com.microfi.shared.dto.ClientRecentCollectionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,15 @@ public class ClientSelfServiceController {
                         .balanceXaf(balance.getBalanceXaf())
                         .asOf(balance.getAsOf())
                         .build());
+    }
+
+    @GetMapping("/recent-collections")
+    @Operation(summary = "My Recent Collections", description = "This client's own recent cash collections, newest first, straight from MICROFI — visible immediately after an agent validates one, unlike /history (CBS-backed), which only catches up at end-of-day export.")
+    public Flux<ClientRecentCollectionResponse> recentCollections(Mono<Authentication> authenticationMono) {
+        return resolveClientId(authenticationMono)
+                .flatMapMany(clientId -> Mono.fromCallable(() -> clientSelfService.getRecentCollections(clientId))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
     }
 
     @GetMapping("/history")

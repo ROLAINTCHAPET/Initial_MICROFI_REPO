@@ -13,6 +13,11 @@ import java.util.UUID;
 public interface AgentRepository extends JpaRepository<Agent, UUID> {
     Optional<Agent> findByEmployeeCode(String employeeCode);
     boolean existsByEmployeeCode(String employeeCode);
+    Optional<Agent> findByUsername(String username);
+    boolean existsByUsername(String username);
     boolean existsByImei(String imei);
+    boolean existsByPhone(String phone);
+    boolean existsByEmail(String email);
     List<Agent> findByBranchIdAndStatus(UUID branchId, AgentStatus status);
+    List<Agent> findByBranchId(UUID branchId);
 }

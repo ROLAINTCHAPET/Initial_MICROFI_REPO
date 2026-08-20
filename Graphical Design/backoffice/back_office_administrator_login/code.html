@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Admin Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#d7dadd",
+                        "on-tertiary-fixed": "#271900",
+                        "surface-variant": "#e0e3e6",
+                        "on-surface": "#181c1e",
+                        "primary-fixed": "#d2e4ff",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "tertiary-container": "#322100",
+                        "on-primary-fixed-variant": "#314865",
+                        "tertiary-fixed": "#ffdea8",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001c37",
+                        "surface-container": "#ebeef1",
+                        "outline": "#74777e",
+                        "on-background": "#181c1e",
+                        "on-primary-container": "#768dad",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#b68200",
+                        "secondary-fixed-dim": "#27dfbc",
+                        "surface": "#f7fafd",
+                        "on-secondary-fixed-variant": "#005142",
+                        "inverse-on-surface": "#eef1f4",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#00725f",
+                        "outline-variant": "#c4c6ce",
+                        "surface-bright": "#f7fafd",
+                        "background": "#f7fafd",
+                        "tertiary": "#170d00",
+                        "surface-tint": "#49607e",
+                        "inverse-primary": "#b0c8eb",
+                        "surface-container-highest": "#e0e3e6",
+                        "secondary-fixed": "#55fcd8",
+                        "secondary-container": "#55fcd8",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#002019",
+                        "surface-container-low": "#f1f4f7",
+                        "on-secondary": "#ffffff",
+                        "secondary": "#006b59",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#0a2540",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#b0c8eb",
+                        "surface-container-high": "#e5e8eb",
+                        "on-error": "#ffffff",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#000f22",
+                        "on-tertiary-fixed-variant": "#5e4200"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "touch-target": "48px",
+                        "stack-md": "16px",
+                        "margin-mobile": "20px",
+                        "gutter": "16px",
+                        "stack-sm": "8px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "body": ["Inter"],
+                        "h1": ["Inter"],
+                        "caption": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "display": ["Inter"],
+                        "h2": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body": ["15px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "h1": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "label-bold": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h2": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-low min-h-screen flex items-center justify-center p-margin-mobile md:p-0 font-body text-body text-on-background">
+<!-- Suppress Nav: Transactional Login Screen -->
+<main class="w-full max-w-md mx-auto">
+<!-- Brand Logo -->
+<div class="text-center mb-stack-lg">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-stack-sm shadow-sm">
+<span class="material-symbols-outlined text-[32px] text-on-primary">account_balance</span>
+</div>
+<h1 class="font-display text-display text-primary">Microfi Admin</h1>
+<p class="font-body text-body text-on-surface-variant mt-2">Regional Operations Back-Office</p>
+</div>
+<!-- Login Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-6 sm:p-8">
+<form action="#" class="space-y-stack-md" method="POST">
+<!-- Email/Username -->
+<div>
+<label class="block font-label-bold text-label-bold text-on-surface mb-stack-sm" for="username">Email or Username</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant">person</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-3 border border-outline-variant rounded-DEFAULT focus:ring-primary focus:border-primary sm:text-sm bg-surface-bright text-on-surface h-touch-target transition-colors" id="username" name="username" placeholder="Enter your credentials" required="" type="text"/>
+</div>
+</div>
+<!-- Password -->
+<div>
+<div class="flex items-center justify-between mb-stack-sm">
+<label class="block font-label-bold text-label-bold text-on-surface" for="password">Password</label>
+<a class="font-label-bold text-label-bold text-primary hover:text-primary-fixed-dim transition-colors" href="#">Forgot Password?</a>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+</div>
+<input class="block w-full pl-10 pr-10 py-3 border border-outline-variant rounded-DEFAULT focus:ring-primary focus:border-primary sm:text-sm bg-surface-bright text-on-surface h-touch-target transition-colors" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me -->
+<div class="flex items-center mt-stack-md">
+<input class="h-5 w-5 text-primary focus:ring-primary border-outline-variant rounded-DEFAULT bg-surface-bright" id="remember-me" name="remember-me" type="checkbox"/>
+<label class="ml-2 block font-body text-body text-on-surface-variant" for="remember-me">
+                            Remember me
+                        </label>
+</div>
+<!-- Submit Button -->
+<div class="pt-stack-sm">
+<button class="w-full flex justify-center py-3 px-4 border border-transparent rounded-DEFAULT shadow-sm font-label-bold text-label-bold text-on-primary bg-primary hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary h-touch-target items-center transition-colors" type="submit">
+                            Sign In
+                        </button>
+</div>
+</form>
+</div>
+<!-- Security Footer -->
+<div class="bg-surface px-6 py-4 border-t border-outline-variant flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">shield</span>
+<span class="font-caption text-caption text-on-surface-variant">Secure administrative access only.</span>
+</div>
+</div>
+<!-- System Status -->
+<div class="mt-stack-lg flex justify-center items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="font-caption text-caption text-on-surface-variant">System Online</span>
+</div>
+</main>
+</body></html>

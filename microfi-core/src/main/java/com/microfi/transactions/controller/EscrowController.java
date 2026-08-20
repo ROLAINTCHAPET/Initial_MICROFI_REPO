@@ -1,5 +1,8 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.authentication.AdminAccess;
+import com.microfi.authentication.domain.AdminRole;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.transactions.service.EscrowService;
 import com.microfi.shared.dto.EscrowResponse;
 import com.microfi.shared.dto.TopUpRequest;
@@ -7,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,18 +33,22 @@ import java.util.UUID;
 public class EscrowController {
 
     private final EscrowService escrowService;
+    private final AgentDirectoryService agentDirectoryService;
 
     @GetMapping
-    @Operation(summary = "Get Escrow Status", description = "Current balance, base ceiling and effective ceiling (including any active override).")
+    @Operation(summary = "Get Escrow Status", description = "Current balance, base ceiling and effective ceiling (including any active override). Any authenticated Back-Office role.")
     public Mono<EscrowResponse> getStatus(@PathVariable("id") UUID agentId) {
         return Mono.fromCallable(() -> escrowService.getStatus(agentId))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/top-up")
-    @Operation(summary = "Top Up Escrow", description = "Manual cashier top-up (MVP): credits the wallet and raises the ceiling by the same amount.")
-    public Mono<EscrowResponse> topUp(@PathVariable("id") UUID agentId, @Valid @RequestBody TopUpRequest request) {
-        return Mono.fromCallable(() -> escrowService.topUp(agentId, request.getAmountXaf(), request.getReference()))
-                .subscribeOn(Schedulers.boundedElastic());
+    @Operation(summary = "Top Up Escrow", description = "Manual cashier top-up (MVP): credits the wallet and raises the ceiling by the same amount, which activates a PENDING_CEILING agent (BR-Escrow-01). ADMIN or BRANCH_MANAGER (own branch only) — this is a funds-moving admin action, not something an agent or plain cashier can trigger on their own escrow.")
+    public Mono<EscrowResponse> topUp(@PathVariable("id") UUID agentId, @Valid @RequestBody TopUpRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(agentId));
+                    return escrowService.topUp(agentId, request.getAmountXaf(), request.getReference());
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 }

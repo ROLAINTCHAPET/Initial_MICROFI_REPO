@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Request Withdrawal - Microfi</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#005142",
+                    "on-primary-container": "#768dad",
+                    "on-primary-fixed": "#001c37",
+                    "primary": "#000f22",
+                    "on-primary-fixed-variant": "#314865",
+                    "on-error-container": "#93000a",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#e5e8eb",
+                    "inverse-on-surface": "#eef1f4",
+                    "on-secondary-container": "#00725f",
+                    "primary-container": "#0a2540",
+                    "secondary-container": "#55fcd8",
+                    "surface": "#f7fafd",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "on-surface-variant": "#43474d",
+                    "on-secondary-fixed": "#002019",
+                    "outline-variant": "#c4c6ce",
+                    "surface-tint": "#49607e",
+                    "tertiary-container": "#322100",
+                    "on-background": "#181c1e",
+                    "surface-variant": "#e0e3e6",
+                    "outline": "#74777e",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "on-surface": "#181c1e",
+                    "error-container": "#ffdad6",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#d7dadd",
+                    "on-error": "#ffffff",
+                    "inverse-surface": "#2d3133",
+                    "surface-container-highest": "#e0e3e6",
+                    "tertiary": "#170d00",
+                    "background": "#f7fafd",
+                    "on-tertiary-fixed": "#271900",
+                    "surface-container-low": "#f1f4f7",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-bright": "#f7fafd",
+                    "secondary-fixed": "#55fcd8",
+                    "secondary": "#006b59",
+                    "on-tertiary-container": "#b68200",
+                    "secondary-fixed-dim": "#27dfbc",
+                    "on-primary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed": "#ffdea8",
+                    "surface-container": "#ebeef1",
+                    "primary-fixed": "#d2e4ff",
+                    "surface-container-lowest": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "touch-target": "48px",
+                    "gutter": "16px",
+                    "stack-md": "16px",
+                    "stack-sm": "8px",
+                    "margin-mobile": "20px",
+                    "stack-lg": "24px"
+            },
+            "fontFamily": {
+                    "label-bold": ["Inter"],
+                    "caption": ["Inter"],
+                    "body": ["Inter"],
+                    "h1": ["Inter"],
+                    "display": ["Inter"],
+                    "h2": ["Inter"]
+            },
+            "fontSize": {
+                    "label-bold": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                    "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                    "body": ["15px", { "lineHeight": "22px", "fontWeight": "400" }],
+                    "h1": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                    "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "h2": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Utility for Material Symbols fill */
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom scrollbar for clean UI */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c4c6ce;
+            border-radius: 4px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col font-body antialiased selection:bg-primary-fixed selection:text-primary">
+<!-- TopAppBar (Semantic Shell injected styles applied) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-touch-target bg-primary text-on-primary font-h1 text-h1 border-b border-outline flat no shadows">
+<button class="material-symbols-outlined text-on-primary scale-95 duration-75 hover:bg-primary-fixed-dim/10 rounded-full w-touch-target h-touch-target flex items-center justify-center -ml-2 focus:outline-none focus:ring-2 focus:ring-primary-fixed">
+            arrow_back
+        </button>
+<h1 class="font-h1 text-h1 font-bold tracking-tight">Request Withdrawal</h1>
+<div class="w-touch-target h-touch-target flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary scale-95 duration-75 hover:bg-primary-fixed-dim/10 rounded-full p-2 cursor-pointer">
+                help
+            </span>
+</div>
+</header>
+<!-- Main Canvas (Transactional flow - Navigation Shell suppressed) -->
+<main class="flex-1 w-full max-w-md mx-auto pt-[64px] px-margin-mobile pb-margin-mobile flex flex-col">
+<!-- Balance Context Card -->
+<section class="mt-stack-lg bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter shadow-sm">
+<h2 class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Available Balance</h2>
+<div class="mt-stack-sm flex items-baseline gap-2">
+<span class="font-display text-display text-primary font-extrabold tracking-tighter">750,000</span>
+<span class="font-h2 text-h2 text-primary-fixed-dim">XAF</span>
+</div>
+</section>
+<!-- Input Field Container -->
+<section class="mt-stack-lg flex flex-col gap-stack-sm">
+<label class="font-label-bold text-label-bold text-primary block" for="withdrawal_amount">Amount to Withdraw</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="font-h2 text-h2 text-outline group-focus-within:text-primary transition-colors">XAF</span>
+</div>
+<!-- Large numeric input following High-Contrast Corporate guidelines -->
+<input class="block w-full h-[64px] pl-16 pr-4 bg-surface-container-lowest border border-outline rounded-DEFAULT font-h1 text-h1 text-primary placeholder:text-outline-variant focus:border-2 focus:border-primary focus:ring-0 focus:outline-none transition-all" id="withdrawal_amount" min="1000" placeholder="0" step="1000" type="number"/>
+</div>
+<!-- Quick Action Chips for outdoor speed -->
+<div class="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar">
+<button class="flex-shrink-0 h-[40px] px-4 bg-surface-container rounded-full border border-outline-variant font-label-bold text-label-bold text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
+                    10,000
+                </button>
+<button class="flex-shrink-0 h-[40px] px-4 bg-surface-container rounded-full border border-outline-variant font-label-bold text-label-bold text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
+                    50,000
+                </button>
+<button class="flex-shrink-0 h-[40px] px-4 bg-surface-container rounded-full border border-outline-variant font-label-bold text-label-bold text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
+                    100,000
+                </button>
+</div>
+</section>
+<!-- Security Notice / Tonal Layering -->
+<section class="mt-stack-lg bg-surface-container rounded-xl p-gutter flex items-start gap-gutter border border-outline-variant">
+<span class="material-symbols-outlined text-secondary flex-shrink-0 mt-0.5" data-weight="fill">security</span>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-bold text-label-bold text-primary">Verification Required</h3>
+<p class="font-body text-body text-on-surface-variant leading-tight">
+                    To ensure the safety of your funds, this withdrawal must be verified. A unique QR code will be generated to present to an authorized field agent or at a branch location.
+                </p>
+</div>
+</section>
+<!-- Spacer to push CTA to the bottom of the viewport on taller screens -->
+<div class="flex-grow"></div>
+<!-- Call to Action -->
+<section class="mt-stack-lg pt-stack-md w-full">
+<button class="w-full h-touch-target bg-primary text-on-primary font-label-bold text-label-bold rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-on-primary-fixed-variant active:scale-[0.98] transition-all focus:outline-none focus:ring-4 focus:ring-primary-fixed-dim shadow-sm">
+<span class="material-symbols-outlined">qr_code_2</span>
+                Generate Withdrawal QR
+            </button>
+</section>
+</main>
+<!-- 
+        Note: The BottomNavBar is intentionally SUPPRESSED per the "Automatic Suppression" mandate. 
+        This is a transactional/task-focused screen with a back action, implying a temporary departure 
+        from the main navigation flow. Rendering the global nav here would violate the UX Goal. 
+    -->
+<script>
+        // Simple micro-interaction for quick amount chips
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputField = document.getElementById('withdrawal_amount');
+            const chips = document.querySelectorAll('button.bg-surface-container');
+
+            chips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    // Extract number from text (remove commas)
+                    const value = chip.textContent.replace(/,/g, '').trim();
+                    if (!isNaN(value) && value !== '') {
+                        inputField.value = value;
+                        // Trigger simple focus effect to show update
+                        inputField.focus();
+                        inputField.classList.add('bg-primary-fixed');
+                        setTimeout(() => {
+                            inputField.classList.remove('bg-primary-fixed');
+                        }, 150);
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

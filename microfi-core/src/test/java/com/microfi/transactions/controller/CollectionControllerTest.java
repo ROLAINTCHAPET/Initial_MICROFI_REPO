@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,7 +66,7 @@ class CollectionControllerTest {
 
     private String requestBody() {
         return "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70," +
-                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\"," +
+                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\",\"pin\":\"1234\"," +
                 "\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}";
     }
 
@@ -100,7 +101,7 @@ class CollectionControllerTest {
     @Test
     void testCreateMissingGpsRejected() {
         String noGps = "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000," +
-                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\"}";
+                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\",\"pin\":\"1234\"}";
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
@@ -120,8 +121,8 @@ class CollectionControllerTest {
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling"));
 
         String batch = "[" +
-                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-OK\",\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}," +
-                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":9000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-FAIL\",\"denominationLines\":[{\"faceValueXaf\":9000,\"quantity\":1}]}" +
+                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-OK\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}," +
+                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":9000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-FAIL\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":9000,\"quantity\":1}]}" +
                 "]";
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
@@ -132,6 +133,28 @@ class CollectionControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBodyList(Object.class).hasSize(2);
+    }
+
+    @Test
+    void testMyCollectionsReturnsAgentsOwnHistory() {
+        CollectionResponse response = CollectionResponse.builder()
+                .id(UUID.randomUUID()).agentId(agentId).clientId(clientId).clientName("Jean Client").amountXaf(5000).build();
+        when(collectionService.findRecentByAgent(agentId)).thenReturn(List.of(response));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/collections")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void testMyCollectionsUnauthenticatedRejected() {
+        webTestClient.get()
+                .uri("/api/v1/collections")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     private com.microfi.shared.dto.CollectionRequest argThatDeviceTxId(String deviceTxId) {

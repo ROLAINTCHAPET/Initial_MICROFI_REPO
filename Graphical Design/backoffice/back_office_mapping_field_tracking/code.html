@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Back-office - Field Tracking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "outline": "#74777e",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "inverse-on-surface": "#eef1f4",
+                        "on-secondary-container": "#00725f",
+                        "on-error": "#ffffff",
+                        "primary-fixed": "#d2e4ff",
+                        "secondary-fixed": "#55fcd8",
+                        "on-background": "#181c1e",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-container": "#b68200",
+                        "secondary-container": "#55fcd8",
+                        "surface-tint": "#49607e",
+                        "on-primary-fixed": "#001c37",
+                        "on-primary-fixed-variant": "#314865",
+                        "primary-fixed-dim": "#b0c8eb",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f7fafd",
+                        "surface-container": "#ebeef1",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#322100",
+                        "tertiary-fixed": "#ffdea8",
+                        "error-container": "#ffdad6",
+                        "secondary": "#006b59",
+                        "primary": "#000f22",
+                        "primary-container": "#0a2540",
+                        "error": "#ba1a1a",
+                        "on-surface": "#181c1e",
+                        "tertiary": "#170d00",
+                        "secondary-fixed-dim": "#27dfbc",
+                        "surface": "#f7fafd",
+                        "surface-dim": "#d7dadd",
+                        "on-tertiary-fixed": "#271900",
+                        "on-primary-container": "#768dad",
+                        "surface-container-low": "#f1f4f7",
+                        "on-secondary-fixed": "#002019",
+                        "background": "#f7fafd",
+                        "inverse-surface": "#2d3133",
+                        "surface-variant": "#e0e3e6",
+                        "outline-variant": "#c4c6ce",
+                        "on-secondary-fixed-variant": "#005142",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "inverse-primary": "#b0c8eb",
+                        "surface-container-high": "#e5e8eb",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e0e3e6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "stack-lg": "24px",
+                        "stack-sm": "8px",
+                        "gutter": "16px",
+                        "touch-target": "48px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px"
+                    },
+                    fontFamily: {
+                        "caption": ["Inter"],
+                        "h1": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "h2": ["Inter"],
+                        "display": ["Inter"],
+                        "body": ["Inter"]
+                    },
+                    fontSize: {
+                        "caption": ["12px", { lineHeight: "16px", fontWeight: "400" }],
+                        "h1": ["22px", { lineHeight: "28px", fontWeight: "700" }],
+                        "label-bold": ["13px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "600" }],
+                        "h2": ["18px", { lineHeight: "24px", fontWeight: "600" }],
+                        "display": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body": ["15px", { lineHeight: "22px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .pulse-marker {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(186, 26, 26, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(186, 26, 26, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(186, 26, 26, 0); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body h-screen w-screen overflow-hidden flex light">
+<!-- SideNavBar (JSON Interpreted) -->
+<nav class="bg-primary-container dark:bg-primary-container h-screen w-64 fixed left-0 top-0 border-r border-outline-variant dark:border-outline-variant z-50 flex flex-col py-6">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+</div>
+<div>
+<h2 class="text-h1 font-h1 text-surface-container-lowest dark:text-surface-container-lowest">Microfi Admin</h2>
+<p class="text-caption font-caption text-primary-fixed-dim">Regional Operations</p>
+</div>
+</div>
+<button class="mx-6 mb-8 bg-secondary text-on-secondary font-label-bold text-label-bold h-touch-target rounded-lg flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+            Collect Cash
+        </button>
+<div class="flex-1 flex flex-col gap-1 px-2">
+<!-- Dashboard (Inactive) -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80 transition-all font-body text-body" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Dashboard
+            </a>
+<!-- Agents (Active - Intent matched) -->
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container-lowest/10 text-secondary-fixed border-l-4 border-secondary-fixed rounded-r-lg cursor-pointer active:opacity-80 transition-all font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+                Agents
+            </a>
+<!-- Branches (Inactive) -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80 transition-all font-body text-body" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+                Branches
+            </a>
+<!-- Reports (Inactive) -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80 transition-all font-body text-body" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+                Reports
+            </a>
+</div>
+<div class="mt-auto px-2 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80 transition-all font-body text-body" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80 transition-all font-body text-body" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-64 flex flex-col relative h-screen">
+<!-- TopNavBar (JSON Interpreted) -->
+<header class="bg-surface-container-lowest dark:bg-surface-dim fixed top-0 right-0 w-[calc(100%-16rem)] h-16 border-b border-outline-variant dark:border-outline-variant z-40 flex justify-between items-center px-gutter">
+<div class="flex items-center gap-4 flex-1">
+<h1 class="font-display text-display text-primary dark:text-primary-fixed hidden md:block">Microfi Back-office</h1>
+<div class="relative w-64 ml-8">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" data-icon="search">search</span>
+<input class="w-full h-10 pl-10 pr-4 rounded bg-surface-container-low border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-body font-body text-on-surface outline-none transition-all" placeholder="Search agents, branches..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="h-8 w-px bg-outline-variant mx-2"></div>
+<button class="flex items-center gap-2 text-primary dark:text-primary-fixed hover:bg-surface-container-low transition-colors px-3 py-1.5 rounded cursor-pointer transition-all">
+<span class="font-label-bold text-label-bold">Profile</span>
+<img alt="User Avatar" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A professional headshot of a corporate financial manager in a bright, modern office setting. The lighting is crisp and clear, reflecting a light-mode aesthetic. The subject is wearing dark navy business attire against a light, neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYxpSRILkk2GETEy8iwTkeme4RQq1geX7lHd-Y-rE3Umr5_26NqAmYn_45O5KUSXZp_XWEE1dygskiRhe7N-01Axwt4LJKlmawn-OyVnlLzsokP3jhTsmnYpZr90rr2jVbagyjg2dkKzp1v-GjxHEzCqz2XnVK0-V7hjfpGMXgl9I-4aUlldovbEP83ABO0ibBMnxQnCqd8PqL44iEebdtOcsAQIjp2Jhol9dhMt2gZhaYVpUnEXdl"/>
+</button>
+</div>
+</header>
+<!-- Map Container -->
+<main class="flex-1 mt-16 relative bg-surface-variant overflow-hidden">
+<!-- Simulated Map Background -->
+<div class="absolute inset-0 bg-cover bg-center w-full h-full opacity-60 mix-blend-multiply" data-alt="A high-altitude, crisp satellite map view of an urban center in the CEMAC region, characterized by distinct road networks and natural geographical boundaries. The color palette is muted and professional, utilizing light grays, soft whites, and subtle topographical textures suitable for a corporate tracking dashboard background." data-location="Douala, Cameroon" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBBx4mmrWIsUGjAUxcnHXHKviSKAfRBUKBno7kTqe7jC0ayKn2PJpkMZL4MD-mIke1TFATDH6t6GwiyQHQA2U3i27BSXpHjqJeXnqtdy3OALrcaOkqH7C15JzdHDJtIWkKdoK2vWGwF2IfvPp6BYRRQ_L6N0emkcORIqi9FlCWO8sR_nhYY3PCb6dL-Dmq2gYf2X9LRzUDGxgasADo09iT5_I3DpcUuGP5UkyyL8unP5lmeP3V-hAfx')"></div>
+<!-- Grid overlay to make it look more like a technical tool -->
+<div class="absolute inset-0 bg-[linear-gradient(rgba(196,198,206,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(196,198,206,0.3)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+<!-- SVG Overlays for Tracking -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" preserveaspectratio="none">
+<!-- Geofence Polygon (Sector 4) -->
+<polygon class="fill-secondary/10 stroke-secondary stroke-2 stroke-dasharray-[8,4]" points="200,100 600,150 700,400 400,600 150,450"></polygon>
+<!-- Safe Route (Inside Geofence) -->
+<path class="fill-none stroke-primary stroke-[4px]" d="M 300,500 L 350,400 L 450,380 L 500,250 L 550,200" stroke-linecap="round" stroke-linejoin="round"></path>
+<!-- Breached Route (Outside Geofence) -->
+<path class="fill-none stroke-error stroke-[4px]" d="M 550,200 L 650,120 L 750,180" stroke-linecap="round" stroke-linejoin="round"></path>
+<!-- Transaction Nodes -->
+<circle class="fill-surface-container-lowest stroke-primary stroke-2" cx="300" cy="500" r="6"></circle>
+<circle class="fill-surface-container-lowest stroke-primary stroke-2" cx="350" cy="400" r="6"></circle>
+<circle class="fill-surface-container-lowest stroke-primary stroke-2" cx="450" cy="380" r="6"></circle>
+<circle class="fill-surface-container-lowest stroke-primary stroke-2" cx="500" cy="250" r="6"></circle>
+<!-- Current Position (Breach) -->
+<circle class="fill-error stroke-surface-container-lowest stroke-2 pulse-marker" cx="750" cy="180" r="8"></circle>
+</svg>
+<!-- Overlay Panels -->
+<div class="absolute inset-0 p-stack-lg pointer-events-none flex justify-between items-start">
+<!-- Left Panel: Active Agents (Glassmorphism Bento) -->
+<div class="w-80 flex flex-col gap-4 pointer-events-auto">
+<div class="bg-surface-container-lowest/90 backdrop-blur border border-outline-variant rounded-xl p-4 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-h2 text-h2 text-on-surface">Active Field Units</h3>
+<span class="bg-secondary-container text-on-secondary-container text-caption font-label-bold px-2 py-0.5 rounded-full">12 Online</span>
+</div>
+<div class="flex flex-col gap-2">
+<!-- Selected Agent -->
+<div class="border-2 border-primary bg-primary/5 rounded-lg p-3 cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-bold">402</div>
+<div>
+<p class="font-label-bold text-label-bold text-on-surface">Agent 402</p>
+<p class="font-caption text-caption text-error flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="warning">warning</span> Out of Zone</p>
+</div>
+</div>
+<span class="text-caption font-label-bold text-on-surface-variant">2m ago</span>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-outline-variant/50">
+<div>
+<p class="font-caption text-caption text-on-surface-variant">Collected</p>
+<p class="font-label-bold text-label-bold text-on-surface">450,000 XAF</p>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant">Stops</p>
+<p class="font-label-bold text-label-bold text-on-surface">14/20</p>
+</div>
+</div>
+</div>
+<!-- Standard Agent List Item -->
+<div class="border border-outline-variant bg-surface-container-lowest rounded-lg p-3 cursor-pointer hover:border-primary transition-colors">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-bold">118</div>
+<div>
+<p class="font-label-bold text-label-bold text-on-surface">Agent 118</p>
+<p class="font-caption text-caption text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> In Sector 2</p>
+</div>
+</div>
+<span class="text-caption font-label-bold text-on-surface-variant">15m ago</span>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-lowest rounded-lg p-3 cursor-pointer hover:border-primary transition-colors">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-bold">305</div>
+<div>
+<p class="font-label-bold text-label-bold text-on-surface">Agent 305</p>
+<p class="font-caption text-caption text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> In Sector 4</p>
+</div>
+</div>
+<span class="text-caption font-label-bold text-on-surface-variant">Just now</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Panel: Notifications / Alerts -->
+<div class="w-80 pointer-events-auto">
+<div class="bg-error-container text-on-error-container border border-error/20 rounded-xl p-4 shadow-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error" data-icon="gpp_bad" data-weight="fill" style="font-variation-settings: 'FILL' 1;">gpp_bad</span>
+<div class="flex-1">
+<h3 class="font-h2 text-h2 mb-1">Geofence Breach</h3>
+<p class="font-body text-body text-on-error-container/80 mb-3">Agent 402 has exited assigned Sector 4 with active cash liabilities.</p>
+<div class="bg-surface-container-lowest/50 rounded p-2 mb-4 border border-error/10">
+<div class="flex justify-between text-caption font-caption mb-1">
+<span>Liability at risk:</span>
+<span class="font-label-bold">450,000 XAF</span>
+</div>
+<div class="flex justify-between text-caption font-caption">
+<span>Breach duration:</span>
+<span class="font-label-bold text-error">00:12:45</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="w-full bg-error text-on-error h-10 rounded font-label-bold text-label-bold flex items-center justify-center gap-2 hover:bg-error/90 transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="call">call</span>
+                                        Initiate Contact
+                                    </button>
+<button class="w-full bg-transparent border border-error text-error h-10 rounded font-label-bold text-label-bold hover:bg-error/5 transition-colors">
+                                        Escalate to Security
+                                    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

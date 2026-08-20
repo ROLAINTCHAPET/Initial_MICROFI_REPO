@@ -7,14 +7,18 @@ import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
+import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.authentication.service.AgentEnrollmentService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.transactions.service.EscrowService;
+import com.microfi.transactions.service.OfjService;
 import com.microfi.shared.dto.EscrowResponse;
+import com.microfi.shared.dto.VarianceDebtResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
@@ -40,7 +44,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = AgentManagementController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AgentEnrollmentService.class})
 class AgentManagementControllerTest {
 
     @Autowired
@@ -72,6 +76,9 @@ class AgentManagementControllerTest {
     @MockitoBean
     private EscrowService escrowService;
 
+    @MockitoBean
+    private OfjService ofjService;
+
     private Authentication adminAuthentication(AdminRole role) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")
                 .role(role).status(AdminUserStatus.ACTIVE).build();
@@ -81,15 +88,16 @@ class AgentManagementControllerTest {
 
     private String registerBody(UUID branchId) {
         return "{\"employeeCode\":\"AGT001\",\"fullName\":\"Jean Dupont\",\"phone\":\"+237600000001\"," +
-                "\"imei\":\"IMEI-001\",\"pin\":\"1234\",\"branchId\":\"" + branchId + "\"}";
+                "\"imei\":\"IMEI-001\",\"username\":\"agt.dupont\",\"email\":\"agt.dupont@microfi.test\"," +
+                "\"password\":\"password123\",\"pin\":\"1234\",\"branchId\":\"" + branchId + "\"}";
     }
 
     @Test
     void testRegisterSuccess() {
         UUID branchId = UUID.randomUUID();
         when(agentRepository.existsByEmployeeCode("AGT001")).thenReturn(false);
-        when(agentRepository.existsByImei("IMEI-001")).thenReturn(false);
-        when(branchRepository.existsById(branchId)).thenReturn(true);
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(false);
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).build()));
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -102,7 +110,7 @@ class AgentManagementControllerTest {
                 .expectStatus().isCreated()
                 .expectBody()
                 .jsonPath("$.employeeCode").isEqualTo("AGT001")
-                .jsonPath("$.status").isEqualTo("ACTIVE");
+                .jsonPath("$.status").isEqualTo("PENDING_CEILING");
 
         verify(escrowService).createAccountForAgent(any(UUID.class));
     }
@@ -122,10 +130,41 @@ class AgentManagementControllerTest {
     }
 
     @Test
-    void testRegisterDuplicateImeiConflict() {
+    void testRegisterDuplicateUsernameConflict() {
         UUID branchId = UUID.randomUUID();
         when(agentRepository.existsByEmployeeCode("AGT001")).thenReturn(false);
-        when(agentRepository.existsByImei("IMEI-001")).thenReturn(true);
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(true);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/agents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(registerBody(branchId))
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testRegisterDuplicatePhoneConflict() {
+        UUID branchId = UUID.randomUUID();
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(false);
+        when(agentRepository.existsByPhone("+237600000001")).thenReturn(true);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/agents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(registerBody(branchId))
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testRegisterDuplicateEmailConflict() {
+        UUID branchId = UUID.randomUUID();
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(false);
+        when(agentRepository.existsByPhone("+237600000001")).thenReturn(false);
+        when(agentRepository.existsByEmail("agt.dupont@microfi.test")).thenReturn(true);
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .post()
@@ -140,8 +179,7 @@ class AgentManagementControllerTest {
     void testRegisterBranchNotFound() {
         UUID branchId = UUID.randomUUID();
         when(agentRepository.existsByEmployeeCode("AGT001")).thenReturn(false);
-        when(agentRepository.existsByImei("IMEI-001")).thenReturn(false);
-        when(branchRepository.existsById(branchId)).thenReturn(false);
+        when(branchRepository.findById(branchId)).thenReturn(Optional.empty());
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .post()
@@ -150,6 +188,69 @@ class AgentManagementControllerTest {
                 .bodyValue(registerBody(branchId))
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void testRegisterNeverSetsImeiEvenWhenBranchRequiresBinding() {
+        // Device binding now happens on the agent's first login, not at registration — even a
+        // branch with requireImei=true gets an unbound agent here.
+        UUID branchId = UUID.randomUUID();
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(false);
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).requireImei(true).build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/agents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(registerBody(branchId))
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.imei").isEmpty();
+
+        verify(agentRepository, org.mockito.Mockito.never()).existsByImei(any());
+    }
+
+    @Test
+    void testRegisterDefaultsEmployeeCodeToUsernameWhenOmitted() {
+        UUID branchId = UUID.randomUUID();
+        when(agentRepository.existsByUsername("agt.dupont")).thenReturn(false);
+        when(agentRepository.existsByEmployeeCode("agt.dupont")).thenReturn(false);
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = "{\"fullName\":\"Jean Dupont\",\"phone\":\"+237600000002\"," +
+                "\"username\":\"agt.dupont\",\"email\":\"agt.dupont@microfi.test\",\"password\":\"password123\"," +
+                "\"pin\":\"1234\",\"branchId\":\"" + branchId + "\"}";
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/agents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.employeeCode").isEqualTo("agt.dupont");
+    }
+
+    @Test
+    void testRegisterRejectsNonInternationalPhoneFormat() {
+        UUID branchId = UUID.randomUUID();
+        String body = "{\"fullName\":\"Jean Dupont\",\"phone\":\"0600000001\"," +
+                "\"username\":\"agt.dupont\",\"email\":\"agt.dupont@microfi.test\",\"password\":\"password123\"," +
+                "\"pin\":\"1234\",\"branchId\":\"" + branchId + "\"}";
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/agents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 
     @Test
@@ -197,6 +298,61 @@ class AgentManagementControllerTest {
     }
 
     @Test
+    void testReactivateAgentWithConfiguredCeilingSucceeds() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").status(AgentStatus.SUSPENDED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(escrowService.getStatus(id)).thenReturn(EscrowResponse.builder().agentId(id).baseCeilingXaf(50_000).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void testReactivateAgentWithoutConfiguredCeilingRejected() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").status(AgentStatus.SUSPENDED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(escrowService.getStatus(id)).thenReturn(EscrowResponse.builder().agentId(id).baseCeilingXaf(0).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+
+        verify(agentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void testReactivateAgentFromPendingCeilingRejected() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").status(AgentStatus.PENDING_CEILING).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+
+        verify(agentRepository, org.mockito.Mockito.never()).save(any());
+        verify(escrowService, org.mockito.Mockito.never()).getStatus(any());
+    }
+
+    @Test
     void testSuspendAgentNotFound() {
         UUID id = UUID.randomUUID();
         when(agentRepository.findById(id)).thenReturn(Optional.empty());
@@ -208,6 +364,66 @@ class AgentManagementControllerTest {
                 .bodyValue("{\"status\":\"SUSPENDED\"}")
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void testResetDeviceBindingClearsImeiAndRecordsReason() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").imei("OLD-DEVICE").status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/device-binding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Lost phone, reported at branch\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.imei").isEmpty()
+                .jsonPath("$.deviceResetReason").isEqualTo("Lost phone, reported at branch");
+
+        org.mockito.Mockito.verify(agentRepository).save(org.mockito.ArgumentMatchers.argThat(
+                a -> a.getImei() == null && "Lost phone, reported at branch".equals(a.getDeviceResetReason()) && a.getDeviceResetAt() != null));
+    }
+
+    @Test
+    void testResetDeviceBindingRequiresReason() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/device-binding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testResetDeviceBindingNotFound() {
+        UUID id = UUID.randomUUID();
+        when(agentRepository.findById(id)).thenReturn(Optional.empty());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/device-binding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Lost phone\"}")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void testResetDeviceBindingByCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + UUID.randomUUID() + "/device-binding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Lost phone\"}")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
@@ -259,5 +475,50 @@ class AgentManagementControllerTest {
                 .bodyValue("{\"tempCeilingXaf\":50000,\"reason\":\"Market day surge\",\"validUntil\":\"" + validUntil + "\"}")
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void testGetAgentSuccess() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/admin/agents/" + id)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.employeeCode").isEqualTo("AGT001");
+    }
+
+    @Test
+    void testGetAgentNotFound() {
+        UUID id = UUID.randomUUID();
+        when(agentRepository.findById(id)).thenReturn(Optional.empty());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/admin/agents/" + id)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void testAgentVarianceDebts() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(ofjService.listVarianceDebtsForAgent(id, false)).thenReturn(List.of(
+                VarianceDebtResponse.builder().id(UUID.randomUUID()).agentId(id).amountXaf(2000).status("OPEN").build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/admin/agents/" + id + "/variance-debts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
     }
 }

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Collection Wizard - Step 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#002019",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "on-surface-variant": "#43474d",
+                    "tertiary-fixed": "#ffdea8",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e0e3e6",
+                    "on-tertiary-fixed": "#271900",
+                    "primary-container": "#0a2540",
+                    "on-primary-container": "#768dad",
+                    "surface-container-highest": "#e0e3e6",
+                    "on-secondary-fixed-variant": "#005142",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#e5e8eb",
+                    "surface-bright": "#f7fafd",
+                    "on-background": "#181c1e",
+                    "error": "#ba1a1a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "primary": "#000f22",
+                    "inverse-on-surface": "#eef1f4",
+                    "inverse-surface": "#2d3133",
+                    "secondary-fixed-dim": "#27dfbc",
+                    "on-tertiary-container": "#b68200",
+                    "surface-tint": "#49607e",
+                    "on-surface": "#181c1e",
+                    "secondary-container": "#55fcd8",
+                    "tertiary": "#170d00",
+                    "on-primary-fixed": "#001c37",
+                    "surface-container-low": "#f1f4f7",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "outline": "#74777e",
+                    "outline-variant": "#c4c6ce",
+                    "tertiary-container": "#322100",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#d7dadd",
+                    "background": "#f7fafd",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "secondary": "#006b59",
+                    "on-secondary-container": "#00725f",
+                    "primary-fixed": "#d2e4ff",
+                    "surface-container": "#ebeef1",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#b0c8eb",
+                    "on-secondary": "#ffffff",
+                    "secondary-fixed": "#55fcd8",
+                    "on-primary-fixed-variant": "#314865",
+                    "surface": "#f7fafd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-md": "16px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "stack-lg": "24px",
+                    "stack-sm": "8px",
+                    "touch-target": "48px"
+            },
+            "fontFamily": {
+                    "label-bold": [
+                            "Inter"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "caption": [
+                            "Inter"
+                    ],
+                    "h2": [
+                            "Inter"
+                    ],
+                    "h1": [
+                            "Inter"
+                    ],
+                    "display": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "label-bold": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body": [
+                            "15px",
+                            {
+                                    "lineHeight": "22px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "caption": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "h2": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "h1": [
+                            "22px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "display": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen flex flex-col pt-touch-target pb-touch-target md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-touch-target bg-primary dark:bg-primary-container border-b border-outline dark:border-outline-variant flat no shadows">
+<div class="flex items-center gap-4">
+<button class="text-on-primary dark:text-on-primary-container scale-95 duration-75 hover:bg-primary-fixed-dim/10 rounded-full p-2 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display text-display text-on-primary dark:text-on-primary-container">Microfi</h1>
+</div>
+<button class="text-on-primary dark:text-on-primary-container scale-95 duration-75 hover:bg-primary-fixed-dim/10 rounded-full p-2 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="signal_wifi_4_bar">signal_wifi_4_bar</span>
+</button>
+</header>
+<!-- Main Layout Container -->
+<div class="flex flex-1 relative w-full h-full max-w-7xl mx-auto">
+<!-- NavigationDrawer (Hidden on Mobile) -->
+<aside class="hidden md:flex flex-col p-gutter w-80 h-full border-r border-outline-variant shadow-sm bg-surface dark:bg-surface-container fixed top-touch-target left-0 bottom-0 z-40 overflow-y-auto">
+<div class="flex flex-col items-start mb-8 w-full p-4 border-b border-outline-variant">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4 overflow-hidden border border-outline">
+<span class="material-symbols-outlined text-4xl text-primary" data-icon="person">person</span>
+</div>
+<h2 class="font-h1 text-h1 text-primary">Agent 402</h2>
+<p class="font-body text-body text-on-surface-variant">Douala Sector</p>
+<p class="font-caption text-caption text-secondary mt-1">Status: Online</p>
+</div>
+<nav class="flex-1 w-full flex flex-col gap-2">
+<button class="text-on-surface-variant font-body my-1 flex items-center gap-3 p-3 w-full text-left rounded-xl hover:bg-surface-container-high transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span>Agent Profile</span>
+</button>
+<button class="bg-primary-container text-on-primary-container font-label-bold rounded-full my-1 flex items-center gap-3 p-3 w-full text-left transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span>Collection Wizard</span>
+</button>
+<button class="text-on-surface-variant font-body my-1 flex items-center gap-3 p-3 w-full text-left rounded-xl hover:bg-surface-container-high transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span>Savings Booklet</span>
+</button>
+<button class="text-on-surface-variant font-body my-1 flex items-center gap-3 p-3 w-full text-left rounded-xl hover:bg-surface-container-high transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+<span>Security Settings</span>
+</button>
+</nav>
+<div class="mt-auto w-full pt-4 border-t border-outline-variant">
+<button class="text-on-surface-variant font-body my-1 flex items-center gap-3 p-3 w-full text-left rounded-xl hover:bg-surface-container-high transition-colors duration-200 text-error">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</button>
+</div>
+</aside>
+<!-- Main Content Area (Canvas) -->
+<main class="flex-1 w-full md:ml-80 p-margin-mobile flex flex-col gap-stack-lg max-w-3xl mx-auto mt-stack-lg">
+<!-- Stepper -->
+<div class="flex items-center w-full max-w-sm mx-auto mb-4">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-sm font-bold" data-icon="check">check</span>
+</div>
+<span class="font-caption text-caption text-secondary mt-1">Step 1</span>
+</div>
+<div class="flex-1 h-[2px] bg-secondary mx-2"></div>
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-bold text-label-bold border-2 border-primary">
+                        2
+                    </div>
+<span class="font-caption text-caption text-primary mt-1 font-bold">Step 2</span>
+</div>
+<div class="flex-1 h-[2px] bg-surface-container-highest mx-2"></div>
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-surface-container-lowest text-outline flex items-center justify-center font-label-bold text-label-bold border-2 border-outline-variant">
+                        3
+                    </div>
+<span class="font-caption text-caption text-outline mt-1">Step 3</span>
+</div>
+</div>
+<!-- Client Context Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="account_circle">account_circle</span>
+</div>
+<div class="flex-1">
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-1">Target Client</p>
+<h2 class="font-h2 text-h2 text-primary">Kamga Adele</h2>
+<p class="font-body text-body text-outline font-mono text-sm">MFI-2026-88391</p>
+</div>
+<div class="text-right">
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-1">Target Amount</p>
+<p class="font-h2 text-h2 text-primary">25,000 XAF</p>
+</div>
+</div>
+<!-- Denomination Grid -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-1 shadow-sm">
+<div class="p-4 border-b border-outline-variant/50 bg-surface-bright rounded-t-xl flex justify-between items-center">
+<h3 class="font-h2 text-h2 text-primary">Denomination Breakdown</h3>
+<span class="material-symbols-outlined text-outline" data-icon="payments">payments</span>
+</div>
+<div class="flex flex-col">
+<!-- Row 1: 10,000 -->
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/30 min-h-[64px]">
+<div class="flex items-center gap-3 w-1/3">
+<div class="w-10 h-6 bg-surface-variant rounded border border-outline-variant flex items-center justify-center">
+<span class="font-label-bold text-[10px] text-on-surface-variant">BEAC</span>
+</div>
+<span class="font-h2 text-h2 text-primary">10,000</span>
+</div>
+<span class="font-body text-body text-outline mx-2 text-sm">x</span>
+<div class="w-1/3 flex justify-end">
+<input class="w-20 h-touch-target rounded-DEFAULT border-outline focus:border-primary focus:ring-1 focus:ring-primary text-center font-h2 text-h2 text-primary bg-surface-container-lowest p-2" inputmode="numeric" pattern="\d*" placeholder="0" type="number"/>
+</div>
+</div>
+<!-- Row 2: 5,000 -->
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/30 min-h-[64px]">
+<div class="flex items-center gap-3 w-1/3">
+<div class="w-10 h-6 bg-surface-variant rounded border border-outline-variant flex items-center justify-center">
+<span class="font-label-bold text-[10px] text-on-surface-variant">BEAC</span>
+</div>
+<span class="font-h2 text-h2 text-primary">5,000</span>
+</div>
+<span class="font-body text-body text-outline mx-2 text-sm">x</span>
+<div class="w-1/3 flex justify-end">
+<input class="w-20 h-touch-target rounded-DEFAULT border-outline focus:border-primary focus:ring-1 focus:ring-primary text-center font-h2 text-h2 text-primary bg-surface-container-lowest p-2" inputmode="numeric" pattern="\d*" placeholder="0" type="number"/>
+</div>
+</div>
+<!-- Row 3: 2,000 -->
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/30 min-h-[64px]">
+<div class="flex items-center gap-3 w-1/3">
+<div class="w-10 h-6 bg-surface-variant rounded border border-outline-variant flex items-center justify-center">
+<span class="font-label-bold text-[10px] text-on-surface-variant">BEAC</span>
+</div>
+<span class="font-h2 text-h2 text-primary">2,000</span>
+</div>
+<span class="font-body text-body text-outline mx-2 text-sm">x</span>
+<div class="w-1/3 flex justify-end">
+<input class="w-20 h-touch-target rounded-DEFAULT border-outline focus:border-primary focus:ring-1 focus:ring-primary text-center font-h2 text-h2 text-primary bg-surface-container-lowest p-2" inputmode="numeric" pattern="\d*" placeholder="0" type="number"/>
+</div>
+</div>
+<!-- Row 4: 1,000 -->
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/30 min-h-[64px]">
+<div class="flex items-center gap-3 w-1/3">
+<div class="w-10 h-6 bg-surface-variant rounded border border-outline-variant flex items-center justify-center">
+<span class="font-label-bold text-[10px] text-on-surface-variant">BEAC</span>
+</div>
+<span class="font-h2 text-h2 text-primary">1,000</span>
+</div>
+<span class="font-body text-body text-outline mx-2 text-sm">x</span>
+<div class="w-1/3 flex justify-end">
+<input class="w-20 h-touch-target rounded-DEFAULT border-outline focus:border-primary focus:ring-1 focus:ring-primary text-center font-h2 text-h2 text-primary bg-surface-container-lowest p-2" inputmode="numeric" pattern="\d*" placeholder="0" type="number"/>
+</div>
+</div>
+<!-- Row 5: 500 -->
+<div class="flex items-center justify-between p-4 min-h-[64px]">
+<div class="flex items-center gap-3 w-1/3">
+<div class="w-10 h-6 bg-surface-variant rounded border border-outline-variant flex items-center justify-center">
+<span class="font-label-bold text-[10px] text-on-surface-variant">BEAC</span>
+</div>
+<span class="font-h2 text-h2 text-primary">500</span>
+</div>
+<span class="font-body text-body text-outline mx-2 text-sm">x</span>
+<div class="w-1/3 flex justify-end">
+<input class="w-20 h-touch-target rounded-DEFAULT border-outline focus:border-primary focus:ring-1 focus:ring-primary text-center font-h2 text-h2 text-primary bg-surface-container-lowest p-2" inputmode="numeric" pattern="\d*" placeholder="0" type="number"/>
+</div>
+</div>
+</div>
+<!-- Live Total Area -->
+<div class="bg-surface-container p-6 rounded-b-xl flex flex-col items-center justify-center border-t border-outline-variant mt-2">
+<p class="font-caption text-caption text-on-surface-variant uppercase tracking-wider mb-2">Calculated Total</p>
+<div class="font-display text-display text-primary tracking-tight">TOTAL: 0 XAF</div>
+<p class="font-body text-body text-error mt-2 hidden" id="error-message">Total must exactly match 25,000 XAF</p>
+</div>
+</div>
+<!-- Action Button -->
+<div class="mt-4 pb-24 md:pb-8 w-full">
+<button class="w-full h-touch-target bg-primary text-on-primary font-label-bold text-label-bold rounded-full flex items-center justify-center gap-2 opacity-50 cursor-not-allowed transition-all" disabled="">
+<span>Verify &amp; Continue</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Hidden on Desktop) -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface dark:bg-surface-container-lowest border-t border-outline-variant dark:border-outline md:hidden flat no shadows">
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-lg">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-bold text-[10px] mt-1">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full h-[48px] w-full mx-1 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-label-bold text-[10px] mt-1">Collect</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-lg">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-bold text-[10px] mt-1">History</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform rounded-lg">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-bold text-[10px] mt-1">Wallet</span>
+</button>
+</nav>
+</body></html>

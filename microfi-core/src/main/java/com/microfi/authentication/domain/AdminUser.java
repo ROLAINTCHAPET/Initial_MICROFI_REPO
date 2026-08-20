@@ -44,4 +44,16 @@ public class AdminUser {
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private AdminUserStatus status = AdminUserStatus.ACTIVE;
+
+    private String fullName;
+
+    private String phone;
+
+    /**
+     * True until the account holder replaces the admin-assigned starting password with one of
+     * their own. Null (the default for every row created before this field existed, including
+     * the bootstrap ADMIN) is treated as "not forced" — this only applies to accounts created
+     * through {@code AdminUserManagementController#create} going forward.
+     */
+    private Boolean mustChangePassword;
 }

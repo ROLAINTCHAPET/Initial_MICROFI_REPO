@@ -5,8 +5,12 @@ import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.repository.AdminUserRepository;
+import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.authentication.service.AdminUserEnrollmentService;
 import com.microfi.shared.dto.AdminUserResponse;
 import com.microfi.shared.dto.CreateAdminUserRequest;
+import com.microfi.shared.dto.ResetAdminUserPasswordRequest;
+import com.microfi.shared.dto.UpdateAdminUserRoleRequest;
 import com.microfi.shared.dto.UpdateAdminUserStatusRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,7 +47,9 @@ import java.util.UUID;
 public class AdminUserManagementController {
 
     private final AdminUserRepository adminUserRepository;
+    private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AdminUserEnrollmentService adminUserEnrollmentService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -61,24 +67,7 @@ public class AdminUserManagementController {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch managers can only create accounts within their own branch");
                         }
                     }
-                    if (request.getRole() == AdminRole.ADMIN && request.getBranchId() != null) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ADMIN accounts must not be branch-scoped");
-                    }
-                    if (request.getRole() != AdminRole.ADMIN && request.getBranchId() == null) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, request.getRole() + " accounts must be assigned a branch");
-                    }
-                    if (adminUserRepository.existsByLogin(request.getLogin())) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Login '" + request.getLogin() + "' already exists");
-                    }
-
-                    AdminUser newUser = AdminUser.builder()
-                            .id(UUID.randomUUID())
-                            .login(request.getLogin())
-                            .passwordHash(passwordEncoder.encode(request.getPassword()))
-                            .role(request.getRole())
-                            .branchId(request.getBranchId())
-                            .build();
-                    return toResponse(adminUserRepository.save(newUser));
+                    return toResponse(adminUserEnrollmentService.create(request));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -99,26 +88,78 @@ public class AdminUserManagementController {
                 .map(this::toResponse);
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "Get Back-Office Account", description = "ADMIN can view any account; BRANCH_MANAGER/BRANCH_CASHIER only their own branch's.")
+    public Mono<AdminUserResponse> get(@PathVariable UUID id, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminUser target = findOrThrow(id);
+                    AdminAccess.requireBranchScope(caller, target.getBranchId());
+                    return toResponse(target);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @PatchMapping("/{id}/status")
     @Operation(summary = "Suspend / Reactivate Back-Office Account")
     public Mono<AdminUserResponse> updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateAdminUserStatusRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
-                    AdminUser target = adminUserRepository.findById(id)
-                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin user not found: " + id));
+                    AdminUser target = findOrThrow(id);
                     AdminAccess.requireBranchScope(caller, target.getBranchId());
                     target.setStatus(request.getStatus());
                     return toResponse(adminUserRepository.save(target));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @PatchMapping("/{id}/role")
+    @Operation(summary = "Change Role / Branch", description = "ADMIN only — unlike creation and status changes, a BRANCH_MANAGER cannot reassign roles or move accounts across branches (that would let them promote their own privileges by proxy).")
+    public Mono<AdminUserResponse> updateRole(@PathVariable UUID id, @Valid @RequestBody UpdateAdminUserRoleRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminUser target = findOrThrow(id);
+                    requireConsistentRoleAndBranch(request.getRole(), request.getBranchId());
+                    target.setRole(request.getRole());
+                    target.setBranchId(request.getBranchId());
+                    return toResponse(adminUserRepository.save(target));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/{id}/password")
+    @Operation(summary = "Reset Password", description = "Back-Office-initiated reset (no current-password confirmation, unlike a self-service change). ADMIN, or BRANCH_MANAGER for accounts in their own branch.")
+    public Mono<AdminUserResponse> resetPassword(@PathVariable UUID id, @Valid @RequestBody ResetAdminUserPasswordRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminUser target = findOrThrow(id);
+                    AdminAccess.requireBranchScope(caller, target.getBranchId());
+                    target.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+                    return toResponse(adminUserRepository.save(target));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private void requireConsistentRoleAndBranch(AdminRole role, UUID branchId) {
+        if (role == AdminRole.ADMIN && branchId != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ADMIN accounts must not be branch-scoped");
+        }
+        if (role != AdminRole.ADMIN && branchId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, role + " accounts must be assigned a branch");
+        }
+    }
+
+    private AdminUser findOrThrow(UUID id) {
+        return adminUserRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin user not found: " + id));
+    }
+
     private AdminUserResponse toResponse(AdminUser user) {
         return AdminUserResponse.builder()
                 .id(user.getId())
                 .login(user.getLogin())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .branchId(user.getBranchId())
                 .status(user.getStatus())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 }

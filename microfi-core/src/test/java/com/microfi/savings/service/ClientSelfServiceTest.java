@@ -6,6 +6,9 @@ import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.repository.AccessTokenRepository;
 import com.microfi.savings.repository.ClientProfileRepository;
 import com.microfi.shared.dto.ClientProfileSelfResponse;
+import com.microfi.shared.dto.ClientRecentCollectionResponse;
+import com.microfi.transactions.service.CollectionDirectoryService;
+import com.microfi.transactions.service.CollectionSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -14,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +31,8 @@ class ClientSelfServiceTest {
     private ClientProfileRepository clientProfileRepository;
     @Mock
     private AccessTokenRepository accessTokenRepository;
+    @Mock
+    private CollectionDirectoryService collectionDirectoryService;
 
     private ClientSelfService service;
 
@@ -35,7 +41,7 @@ class ClientSelfServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new ClientSelfService(clientProfileRepository, accessTokenRepository);
+        service = new ClientSelfService(clientProfileRepository, accessTokenRepository, collectionDirectoryService);
     }
 
     private ClientProfile client() {
@@ -96,5 +102,21 @@ class ClientSelfServiceTest {
         when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(client()));
 
         assertThat(service.getCbsRef(clientId)).isEqualTo("CBS-1");
+    }
+
+    @Test
+    void getRecentCollectionsMapsFromCollectionDirectoryService() {
+        UUID collectionId = UUID.randomUUID();
+        Instant collectedAt = Instant.now();
+        when(collectionDirectoryService.findRecentByClient(clientId)).thenReturn(
+                List.of(new CollectionSummary(collectionId, UUID.randomUUID(), clientId, 5000L, "Akwa, Douala", collectedAt)));
+
+        List<ClientRecentCollectionResponse> response = service.getRecentCollections(clientId);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getId()).isEqualTo(collectionId);
+        assertThat(response.get(0).getAmountXaf()).isEqualTo(5000L);
+        assertThat(response.get(0).getLocationName()).isEqualTo("Akwa, Douala");
+        assertThat(response.get(0).getCollectedAt()).isEqualTo(collectedAt);
     }
 }

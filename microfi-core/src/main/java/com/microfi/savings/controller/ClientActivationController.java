@@ -10,11 +10,13 @@ import com.microfi.shared.dto.CancelActivationRequestRequest;
 import com.microfi.shared.dto.ClientActivationResponse;
 import com.microfi.shared.dto.ClientPaymentConfirmationRequest;
 import com.microfi.shared.dto.PendingActivationRequestResponse;
+import com.microfi.shared.dto.PendingClientActivationResponse;
 import com.microfi.shared.dto.SponsorActivationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,7 +24,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -55,6 +59,29 @@ public class ClientActivationController {
     public Mono<ClientActivationResponse> sponsor(@Valid @RequestBody SponsorActivationRequest request, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
                 .flatMap(agentId -> Mono.fromCallable(() -> clientActivationService.sponsorActivation(request.getLogin(), agentId))
+                        .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/api/v1/clients/pending-activation")
+    @Operation(summary = "List Clients Awaiting Activation", description = "Clients who've already self-activated (set their own login) but have no live booklet token yet — the sponsor-activation candidate list for the mobile app. Same name/phone/member-number search as GET /clients/lookup. Not branch-scoped, same reasoning as client lookup. Agent principals only.")
+    public Flux<PendingClientActivationResponse> pendingActivation(@RequestParam(defaultValue = "") String query, Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(authentication -> {
+                    if (!(authentication.getPrincipal() instanceof AgentDetails)) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only agent accounts can list clients awaiting activation");
+                    }
+                    return query;
+                })
+                .flatMapMany(q -> Mono.fromCallable(() -> clientActivationService.listPendingActivation(q))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
+    }
+
+    @PostMapping("/api/v1/clients/{clientId}/activation")
+    @Operation(summary = "Register Client Activation Cash Payment (by client id)", description = "Same gate as POST /clients/activation, identifying the client by id instead of login — for the mobile app's pending-activation list (tap a client instead of typing their login).")
+    public Mono<ClientActivationResponse> sponsorById(@PathVariable UUID clientId, Mono<Authentication> authenticationMono) {
+        return resolveAgentId(authenticationMono)
+                .flatMap(agentId -> Mono.fromCallable(() -> clientActivationService.sponsorActivationById(clientId, agentId))
                         .subscribeOn(Schedulers.boundedElastic()));
     }
 

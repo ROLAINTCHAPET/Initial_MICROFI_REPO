@@ -13,6 +13,7 @@ public class EscrowResponse {
     private long balanceXaf;
     private long baseCeilingXaf;
     private long effectiveCeilingXaf;
+    private long cumulativeTodayXaf;
     private String activeOverrideReason;
     private Instant overrideValidUntil;
     private Instant updatedAt;

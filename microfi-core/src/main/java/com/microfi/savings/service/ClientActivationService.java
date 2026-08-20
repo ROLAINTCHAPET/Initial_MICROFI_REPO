@@ -19,6 +19,7 @@ import com.microfi.shared.dto.ClientPaymentConfirmationRequest;
 import com.microfi.shared.dto.MiddlewareFeeSplit;
 import com.microfi.shared.dto.MiddlewareMemberVerification;
 import com.microfi.shared.dto.PendingActivationRequestResponse;
+import com.microfi.shared.dto.PendingClientActivationResponse;
 import com.microfi.transactions.service.CollectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,6 +101,17 @@ public class ClientActivationService {
     public ClientActivationResponse sponsorActivation(String login, UUID agentId) {
         ClientProfile client = clientProfileRepository.findByLogin(login)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No client with login: " + login));
+        return doSponsor(client, agentId);
+    }
+
+    /** Same gate as {@link #sponsorActivation}, identifying the client by id instead of login — backs the mobile app's pending-activation list (tap a client instead of typing their login). */
+    public ClientActivationResponse sponsorActivationById(UUID clientId, UUID agentId) {
+        ClientProfile client = clientProfileRepository.findById(clientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + clientId));
+        return doSponsor(client, agentId);
+    }
+
+    private ClientActivationResponse doSponsor(ClientProfile client, UUID agentId) {
         requireNotAlreadyActive(client.getId());
 
         ActivationRequest activationRequest = openRequestFor(client.getId());
@@ -115,6 +127,26 @@ public class ClientActivationService {
         activationRequestRepository.save(activationRequest);
 
         return finalizeIfReady(client, activationRequest);
+    }
+
+    /** UC-19 step 2 candidate list for the mobile app's Sponsor Activation screen — same name/phone/member-number search as client lookup, restricted to clients who've self-activated but have no live booklet token yet. */
+    public List<PendingClientActivationResponse> listPendingActivation(String query) {
+        return clientProfileRepository.findPendingActivation(query == null ? "" : query.trim()).stream()
+                .map(this::toPendingClientResponse)
+                .toList();
+    }
+
+    private PendingClientActivationResponse toPendingClientResponse(ClientProfile client) {
+        boolean sponsored = activationRequestRepository.findByClientIdAndStatus(client.getId(), ActivationRequestStatus.PENDING)
+                .map(r -> r.getSponsoredAt() != null)
+                .orElse(false);
+        return PendingClientActivationResponse.builder()
+                .id(client.getId())
+                .mfiMemberNo(client.getMfiMemberNo())
+                .fullName(client.getFullName())
+                .phone(client.getPhone())
+                .sponsored(sponsored)
+                .build();
     }
 
     public ClientActivationResponse confirmPayment(UUID clientId, ClientPaymentConfirmationRequest request) {

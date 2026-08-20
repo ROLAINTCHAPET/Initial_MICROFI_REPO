@@ -1,6 +1,7 @@
 package com.microfi.authentication.controller;
 
 import com.microfi.authentication.AgentDetails;
+import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
@@ -14,18 +15,22 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -40,50 +45,100 @@ public class AuthenticationController {
     private final BranchRepository branchRepository;
 
     @PostMapping("/agent/login")
-    @Operation(summary = "Agent Login", description = "Authenticates an agent using their employee code, PIN, and device IMEI. Returns a JWT token.")
+    @Operation(summary = "Agent Login", description = "Authenticates an agent using their username, password, and device IMEI. Returns a JWT token. The transaction PIN is not involved in login — see POST /collections.")
     public Mono<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
-        return agentDetailsService.findByUsername(request.getEmployeeCode())
+        return agentDetailsService.findByUsername(request.getUsername())
                 .cast(AgentDetails.class)
                 .flatMap(agentDetails -> {
-                    // Suspended agents must not be able to open a new session (FR-02)
-                    if (agentDetails.getAgent().getStatus() != AgentStatus.ACTIVE) {
-                        authEventPublisher.publishFailure(request.getEmployeeCode(), request.getImei());
+                    Agent agent = agentDetails.getAgent();
+
+                    // Only a SUSPENDED agent is blocked from logging in (FR-02). A PENDING_CEILING
+                    // agent (escrow not yet funded) may still log in and use the app — they just
+                    // can't collect deposits yet, enforced separately at collection time (see
+                    // AgentDirectoryService#verifyTransactionPin).
+                    if (agent.getStatus() == AgentStatus.SUSPENDED) {
+                        authEventPublisher.publishFailure(request.getUsername(), request.getImei());
                         return Mono.error(new InvalidCredentialsException("Agent account is suspended"));
                     }
 
-                    // Check PIN
-                    if (!passwordEncoder.matches(request.getPin(), agentDetails.getPassword())) {
-                        authEventPublisher.publishFailure(request.getEmployeeCode(), request.getImei());
-                        return Mono.error(new InvalidCredentialsException("Invalid PIN"));
+                    // UC-01 §4.1: locked out after too many failed login attempts — rejected before the password is even checked.
+                    if (agent.getLockedUntil() != null && agent.getLockedUntil().isAfter(Instant.now())) {
+                        authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                        return Mono.error(new ResponseStatusException(HttpStatus.LOCKED,
+                                "Too many failed login attempts. Try again after " + DateTimeFormatter.ISO_INSTANT.format(agent.getLockedUntil())));
                     }
 
-                    // Check IMEI binding (FR-01, BR-Auth-02: mandatory, no soft-login without hardware association)
-                    if (!request.getImei().equals(agentDetails.getAgent().getImei())) {
-                        authEventPublisher.publishFailure(request.getEmployeeCode(), request.getImei());
-                        return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
+                    // Check password
+                    if (!passwordEncoder.matches(request.getPassword(), agentDetails.getPassword())) {
+                        return Mono.fromRunnable(() -> agentDetailsService.registerFailedLoginAttempt(agent))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .then(Mono.defer(() -> {
+                                    authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                                    return Mono.error(new InvalidCredentialsException("Invalid password"));
+                                }));
+                    }
+
+                    Branch branch = branchRepository.findById(agent.getBranchId()).orElse(null);
+
+                    // Device binding (FR-01, BR-Auth-02). Three cases:
+                    //  - already bound (agent.imei set): strict match required, regardless of the
+                    //    branch's current setting — a branch turning the requirement off later
+                    //    doesn't retroactively unbind an already-enrolled agent.
+                    //  - not yet bound, branch requires binding: this login IS the enrollment —
+                    //    bind whatever device sent it, so long as one was actually sent.
+                    //  - not yet bound, branch doesn't require binding: skip entirely.
+                    boolean requiresImei = branch != null && branch.effectiveRequireImei();
+                    boolean bindDeviceNow = false;
+                    if (agent.getImei() != null) {
+                        if (!agent.getImei().equals(request.getImei())) {
+                            authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                            return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
+                        }
+                    } else if (requiresImei) {
+                        if (request.getImei() == null || request.getImei().isBlank()) {
+                            authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                            return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
+                        }
+                        bindDeviceNow = true;
                     }
 
                     // Enforce branch schedule window (UC-01 rule: session limited to schedule window, FR-15)
-                    String scheduleViolation = checkScheduleWindow(agentDetails.getAgent().getBranchId());
+                    String scheduleViolation = checkScheduleWindow(branch);
                     if (scheduleViolation != null) {
-                        authEventPublisher.publishFailure(request.getEmployeeCode(), request.getImei());
+                        authEventPublisher.publishFailure(request.getUsername(), request.getImei());
                         return Mono.error(new InvalidCredentialsException(scheduleViolation));
                     }
 
-                    // Generate Token
-                    Map<String, Object> extraClaims = new HashMap<>();
-                    extraClaims.put("branchId", agentDetails.getAgent().getBranchId());
-                    extraClaims.put("role", "AGENT");
-                    extraClaims.put("imei", request.getImei());
-                    extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_AGENT);
+                    boolean finalBindDeviceNow = bindDeviceNow;
+                    return Mono.fromRunnable(() -> {
+                                agentDetailsService.resetFailedLoginAttempts(agent);
+                                if (finalBindDeviceNow) {
+                                    agent.setImei(request.getImei());
+                                    agentDetailsService.bindDevice(agent);
+                                }
+                            })
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .then(Mono.defer(() -> {
+                                Map<String, Object> extraClaims = new HashMap<>();
+                                extraClaims.put("branchId", agent.getBranchId());
+                                extraClaims.put("role", "AGENT");
+                                extraClaims.put("imei", request.getImei());
+                                extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_AGENT);
 
-                    String jwtToken = jwtService.generateToken(extraClaims, agentDetails);
-                    authEventPublisher.publishSuccess(request.getEmployeeCode(), request.getImei());
-                    return Mono.just(AuthResponse.builder().token(jwtToken).build());
+                                String jwtToken = jwtService.generateToken(extraClaims, agentDetails);
+                                authEventPublisher.publishSuccess(request.getUsername(), request.getImei());
+                                return Mono.just(AuthResponse.builder().token(jwtToken).build());
+                            }));
                 })
-                .onErrorResume(InvalidCredentialsException.class, Mono::error)
                 .onErrorResume(e -> {
-                    authEventPublisher.publishFailure(request.getEmployeeCode(), request.getImei());
+                    // InvalidCredentialsException/ResponseStatusException (e.g. the 423 lockout
+                    // above) already carry the right status/message — passing them downstream
+                    // through further onErrorResume operators doesn't exempt them from a later
+                    // unconditional one, so the type check has to happen right here.
+                    if (e instanceof InvalidCredentialsException || e instanceof ResponseStatusException) {
+                        return Mono.error(e);
+                    }
+                    authEventPublisher.publishFailure(request.getUsername(), request.getImei());
                     return Mono.error(new InvalidCredentialsException("Authentication failed: " + e.getMessage()));
                 });
     }
@@ -93,11 +148,7 @@ public class AuthenticationController {
      * current time falls outside it, or {@code null} if the session is allowed. A branch with no
      * (or partially configured) schedule imposes no restriction.
      */
-    private String checkScheduleWindow(UUID branchId) {
-        if (branchId == null) {
-            return null;
-        }
-        Branch branch = branchRepository.findById(branchId).orElse(null);
+    private String checkScheduleWindow(Branch branch) {
         if (branch == null || branch.getOpenTime() == null || branch.getCloseTime() == null || branch.getTimezone() == null) {
             return null;
         }

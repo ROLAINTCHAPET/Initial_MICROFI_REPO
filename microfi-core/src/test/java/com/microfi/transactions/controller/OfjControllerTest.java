@@ -65,7 +65,7 @@ class OfjControllerTest {
 
     @Test
     void testSummary() {
-        when(ofjService.getSummary(branchId)).thenReturn(
+        when(ofjService.getSummary(branchId, null)).thenReturn(
                 OfjSummaryResponse.builder().sessionId(UUID.randomUUID()).branchId(branchId).status("OPEN").agentLines(List.of()).build());
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
@@ -75,6 +75,63 @@ class OfjControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("OPEN");
+    }
+
+    @Test
+    void testSummaryWithDateParam() {
+        java.time.LocalDate yesterday = java.time.LocalDate.now().minusDays(1);
+        when(ofjService.getSummary(branchId, yesterday)).thenReturn(
+                OfjSummaryResponse.builder().sessionId(UUID.randomUUID()).branchId(branchId).businessDate(yesterday).status("CLOSED").agentLines(List.of()).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/ofj/" + branchId + "/summary?date=" + yesterday)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("CLOSED");
+    }
+
+    @Test
+    void testPending() {
+        UUID agentId = UUID.randomUUID();
+        when(ofjService.listPendingAgents(branchId)).thenReturn(List.of(
+                com.microfi.shared.dto.OfjPendingLineResponse.builder().agentId(agentId).collectionsTotalXaf(4000).digitalTotalXaf(4000).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/ofj/" + branchId + "/pending")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].agentId").isEqualTo(agentId.toString())
+                .jsonPath("$[0].digitalTotalXaf").isEqualTo(4000);
+    }
+
+    @Test
+    void testHistory() {
+        when(ofjService.listHistory(branchId)).thenReturn(List.of(
+                OfjSummaryResponse.builder().sessionId(UUID.randomUUID()).branchId(branchId).status("CLOSED").agentLines(List.of()).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/ofj/" + branchId + "/history")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void testBranchVarianceDebts() {
+        when(ofjService.listVarianceDebtsForBranch(branchId, false)).thenReturn(List.of(
+                VarianceDebtResponse.builder().id(UUID.randomUUID()).amountXaf(1000).status("OPEN").build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/ofj/" + branchId + "/variance-debts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
     }
 
     @Test

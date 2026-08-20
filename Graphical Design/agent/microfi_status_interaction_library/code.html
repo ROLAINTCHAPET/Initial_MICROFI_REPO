@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi - Status Cards Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#005142",
+                      "on-primary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "secondary-container": "#55fcd8",
+                      "surface-bright": "#f7fafd",
+                      "on-primary-container": "#768dad",
+                      "on-primary-fixed": "#001c37",
+                      "surface-container-highest": "#e0e3e6",
+                      "on-surface-variant": "#43474d",
+                      "surface-dim": "#d7dadd",
+                      "on-primary-fixed-variant": "#314865",
+                      "secondary-fixed": "#55fcd8",
+                      "primary-fixed": "#d2e4ff",
+                      "surface-container": "#ebeef1",
+                      "on-error": "#ffffff",
+                      "primary": "#000f22",
+                      "on-secondary-fixed": "#002019",
+                      "tertiary-fixed": "#ffdea8",
+                      "on-tertiary-fixed": "#271900",
+                      "secondary": "#006b59",
+                      "on-tertiary-container": "#b68200",
+                      "on-secondary-container": "#00725f",
+                      "on-background": "#181c1e",
+                      "inverse-on-surface": "#eef1f4",
+                      "surface-container-lowest": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "surface-tint": "#49607e",
+                      "inverse-surface": "#2d3133",
+                      "outline": "#74777e",
+                      "outline-variant": "#c4c6ce",
+                      "primary-container": "#0a2540",
+                      "primary-fixed-dim": "#b0c8eb",
+                      "inverse-primary": "#b0c8eb",
+                      "on-tertiary-fixed-variant": "#5e4200",
+                      "background": "#f7fafd",
+                      "tertiary-container": "#322100",
+                      "tertiary-fixed-dim": "#ffba20",
+                      "surface-variant": "#e0e3e6",
+                      "on-tertiary": "#ffffff",
+                      "on-surface": "#181c1e",
+                      "tertiary": "#170d00",
+                      "surface": "#f7fafd",
+                      "error": "#ba1a1a",
+                      "error-container": "#ffdad6",
+                      "surface-container-low": "#f1f4f7",
+                      "surface-container-high": "#e5e8eb",
+                      "secondary-fixed-dim": "#27dfbc"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-mobile": "20px",
+                      "gutter": "16px",
+                      "stack-md": "16px",
+                      "stack-sm": "8px",
+                      "stack-lg": "24px",
+                      "touch-target": "48px"
+              },
+              "fontFamily": {
+                      "h1": [
+                              "Inter"
+                      ],
+                      "caption": [
+                              "Inter"
+                      ],
+                      "body": [
+                              "Inter"
+                      ],
+                      "display": [
+                              "Inter"
+                      ],
+                      "h2": [
+                              "Inter"
+                      ],
+                      "label-bold": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "h1": [
+                              "22px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "caption": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body": [
+                              "15px",
+                              {
+                                      "lineHeight": "22px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "h2": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-bold": [
+                              "13px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* Utility for 4px baseline grid */
+        .baseline-grid {
+            background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+            background-size: 100% 4px;
+        }
+
+        /* Prevent overscroll on mobile */
+        html, body {
+            overscroll-behavior-y: none;
+        }
+        
+        /* Custom scrollbar hiding for clean look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col pt-[calc(48px+env(safe-area-inset-top))] pb-[calc(80px+env(safe-area-inset-bottom))]">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-[calc(48px+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-primary dark:bg-primary-container border-b border-outline dark:border-outline-variant flat no shadows scale-95 duration-75">
+<button aria-label="Menu" class="flex items-center justify-center w-touch-target h-touch-target text-on-primary dark:text-on-primary-container hover:bg-primary-fixed-dim/10 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display text-display text-on-primary dark:text-on-primary-container font-h1 text-h1 text-center flex-1">Microfi</h1>
+<button aria-label="Signal" class="flex items-center justify-center w-touch-target h-touch-target text-on-primary dark:text-on-primary-container hover:bg-primary-fixed-dim/10 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="signal_wifi_4_bar">signal_wifi_4_bar</span>
+</button>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 px-margin-mobile flex flex-col gap-stack-lg py-stack-md w-full max-w-[480px] mx-auto overflow-y-auto no-scrollbar">
+<h2 class="font-h1 text-h1 text-primary mb-stack-sm">Status Cards Library</h2>
+<!-- 1. Success Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter flex flex-col gap-stack-sm shadow-sm">
+<div class="flex items-center gap-gutter">
+<div class="w-12 h-12 rounded-full bg-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1; font-size: 28px;">check_circle</span>
+</div>
+<div class="flex-1">
+<h3 class="font-h2 text-h2 text-secondary mb-1">Collection Validated</h3>
+<p class="font-body text-body text-on-surface-variant">Transaction ID: TXN-8932-B</p>
+</div>
+</div>
+<div class="mt-stack-sm pt-stack-sm border-t border-outline-variant/30 flex justify-between items-center">
+<span class="font-label-bold text-label-bold text-on-surface">Amount Collected</span>
+<span class="font-display text-display text-primary text-[24px] leading-[32px]">25,000 XAF</span>
+</div>
+</div>
+<!-- 2. Pending Sync Banner -->
+<div class="bg-tertiary-fixed-dim/20 border border-tertiary-fixed-dim rounded-xl p-gutter flex items-center gap-gutter">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed-dim flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-fixed" data-icon="schedule" style="font-variation-settings: 'FILL' 1;">schedule</span>
+</div>
+<div class="flex-1">
+<p class="font-label-bold text-label-bold text-on-tertiary-fixed-variant">Offline Mode</p>
+<p class="font-body text-body text-on-surface-variant text-[13px] leading-snug">3 tickets pending sync</p>
+</div>
+<button class="h-10 px-4 rounded-full border border-tertiary-fixed-dim text-on-tertiary-fixed-variant font-label-bold text-label-bold active:bg-tertiary-fixed-dim/30 transition-colors">
+                Sync Now
+            </button>
+</div>
+<!-- 3. Error Modal (Network) Simulation -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col">
+<div class="bg-primary px-gutter py-3 flex items-center justify-between">
+<h3 class="font-h2 text-h2 text-on-primary">Network Update</h3>
+<div class="w-5 h-5 rounded-full border-2 border-on-primary/30 border-t-on-primary animate-spin"></div>
+</div>
+<div class="p-gutter flex flex-col gap-stack-sm">
+<p class="font-body text-body text-on-surface">Record saved successfully. The collection has been recorded.</p>
+<p class="font-body text-body text-on-surface-variant text-[14px]">The client's official bank balance update is being processed.</p>
+<button class="mt-stack-sm w-full h-touch-target rounded-lg bg-surface-container-high text-on-surface-variant font-label-bold text-label-bold border border-outline-variant hover:bg-surface-variant active:scale-[0.98] transition-all">
+                    Dismiss
+                </button>
+</div>
+</div>
+<!-- 4. Alert Card (Geofence/Ceiling) -->
+<div class="bg-error-container/30 border border-error-container rounded-xl p-gutter flex flex-col gap-stack-sm">
+<div class="flex items-start gap-gutter">
+<div class="w-12 h-12 rounded-full bg-error flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-error" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+<div class="flex-1 pt-1">
+<h3 class="font-h2 text-h2 text-error mb-1">Escrow Ceiling Reached</h3>
+<p class="font-body text-body text-on-surface-variant text-[14px] leading-snug">Maximum safe carrying capacity exceeded. Immediate deposit required before further collections.</p>
+</div>
+</div>
+<div class="mt-stack-sm flex gap-stack-sm">
+<button class="flex-1 h-touch-target rounded-lg border-2 border-primary text-primary font-label-bold text-label-bold hover:bg-primary/5 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="call">call</span>
+                    Contact Branch
+                </button>
+</div>
+</div>
+<!-- 5. Token States -->
+<div class="bg-surface-container border border-outline-variant rounded-xl p-gutter">
+<h3 class="font-label-bold text-label-bold text-on-surface-variant mb-stack-sm uppercase tracking-wider text-[11px]">Token Validation States</h3>
+<div class="flex flex-wrap gap-stack-sm">
+<!-- ACTIVE -->
+<div class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-secondary text-on-secondary font-label-bold text-label-bold text-[12px]">
+<span class="w-1.5 h-1.5 rounded-full bg-on-secondary animate-pulse"></span>
+                    ACTIVE
+                </div>
+<!-- GRACE -->
+<div class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-tertiary-fixed-dim text-on-tertiary-fixed-variant font-label-bold text-label-bold text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="hourglass_empty">hourglass_empty</span>
+                    GRACE
+                </div>
+<!-- EXPIRED -->
+<div class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-surface-variant text-on-surface-variant font-label-bold text-label-bold text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="do_not_disturb_on">do_not_disturb_on</span>
+                    EXPIRED
+                </div>
+<!-- REVOKED -->
+<div class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-error text-on-error font-label-bold text-label-bold text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="block">block</span>
+                    REVOKED
+                </div>
+</div>
+</div>
+<!-- Spacer for Bottom Nav -->
+<div class="h-8"></div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface dark:bg-surface-container-lowest border-t border-outline-variant dark:border-outline flat no shadows pb-[env(safe-area-inset-bottom)] h-[calc(64px+env(safe-area-inset-bottom))] md:hidden">
+<button class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full h-[48px] w-full mx-1 hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-bold text-label-bold text-[11px] leading-[11px]">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="history">history</span>
+<span class="font-label-bold text-label-bold text-[11px] leading-[11px]">History</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-bold text-label-bold text-[11px] leading-[11px]">Wallet</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="emergency">emergency</span>
+<span class="font-label-bold text-label-bold text-[11px] leading-[11px]">Emergency</span>
+</button>
+</nav>
+</body></html>

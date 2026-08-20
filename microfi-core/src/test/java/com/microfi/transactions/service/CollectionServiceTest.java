@@ -1,5 +1,6 @@
 package com.microfi.transactions.service;
 
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.CollectionRequest;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +42,12 @@ class CollectionServiceTest {
     private EscrowService escrowService;
     @Mock
     private ActivationDirectoryService activationDirectoryService;
+    @Mock
+    private AgentDirectoryService agentDirectoryService;
+    @Mock
+    private GeofenceService geofenceService;
+    @Mock
+    private GeocodingService geocodingService;
 
     private CollectionService collectionService;
 
@@ -49,9 +57,10 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService);
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, geocodingService);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
+        when(geofenceService.isWithinAssignedGeofence(any(), anyDouble(), anyDouble())).thenReturn(true);
     }
 
     private CollectionRequest validRequest(long amountXaf, List<DenominationLineDto> lines) {
@@ -63,6 +72,7 @@ class CollectionServiceTest {
         request.setCollectedAt(Instant.now());
         request.setDeviceTxId("DEV-TX-1");
         request.setDenominationLines(lines);
+        request.setPin("1234");
         return request;
     }
 
@@ -97,6 +107,92 @@ class CollectionServiceTest {
 
         assertThat(response.isDuplicate()).isTrue();
         assertThat(response.getId()).isEqualTo(existing.getId());
+    }
+
+    @Test
+    void verifiesTransactionPinBeforeRecording() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request);
+
+        org.mockito.Mockito.verify(agentDirectoryService).verifyTransactionPin(agentId, "1234");
+    }
+
+    @Test
+    void rejectsCollectionWhenTransactionPinIsWrong() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect PIN"))
+                .when(agentDirectoryService).verifyTransactionPin(agentId, "1234");
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("401");
+    }
+
+    @Test
+    void doesNotCheckTransactionPinOnIdempotentReplay() {
+        Collection existing = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("DEV-TX-1").build();
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.of(existing));
+
+        collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1))));
+
+        org.mockito.Mockito.verifyNoInteractions(agentDirectoryService);
+    }
+
+    @Test
+    void rejectsCollectionWhenOutsideAssignedGeofence() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(geofenceService.isWithinAssignedGeofence(agentId, 4.05, 9.70)).thenReturn(false);
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+
+        org.mockito.Mockito.verify(collectionRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void allowsCollectionWhenAgentHasNoGeofenceAssigned() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(geofenceService.isWithinAssignedGeofence(agentId, 4.05, 9.70)).thenReturn(true);
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        assertThat(response.isDuplicate()).isFalse();
+    }
+
+    @Test
+    void capturesReverseGeocodedLocationName() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(geocodingService.reverseGeocode(4.05, 9.70)).thenReturn("Akwa, Douala, Cameroon");
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        assertThat(response.getLocationName()).isEqualTo("Akwa, Douala, Cameroon");
+    }
+
+    @Test
+    void recordsCollectionEvenWhenGeocodingFails() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(geocodingService.reverseGeocode(4.05, 9.70)).thenReturn(null);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        assertThat(response.isDuplicate()).isFalse();
+        assertThat(response.getLocationName()).isNull();
     }
 
     @Test
@@ -171,5 +267,19 @@ class CollectionServiceTest {
         CollectionResponse response = collectionService.recordCollection(agentId, validRequest(500, null));
 
         assertThat(response.getAmountXaf()).isEqualTo(500);
+    }
+
+    @Test
+    void findRecentByAgentResolvesClientNames() {
+        Collection collection = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("DEV-TX-1").build();
+        when(collectionRepository.findTop50ByAgentIdOrderByCollectedAtDesc(agentId)).thenReturn(List.of(collection));
+        when(clientDirectoryService.findFullNames(any())).thenReturn(java.util.Map.of(clientId, "Jean Client"));
+
+        List<CollectionResponse> results = collectionService.findRecentByAgent(agentId);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getClientName()).isEqualTo("Jean Client");
+        assertThat(results.get(0).getAmountXaf()).isEqualTo(5000);
     }
 }

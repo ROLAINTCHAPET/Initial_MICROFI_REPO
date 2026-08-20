@@ -5,6 +5,7 @@ import com.microfi.authentication.domain.AdminRole;
 import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
 import com.microfi.shared.dto.OfjAgentLineResponse;
+import com.microfi.shared.dto.OfjPendingLineResponse;
 import com.microfi.shared.dto.OfjSummaryResponse;
 import com.microfi.shared.dto.ReconcileRequest;
 import com.microfi.shared.dto.VarianceDebtResponse;
@@ -14,16 +15,20 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -41,13 +46,53 @@ public class OfjController {
     private final OfjService ofjService;
 
     @GetMapping("/summary")
-    @Operation(summary = "OFJ Summary", description = "Current session state: digital totals per reconciled agent, physical totals and deltas so far. Any Back-Office role, own branch only.")
-    public Mono<OfjSummaryResponse> summary(@PathVariable UUID branchId, Mono<Authentication> authenticationMono) {
+    @Operation(summary = "OFJ Summary", description = "Current session state: digital totals per reconciled agent, physical totals and deltas so far. Omit `date` for today (auto-creates the session if needed); any other date is read-only history and 404s if that day never had a session. Any Back-Office role, own branch only.")
+    public Mono<OfjSummaryResponse> summary(@PathVariable UUID branchId,
+                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                             Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono)
                 .flatMap(caller -> {
                     AdminAccess.requireBranchScope(caller, branchId);
-                    return Mono.fromCallable(() -> ofjService.getSummary(branchId))
+                    return Mono.fromCallable(() -> ofjService.getSummary(branchId, date))
                             .subscribeOn(Schedulers.boundedElastic());
+                });
+    }
+
+    @GetMapping("/pending")
+    @Operation(summary = "Pending Reconciliation Queue", description = "Active agents in the branch who've collected cash today but haven't been reconciled yet — the cashier's real \"who's next\" queue (not individually tabled in architecture.txt's endpoint list, but required to back UC-16's nominal flow: a cashier needs to see who's waiting before reconciling them, not just the outcome afterward). Any Back-Office role, own branch only.")
+    public Flux<OfjPendingLineResponse> pending(@PathVariable UUID branchId, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMapMany(caller -> {
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    return Mono.fromCallable(() -> ofjService.listPendingAgents(branchId))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(Flux::fromIterable);
+                });
+    }
+
+    @GetMapping("/history")
+    @Operation(summary = "OFJ History", description = "Every past session for the branch, most recent business date first — for a reports/history screen. Any Back-Office role, own branch only.")
+    public Flux<OfjSummaryResponse> history(@PathVariable UUID branchId, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMapMany(caller -> {
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    return Mono.fromCallable(() -> ofjService.listHistory(branchId))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(Flux::fromIterable);
+                });
+    }
+
+    @GetMapping("/variance-debts")
+    @Operation(summary = "Branch Variance Debts", description = "Every agent debt recorded in the branch, most recent first — for a \"who owes what\" dashboard. Any Back-Office role, own branch only.")
+    public Flux<VarianceDebtResponse> varianceDebts(@PathVariable UUID branchId,
+                                                      @RequestParam(defaultValue = "false") boolean openOnly,
+                                                      Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMapMany(caller -> {
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    return Mono.fromCallable(() -> ofjService.listVarianceDebtsForBranch(branchId, openOnly))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(Flux::fromIterable);
                 });
     }
 

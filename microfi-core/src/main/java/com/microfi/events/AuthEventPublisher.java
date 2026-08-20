@@ -13,15 +13,15 @@ public class AuthEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void publishSuccess(String employeeCode, String imei) {
-        AuthEvent event = AuthEvent.success(employeeCode, imei);
-        log.info("Publishing LOGIN_SUCCESS event for agent: {}", employeeCode);
+    public void publishSuccess(String username, String imei) {
+        AuthEvent event = AuthEvent.success(username, imei);
+        log.info("Publishing LOGIN_SUCCESS event for agent: {}", username);
         publish(RabbitMQConfig.LOGIN_SUCCESS_KEY, event);
     }
 
-    public void publishFailure(String employeeCode, String imei) {
-        AuthEvent event = AuthEvent.failure(employeeCode, imei);
-        log.warn("Publishing LOGIN_FAILURE event for agent: {}", employeeCode);
+    public void publishFailure(String username, String imei) {
+        AuthEvent event = AuthEvent.failure(username, imei);
+        log.warn("Publishing LOGIN_FAILURE event for agent: {}", username);
         publish(RabbitMQConfig.LOGIN_FAILURE_KEY, event);
     }
 
@@ -31,7 +31,7 @@ public class AuthEventPublisher {
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.AUTH_EXCHANGE, routingKey, event);
         } catch (Exception e) {
-            log.error("Failed to publish auth event {} for agent {}: {}", event.eventType(), event.employeeCode(), e.getMessage());
+            log.error("Failed to publish auth event {} for agent {}: {}", event.eventType(), event.username(), e.getMessage());
         }
     }
 }

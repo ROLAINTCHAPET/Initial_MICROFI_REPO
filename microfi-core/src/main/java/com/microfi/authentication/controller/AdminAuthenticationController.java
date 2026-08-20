@@ -48,6 +48,7 @@ public class AdminAuthenticationController {
                     Map<String, Object> extraClaims = new HashMap<>();
                     extraClaims.put("role", adminDetails.getAdminUser().getRole().name());
                     extraClaims.put("branchId", adminDetails.getAdminUser().getBranchId());
+                    extraClaims.put("mustChangePassword", Boolean.TRUE.equals(adminDetails.getAdminUser().getMustChangePassword()));
                     extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_ADMIN_USER);
 
                     String token = jwtService.generateToken(extraClaims, adminDetails);

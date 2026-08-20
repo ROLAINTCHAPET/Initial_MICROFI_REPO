@@ -1,5 +1,6 @@
 package com.microfi.transactions.service;
 
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
@@ -20,7 +21,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * UC-06/07/08/12 — the Digital Cash Desk loop: resolve client, enforce the GPS gate, validate the
@@ -43,6 +46,9 @@ public class CollectionService {
     private final ClientDirectoryService clientDirectoryService;
     private final EscrowService escrowService;
     private final ActivationDirectoryService activationDirectoryService;
+    private final AgentDirectoryService agentDirectoryService;
+    private final GeofenceService geofenceService;
+    private final GeocodingService geocodingService;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
@@ -53,6 +59,8 @@ public class CollectionService {
             return toResponse(existing.get(), true);
         }
 
+        agentDirectoryService.verifyTransactionPin(agentId, request.getPin());
+        requireWithinAssignedGeofence(agentId, request.getLat(), request.getLon());
         clientDirectoryService.requireActiveClient(request.getClientId());
         requireNoPendingActivation(agentId);
 
@@ -67,6 +75,7 @@ public class CollectionService {
                 .lat(request.getLat())
                 .lon(request.getLon())
                 .accuracyM(request.getAccuracyM())
+                .locationName(geocodingService.reverseGeocode(request.getLat(), request.getLon()))
                 .collectedAt(request.getCollectedAt())
                 .deviceTxId(request.getDeviceTxId())
                 .build();
@@ -126,6 +135,19 @@ public class CollectionService {
     }
 
     /**
+     * If the agent has a geofence assigned, their captured position must fall inside it — an
+     * agent with no geofence assigned is unrestricted (see GeofenceService#isWithinAssignedGeofence).
+     * Distinct from BR-05's plain GPS-presence gate (enforced by {@code CollectionRequest}'s
+     * {@code @NotNull} lat/lon — a position must exist before this check even runs).
+     */
+    private void requireWithinAssignedGeofence(UUID agentId, double lat, double lon) {
+        if (!geofenceService.isWithinAssignedGeofence(agentId, lat, lon)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You are outside your assigned collection zone — move back inside your geofence to collect here");
+        }
+    }
+
+    /**
      * An agent-registered activation payment isn't a finalized {@code ActivationPayment} (and so
      * isn't counted by {@link #enforceEscrowCeiling}) until the client also confirms it — so while
      * one is pending, the agent's true cash-in-hand is invisible to ceiling accounting. Blocking
@@ -136,6 +158,30 @@ public class CollectionService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "You have a pending client activation payment awaiting confirmation — resolve it before collecting more cash");
         }
+    }
+
+    /** Mobile Home/History views — the agent's own last 50 collections, newest first, with client names resolved. */
+    public List<CollectionResponse> findRecentByAgent(UUID agentId) {
+        List<Collection> collections = collectionRepository.findTop50ByAgentIdOrderByCollectedAtDesc(agentId);
+        Map<UUID, String> namesByClientId = clientDirectoryService.findFullNames(
+                collections.stream().map(Collection::getClientId).collect(Collectors.toSet()));
+
+        return collections.stream()
+                .map(collection -> CollectionResponse.builder()
+                        .id(collection.getId())
+                        .agentId(collection.getAgentId())
+                        .clientId(collection.getClientId())
+                        .clientName(namesByClientId.get(collection.getClientId()))
+                        .amountXaf(collection.getAmountXaf())
+                        .lat(collection.getLat())
+                        .lon(collection.getLon())
+                        .accuracyM(collection.getAccuracyM())
+                        .locationName(collection.getLocationName())
+                        .collectedAt(collection.getCollectedAt())
+                        .syncStatus(collection.getSyncStatus())
+                        .deviceTxId(collection.getDeviceTxId())
+                        .build())
+                .toList();
     }
 
     private CollectionResponse toResponse(Collection collection, boolean duplicate) {
@@ -156,6 +202,7 @@ public class CollectionService {
                 .lat(collection.getLat())
                 .lon(collection.getLon())
                 .accuracyM(collection.getAccuracyM())
+                .locationName(collection.getLocationName())
                 .collectedAt(collection.getCollectedAt())
                 .syncStatus(collection.getSyncStatus())
                 .deviceTxId(collection.getDeviceTxId())

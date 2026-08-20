@@ -2,13 +2,13 @@ package com.microfi.authentication.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +22,13 @@ public class JwtService {
     public static final String PRINCIPAL_TYPE_AGENT = "AGENT";
     public static final String PRINCIPAL_TYPE_ADMIN_USER = "ADMIN_USER";
     public static final String PRINCIPAL_TYPE_CLIENT = "CLIENT";
+
+    /**
+     * Matched against the Kong Gateway JWT plugin's consumer credential {@code key} — Kong looks
+     * up which consumer's secret to verify against by this claim, so it must be present and
+     * stable. See {@code kong/kong.yml}.
+     */
+    public static final String ISSUER = "microfi-core";
 
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;
@@ -61,10 +68,15 @@ public class JwtService {
         return Jwts
                 .builder()
                 .claims(extraClaims)
+                .issuer(ISSUER)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSignInKey())
+                // Explicit algorithm, not left to jjwt's key-length auto-selection: Kong's JWT
+                // plugin credential pins a specific algorithm (HS384, see kong/kong.yml) and
+                // rejects a token signed with any other one, so this must stay deterministic
+                // regardless of how long application.security.jwt.secret-key happens to be.
+                .signWith(getSignInKey(), Jwts.SIG.HS384)
                 .compact();
     }
 
@@ -93,8 +105,14 @@ public class JwtService {
                 .getPayload();
     }
 
+    /**
+     * Raw UTF-8 bytes of the configured secret, not base64-decoded — matches how Kong's JWT
+     * plugin derives HMAC key material from its consumer credential {@code secret} field, so the
+     * same configured string verifies identically at the Gateway and here. (Previously
+     * base64-decoded; changing this invalidates any already-issued tokens, which is fine given
+     * their short lifetime — see kong/kong.yml.)
+     */
     private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 }

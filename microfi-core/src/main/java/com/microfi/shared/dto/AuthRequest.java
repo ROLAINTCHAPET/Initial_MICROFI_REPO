@@ -12,12 +12,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AuthRequest {
     
-    @NotBlank(message = "Employee code is required")
-    private String employeeCode;
-    
-    @NotBlank(message = "PIN is required")
-    private String pin;
-    
-    @NotBlank(message = "IMEI is required for agent binding")
+    @NotBlank(message = "Username is required")
+    private String username;
+
+    @NotBlank(message = "Password is required")
+    private String password;
+
+    /** Required only if the agent has an IMEI bound to their account (Branch#requireImei at enrollment time) — see AuthenticationController#login. */
     private String imei;
 }

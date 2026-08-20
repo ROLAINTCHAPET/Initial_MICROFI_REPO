@@ -5,8 +5,11 @@ import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
+import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.AdminUserRepository;
+import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.authentication.service.AdminUserEnrollmentService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
@@ -31,7 +34,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = AdminUserManagementController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AdminUserEnrollmentService.class})
 class AdminUserManagementControllerTest {
 
     @Autowired
@@ -39,6 +42,9 @@ class AdminUserManagementControllerTest {
 
     @MockitoBean
     private AdminUserRepository adminUserRepository;
+
+    @MockitoBean
+    private BranchRepository branchRepository;
 
     @MockitoBean
     private PasswordEncoder passwordEncoder;
@@ -68,7 +74,8 @@ class AdminUserManagementControllerTest {
 
     private String createBody(AdminRole role, UUID scopedBranchId) {
         String branchJson = scopedBranchId == null ? "null" : "\"" + scopedBranchId + "\"";
-        return "{\"login\":\"newuser\",\"password\":\"password123\",\"role\":\"" + role + "\",\"branchId\":" + branchJson + "}";
+        return "{\"login\":\"newuser\",\"password\":\"password123\",\"fullName\":\"New User\",\"phone\":\"+237600000010\"," +
+                "\"role\":\"" + role + "\",\"branchId\":" + branchJson + "}";
     }
 
     @Test
@@ -94,6 +101,7 @@ class AdminUserManagementControllerTest {
         when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).build()));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
                 .post()
@@ -102,6 +110,88 @@ class AdminUserManagementControllerTest {
                 .bodyValue(createBody(AdminRole.BRANCH_CASHIER, branchId))
                 .exchange()
                 .expectStatus().isCreated();
+    }
+
+    @Test
+    void testCreateManagerConflictsWithExistingManager() {
+        AdminUser existingManager = AdminUser.builder().id(UUID.randomUUID()).login("current-mgr")
+                .role(AdminRole.BRANCH_MANAGER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(adminUserRepository.findByBranchIdAndRole(branchId, AdminRole.BRANCH_MANAGER)).thenReturn(List.of(existingManager));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_MANAGER, branchId))
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testCreateManagerReplaceConfirmedSuspendsOldOneAndCreatesNew() {
+        AdminUser existingManager = AdminUser.builder().id(UUID.randomUUID()).login("current-mgr")
+                .role(AdminRole.BRANCH_MANAGER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(adminUserRepository.findByBranchIdAndRole(branchId, AdminRole.BRANCH_MANAGER)).thenReturn(List.of(existingManager));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = "{\"login\":\"newuser\",\"password\":\"password123\",\"fullName\":\"New User\",\"phone\":\"+237600000010\"," +
+                "\"role\":\"BRANCH_MANAGER\",\"branchId\":\"" + branchId + "\",\"replaceUserId\":\"" + existingManager.getId() + "\"}";
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isCreated();
+
+        org.mockito.Mockito.verify(adminUserRepository).save(
+                org.mockito.ArgumentMatchers.argThat(u -> u.getId().equals(existingManager.getId()) && u.getStatus() == AdminUserStatus.SUSPENDED));
+    }
+
+    @Test
+    void testCreateCashierAtCapConflictsWithoutReplaceUserId() {
+        AdminUser existingCashier = AdminUser.builder().id(UUID.randomUUID()).login("c1")
+                .role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(adminUserRepository.findByBranchIdAndRole(branchId, AdminRole.BRANCH_CASHIER)).thenReturn(List.of(existingCashier));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).maxCashiers(1).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_CASHIER, branchId))
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testCreateCashierReplaceConfirmedSuspendsOldOneAndCreatesNew() {
+        AdminUser existingCashier = AdminUser.builder().id(UUID.randomUUID()).login("c1")
+                .role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(adminUserRepository.findByBranchIdAndRole(branchId, AdminRole.BRANCH_CASHIER)).thenReturn(List.of(existingCashier));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).maxCashiers(1).build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = "{\"login\":\"newuser\",\"password\":\"password123\",\"fullName\":\"New User\",\"phone\":\"+237600000010\"," +
+                "\"role\":\"BRANCH_CASHIER\",\"branchId\":\"" + branchId + "\",\"replaceUserId\":\"" + existingCashier.getId() + "\"}";
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isCreated();
+
+        org.mockito.Mockito.verify(adminUserRepository).save(
+                org.mockito.ArgumentMatchers.argThat(u -> u.getId().equals(existingCashier.getId()) && u.getStatus() == AdminUserStatus.SUSPENDED));
     }
 
     @Test
@@ -161,6 +251,39 @@ class AdminUserManagementControllerTest {
                 .bodyValue(createBody(AdminRole.BRANCH_MANAGER, branchId))
                 .exchange()
                 .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testCreateDuplicatePhoneConflict() {
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(adminUserRepository.existsByPhone("+237600000010")).thenReturn(true);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_MANAGER, branchId))
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testCreateSetsMustChangePasswordTrue() {
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_MANAGER, branchId))
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.mustChangePassword").isEqualTo(true)
+                .jsonPath("$.fullName").isEqualTo("New User")
+                .jsonPath("$.phone").isEqualTo("+237600000010");
     }
 
     @Test
@@ -255,6 +378,95 @@ class AdminUserManagementControllerTest {
                 .uri("/api/v1/admin/users/" + id + "/status")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{\"status\":\"SUSPENDED\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testGetSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .get()
+                .uri("/api/v1/admin/users/" + id)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.login").isEqualTo("target");
+    }
+
+    @Test
+    void testUpdateRoleByAdminSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/role")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"role\":\"BRANCH_MANAGER\",\"branchId\":\"" + branchId + "\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.role").isEqualTo("BRANCH_MANAGER");
+    }
+
+    @Test
+    void testUpdateRoleByManagerForbidden() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/role")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"role\":\"BRANCH_MANAGER\",\"branchId\":\"" + branchId + "\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testUpdateRoleInconsistentBranchRejected() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/role")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"role\":\"ADMIN\",\"branchId\":\"" + branchId + "\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testResetPasswordSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(passwordEncoder.encode(anyString())).thenReturn("newhash");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"newPassword\":\"newpassword123\"}")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void testResetPasswordByCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + UUID.randomUUID() + "/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"newPassword\":\"newpassword123\"}")
                 .exchange()
                 .expectStatus().isForbidden();
     }

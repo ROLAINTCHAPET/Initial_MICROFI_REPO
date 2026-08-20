@@ -18,4 +18,6 @@ public class SosResponse {
     private Double lat;
     private Double lon;
     private Instant raisedAt;
+    private UUID acknowledgedBy;
+    private Instant acknowledgedAt;
 }

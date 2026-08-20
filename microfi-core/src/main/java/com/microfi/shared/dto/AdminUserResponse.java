@@ -12,7 +12,10 @@ import java.util.UUID;
 public class AdminUserResponse {
     private UUID id;
     private String login;
+    private String fullName;
+    private String phone;
     private AdminRole role;
     private UUID branchId;
     private AdminUserStatus status;
+    private boolean mustChangePassword;
 }

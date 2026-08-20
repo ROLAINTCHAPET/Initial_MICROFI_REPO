@@ -45,6 +45,9 @@ public class Collection {
 
     private Float accuracyM;
 
+    /** Reverse-geocoded place name for the captured lat/lon (best-effort — null if the geocoding lookup failed). */
+    private String locationName;
+
     @Column(nullable = false)
     private Instant collectedAt;
 

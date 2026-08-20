@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7fafd;
+  --foreground: #181c1e;
+}
+
+/* Design tokens ported from Graphical Design/backoffice/high_utility_financial_core/DESIGN.md
+   ("High-Utility Financial Core") — the authoritative palette/type/shape spec for this app.
+   DESIGN.md explicitly calls for "Low-Contrast Outlines and Tonal Layering" over shadows/blur
+   ("avoids complex shadows or blurs that wash out in direct sunlight") — no glassmorphism,
+   gradients, or decorative motion here; every surface is flat with a 1px border.
+   Legacy names (primary-navy, success-emerald, ...) are kept as aliases so existing markup
+   repaints correctly; new M3-style names are used for newly-built/redesigned markup. */
+@theme {
+  /* Color system */
+  --color-primary: #000f22;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #0a2540;
+  --color-on-primary-container: #768dad;
+  --color-primary-fixed: #d2e4ff;
+  --color-primary-fixed-dim: #b0c8eb;
+  --color-on-primary-fixed: #001c37;
+  
+  --color-on-primary-fixed-variant: #314865;
+  --color-inverse-primary: #b0c8eb;
+
+  --color-secondary: #006b59;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #55fcd8;
+  --color-on-secondary-container: #00725f;
+  --color-secondary-fixed: #55fcd8;
+  --color-secondary-fixed-dim: #27dfbc;
+  --color-on-secondary-fixed: #002019;
+  --color-on-secondary-fixed-variant: #005142;
+
+  --color-tertiary: #170d00;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #322100;
+  --color-on-tertiary-container: #b68200;
+  --color-tertiary-fixed: #ffdea8;
+  --color-tertiary-fixed-dim: #ffba20;
+  --color-on-tertiary-fixed: #271900;
+  --color-on-tertiary-fixed-variant: #5e4200;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-surface: #f7fafd;
+  --color-surface-dim: #d7dadd;
+  --color-surface-bright: #f7fafd;
+  --color-surface-variant: #e0e3e6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f4f7;
+  --color-surface-container: #ebeef1;
+  --color-surface-container-high: #e5e8eb;
+  --color-surface-container-highest: #e0e3e6;
+  --color-on-surface: #181c1e;
+  --color-on-surface-variant: #43474d;
+  --color-outline: #74777e;
+  --color-outline-variant: #c4c6ce;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eef1f4;
+  --color-surface-tint: #49607e;
+  --color-background: #f7fafd;
+  --color-on-background: #181c1e;
+
+  /* Legacy aliases (kept in sync with the new palette above) */
+  --color-primary-navy: #0a2540;
+  --color-success-emerald: #006b59;
+  --color-warning-amber: #ffba20;
+  --color-danger-red: #ba1a1a;
+  --color-surface-white: #ffffff;
+  --color-surface-grey-100: #f1f4f7;
+  --color-text-slate: #43474d;
+  --color-text-grey-disabled: #74777e;
+
+  /* Spacing (4px baseline grid) */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+
+  /* Shapes: radius-sm on inputs/tags, radius-md on cards/modals/buttons */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-full: 999px;
+
+  /* Elevation: mostly flat with outlines; shadow reserved for floating/modal surfaces */
+  --shadow-elevation-1: 0 1px 2px rgba(24, 28, 30, 0.04);
+  --shadow-elevation-2: 0 4px 16px rgba(24, 28, 30, 0.16);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline);
+}
+
+/* ── Type scale (DESIGN.md typography section, applied consistently instead of ad hoc
+   Tailwind text-* picks) ─────────────────────────────────────────────────────────── */
+.text-display {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.text-h1 {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.text-h2 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.text-label-bold {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.text-caption {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ── Interaction polish: gentle hover-lift for interactive cards/rows, in the spirit of
+   DESIGN.md's tonal layering (border + small shadow, no blur/glow) ─────────────────── */
+.card-interactive {
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.card-interactive:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: var(--shadow-elevation-1);
+  border-color: var(--color-outline);
+}
+.card-interactive:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ── Modal entry transition: fade + slight scale-in instead of the native <dialog> snap ──
+   Tailwind's preflight zeroes margin on every element, which silently breaks the browser's
+   default `dialog::backdrop`-adjacent centering (`margin: auto` over a 0/0/0/0 inset box) —
+   restore it explicitly or every native <dialog> pins to the top-left instead of centering. */
+dialog.modal-transition {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+  transform: scale(0.97) translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease, overlay 150ms ease allow-discrete, display 150ms ease allow-discrete;
+}
+dialog.modal-transition[open] {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+@starting-style {
+  dialog.modal-transition[open] {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+}
+dialog.modal-transition::backdrop {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+dialog.modal-transition[open]::backdrop {
+  opacity: 1;
+}
+
+/* Entry transition for non-<dialog> overlay panels (e.g. WaiverModal's custom form modal). */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes panelScaleIn {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.overlay-fade-in {
+  animation: overlayFadeIn 150ms ease-out both;
+}
+.panel-scale-in {
+  animation: panelScaleIn 150ms ease-out both;
+}
+
+/* One-shot confirmation pulse for buttons that just completed a save. */
+@keyframes successPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.success-pop {
+  animation: successPop 350ms ease-out both;
+}

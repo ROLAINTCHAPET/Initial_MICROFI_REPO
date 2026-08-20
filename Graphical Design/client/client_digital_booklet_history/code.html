@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Contribution History - Microfi</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-secondary-fixed-variant": "#005142",
+                            "on-primary-container": "#768dad",
+                            "on-primary-fixed": "#001c37",
+                            "primary": "#000f22",
+                            "on-primary-fixed-variant": "#314865",
+                            "on-error-container": "#93000a",
+                            "error": "#ba1a1a",
+                            "surface-container-high": "#e5e8eb",
+                            "inverse-on-surface": "#eef1f4",
+                            "on-secondary-container": "#00725f",
+                            "primary-container": "#0a2540",
+                            "secondary-container": "#55fcd8",
+                            "surface": "#f7fafd",
+                            "primary-fixed-dim": "#b0c8eb",
+                            "tertiary-fixed-dim": "#ffba20",
+                            "on-surface-variant": "#43474d",
+                            "on-secondary-fixed": "#002019",
+                            "outline-variant": "#c4c6ce",
+                            "surface-tint": "#49607e",
+                            "tertiary-container": "#322100",
+                            "on-background": "#181c1e",
+                            "surface-variant": "#e0e3e6",
+                            "outline": "#74777e",
+                            "on-tertiary-fixed-variant": "#5e4200",
+                            "on-surface": "#181c1e",
+                            "error-container": "#ffdad6",
+                            "on-tertiary": "#ffffff",
+                            "surface-dim": "#d7dadd",
+                            "on-error": "#ffffff",
+                            "inverse-surface": "#2d3133",
+                            "surface-container-highest": "#e0e3e6",
+                            "tertiary": "#170d00",
+                            "background": "#f7fafd",
+                            "on-tertiary-fixed": "#271900",
+                            "surface-container-low": "#f1f4f7",
+                            "inverse-primary": "#b0c8eb",
+                            "surface-bright": "#f7fafd",
+                            "secondary-fixed": "#55fcd8",
+                            "secondary": "#006b59",
+                            "on-tertiary-container": "#b68200",
+                            "secondary-fixed-dim": "#27dfbc",
+                            "on-primary": "#ffffff",
+                            "on-secondary": "#ffffff",
+                            "tertiary-fixed": "#ffdea8",
+                            "surface-container": "#ebeef1",
+                            "primary-fixed": "#d2e4ff",
+                            "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.125rem",
+                            "lg": "0.25rem",
+                            "xl": "0.5rem",
+                            "full": "0.75rem"
+                    },
+                    "spacing": {
+                            "touch-target": "48px",
+                            "gutter": "16px",
+                            "stack-md": "16px",
+                            "stack-sm": "8px",
+                            "margin-mobile": "20px",
+                            "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                            "label-bold": ["Inter"],
+                            "caption": ["Inter"],
+                            "body": ["Inter"],
+                            "h1": ["Inter"],
+                            "display": ["Inter"],
+                            "h2": ["Inter"]
+                    },
+                    "fontSize": {
+                            "label-bold": ["13px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                            "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                            "body": ["15px", {"lineHeight": "22px", "fontWeight": "400"}],
+                            "h1": ["22px", {"lineHeight": "28px", "fontWeight": "700"}],
+                            "display": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "h2": ["18px", {"lineHeight": "24px", "fontWeight": "600"}]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen pb-[80px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-touch-target bg-primary dark:bg-primary-container border-b border-outline dark:border-outline-variant flat no shadows md:hidden">
+<button aria-label="Back" class="flex items-center justify-center w-touch-target h-touch-target hover:bg-primary-fixed-dim/10 scale-95 duration-75 text-on-primary dark:text-on-primary-container">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-h1 text-h1 text-on-primary dark:text-on-primary-container truncate mx-2">Contribution History</h1>
+<button aria-label="Menu" class="flex items-center justify-center w-touch-target h-touch-target hover:bg-primary-fixed-dim/10 scale-95 duration-75 text-on-primary dark:text-on-primary-container">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<!-- Desktop Navigation Drawer (Hidden on mobile) -->
+<aside class="hidden md:flex flex-col p-gutter w-80 h-full fixed top-0 left-0 z-50 bg-surface dark:bg-surface-container border-r border-outline-variant shadow-sm">
+<div class="mb-stack-lg flex items-center gap-4">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-container-high flex-shrink-0">
+<img alt="Agent Profile Picture" class="w-full h-full object-cover" data-alt="A professional headshot of an African financial field agent wearing a neat uniform shirt, against a bright outdoor background indicating they are active in the field. The lighting is sunny and optimistic, reflecting reliability and trust in a high-contrast corporate style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfO8K2teRM3fKe9LOkSqedln_xIOMLzdIjxn7pMIJB8SGvijlZmE2oNp7cVXoLcwv3ApimRC7nisTowAU6Pz2k098jQtzuU8wnpdZuKrsjsflGydSyx-WtYTAtSTxT241fLzp-6qk231Ex5W1Pi7k2hpAV_J93AfpVPqoAz5b6bKgQ-hqs-Tk0Sx94PgImKjbtkRXf2qsyXlZhgW8OQ0VADRRQ5-CmceZh4lBWEh7QXQL662tLBCU_"/>
+</div>
+<div>
+<h2 class="font-h2 text-h2 text-primary dark:text-primary-fixed">Agent 402</h2>
+<p class="font-caption text-caption text-on-surface-variant">Douala Sector</p>
+<p class="font-caption text-caption text-secondary mt-1">Status: Online</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-4 px-4 py-3 rounded-full text-on-surface-variant font-body hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span>Home</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 bg-primary-container text-on-primary-container font-label-bold rounded-full my-1 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined filled" data-icon="history">history</span>
+<span>History</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-full text-on-surface-variant font-body hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span>Wallet</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-full text-on-surface-variant font-body hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span>Emergency</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="pt-[72px] md:pt-stack-lg px-margin-mobile md:pl-[360px] md:pr-margin-mobile pb-stack-lg max-w-4xl mx-auto">
+<!-- Summary Section -->
+<section class="mb-stack-lg bg-white rounded-xl border border-outline-variant p-6 shadow-sm">
+<h2 class="font-body text-body text-on-surface-variant mb-1">Total Contributions This Month</h2>
+<div class="font-display text-display text-primary flex items-baseline gap-2">
+                125 000 <span class="font-h2 text-h2 text-outline">XAF</span>
+</div>
+</section>
+<!-- Filters (Simplified) -->
+<div class="flex gap-2 mb-stack-md overflow-x-auto pb-2 hide-scrollbar">
+<button class="px-4 h-touch-target rounded-full bg-primary text-on-primary font-label-bold text-label-bold flex items-center whitespace-nowrap">All Time</button>
+<button class="px-4 h-touch-target rounded-full bg-surface-container border border-outline-variant text-on-surface font-label-bold text-label-bold flex items-center whitespace-nowrap">This Week</button>
+<button class="px-4 h-touch-target rounded-full bg-surface-container border border-outline-variant text-on-surface font-label-bold text-label-bold flex items-center whitespace-nowrap">October</button>
+<button aria-label="Filter" class="px-4 h-touch-target rounded-full bg-surface-container border border-outline-variant text-on-surface flex items-center justify-center w-touch-target shrink-0">
+<span class="material-symbols-outlined text-outline" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+<!-- Transaction List -->
+<section class="flex flex-col gap-2">
+<!-- Transaction Row 1 -->
+<article class="bg-white border border-outline-variant rounded-xl p-4 flex items-center justify-between min-h-[64px]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<div class="font-h2 text-h2 text-primary">25 000 XAF</div>
+<div class="font-caption text-caption text-on-surface-variant">Oct 18, 09:00 AM • Agent AF-042</div>
+</div>
+</div>
+<div class="flex items-center justify-center bg-secondary/10 rounded-full px-2 py-1 gap-1">
+<span class="material-symbols-outlined text-secondary text-[16px] filled" data-icon="check_circle">check_circle</span>
+<span class="font-caption text-caption text-secondary hidden sm:inline">Synced</span>
+</div>
+</article>
+<!-- Transaction Row 2 -->
+<article class="bg-white border border-outline-variant rounded-xl p-4 flex items-center justify-between min-h-[64px]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<div class="font-h2 text-h2 text-primary">10 000 XAF</div>
+<div class="font-caption text-caption text-on-surface-variant">Oct 15, 14:30 PM • Agent AF-042</div>
+</div>
+</div>
+<div class="flex items-center justify-center bg-secondary/10 rounded-full px-2 py-1 gap-1">
+<span class="material-symbols-outlined text-secondary text-[16px] filled" data-icon="check_circle">check_circle</span>
+<span class="font-caption text-caption text-secondary hidden sm:inline">Synced</span>
+</div>
+</article>
+<!-- Transaction Row 3 -->
+<article class="bg-white border border-outline-variant rounded-xl p-4 flex items-center justify-between min-h-[64px]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<div class="font-h2 text-h2 text-primary">50 000 XAF</div>
+<div class="font-caption text-caption text-on-surface-variant">Oct 12, 10:15 AM • Agent AF-108</div>
+</div>
+</div>
+<div class="flex items-center justify-center bg-secondary/10 rounded-full px-2 py-1 gap-1">
+<span class="material-symbols-outlined text-secondary text-[16px] filled" data-icon="check_circle">check_circle</span>
+<span class="font-caption text-caption text-secondary hidden sm:inline">Synced</span>
+</div>
+</article>
+<!-- Transaction Row 4 -->
+<article class="bg-white border border-outline-variant rounded-xl p-4 flex items-center justify-between min-h-[64px]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="arrow_downward">arrow_downward</span>
+</div>
+<div>
+<div class="font-h2 text-h2 text-primary">40 000 XAF</div>
+<div class="font-caption text-caption text-on-surface-variant">Oct 05, 16:45 PM • Agent AF-042</div>
+</div>
+</div>
+<div class="flex items-center justify-center bg-secondary/10 rounded-full px-2 py-1 gap-1">
+<span class="material-symbols-outlined text-secondary text-[16px] filled" data-icon="check_circle">check_circle</span>
+<span class="font-caption text-caption text-secondary hidden sm:inline">Synced</span>
+</div>
+</article>
+</section>
+<!-- Empty State Example (Hidden, uncomment to see) -->
+<!--
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-48 h-48 mb-6">
+                <img src="placeholder" data-alt="A clean, vector-style illustration of an empty open vault or safe, signaling no cash deposits have been made yet. The illustration should use the Microfi brand colors: navy blues and subtle grays on a clean white background, conveying institutional security but emptiness." class="w-full h-full object-contain" alt="No contributions illustration">
+            </div>
+            <h3 class="font-h2 text-h2 text-primary mb-2">No contributions yet</h3>
+            <p class="font-body text-body text-on-surface-variant max-w-xs">Your deposit history will appear here once an agent collects a contribution.</p>
+        </div>
+        -->
+</main>
+<!-- BottomNavBar (Mobile only) -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface dark:bg-surface-container-lowest border-t border-outline-variant dark:border-outline flat no shadows md:hidden">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-bold text-[10px] leading-[12px] mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full h-[48px] w-full mx-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined filled" data-icon="history">history</span>
+<span class="font-label-bold text-[10px] leading-[12px] mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-bold text-[10px] leading-[12px] mt-1">Wallet</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-label-bold text-[10px] leading-[12px] mt-1">Emergency</span>
+</a>
+</nav>
+<style>
+        /* Utility to hide scrollbar but allow scrolling */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

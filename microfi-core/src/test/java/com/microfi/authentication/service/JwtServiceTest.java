@@ -25,6 +25,7 @@ class JwtServiceTest {
         Agent agent = Agent.builder()
                 .id(UUID.randomUUID())
                 .employeeCode("AGT001")
+                .username("AGT001")
                 .status(AgentStatus.ACTIVE)
                 .build();
         agentDetails = new AgentDetails(agent);

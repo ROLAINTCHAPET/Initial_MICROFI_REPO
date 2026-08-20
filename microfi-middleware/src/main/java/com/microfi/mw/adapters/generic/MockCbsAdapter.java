@@ -1,6 +1,6 @@
 package com.microfi.mw.adapters.generic;
 
-import com.microfi.mw.adapters.CoreBankingAdapter;
+import com.microfi.mw.adapters.AbstractCoreBankingAdapter;
 import com.microfi.mw.adapters.dto.BalanceResult;
 import com.microfi.mw.adapters.dto.CollectionLine;
 import com.microfi.mw.adapters.dto.EscrowCreditResult;
@@ -9,26 +9,30 @@ import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
- * MVP concrete adapter: simulates a Core Banking System in-memory so the rest of the
- * platform can be built and demoed against a stable, deterministic CBS contract before
- * a real vendor (Amplitude, FinanSoft, ...) is wired in. Selected via {@code cbs.vendor=mock}.
+ * MVP concrete adapter: simulates a Core Banking System so the rest of the platform can be built
+ * and demoed against a stable CBS contract before a real vendor (Amplitude, FinanSoft, ...) is
+ * wired in. Selected via {@code cbs.vendor=mock}. Backed by {@link MockLedgerEntryRepository} —
+ * {@code getBalance}/{@code getHistory} reflect whatever was actually {@code postTransactions}-ed
+ * for that member, not a number with no connection to what happened (fabricating a plausible-looking
+ * but disconnected balance would defeat the point of simulating a CBS at all).
  */
 @Component
-@Slf4j
-public class MockCbsAdapter implements CoreBankingAdapter {
+@RequiredArgsConstructor
+public class MockCbsAdapter extends AbstractCoreBankingAdapter {
 
     public static final String VENDOR = "mock";
 
+    private final MockLedgerEntryRepository ledgerRepository;
+
     @Override
-    public String vendor() {
+    protected String vendorKey() {
         return VENDOR;
     }
 
@@ -43,14 +47,23 @@ public class MockCbsAdapter implements CoreBankingAdapter {
 
     @Override
     public BalanceResult getBalance(String memberId) {
-        long pseudoBalance = Math.floorMod((long) memberId.hashCode(), 500_000L) + 10_000L;
-        return new BalanceResult(memberId, pseudoBalance, Instant.now());
+        return new BalanceResult(memberId, ledgerRepository.sumAmountByMemberId(memberId), Instant.now());
     }
 
     @Override
     public TransactionPostResult postTransactions(List<CollectionLine> collections) {
         List<String> refs = collections.stream()
-                .map(line -> "CBSTX-" + line.collectionId())
+                .map(line -> {
+                    String reference = "CBSTX-" + line.collectionId();
+                    ledgerRepository.save(MockLedgerEntry.builder()
+                            .memberId(line.memberId())
+                            .amountXaf(line.amountXaf())
+                            .reference(reference)
+                            .type("DEPOSIT")
+                            .postedAt(line.collectedAt())
+                            .build());
+                    return reference;
+                })
                 .toList();
         return new TransactionPostResult(true, refs);
     }
@@ -59,26 +72,25 @@ public class MockCbsAdapter implements CoreBankingAdapter {
     public FeeSplitResult splitFee(String memberId, String agentId, long amountXaf) {
         long agentCommission = Math.round(amountXaf * 0.30);
         long mfiShare = amountXaf - agentCommission;
-        return new FeeSplitResult(agentCommission, mfiShare, "FEESPLIT-" + UUID.randomUUID());
+        return new FeeSplitResult(agentCommission, mfiShare, newReference("FEESPLIT"));
     }
 
     @Override
     public EscrowCreditResult creditEscrow(String agentId, long amountXaf, String reference) {
         long pseudoNewBalance = Math.floorMod((long) agentId.hashCode(), 1_000_000L) + amountXaf;
-        return new EscrowCreditResult(true, pseudoNewBalance, "ESCROW-" + UUID.randomUUID());
+        return new EscrowCreditResult(true, pseudoNewBalance, newReference("ESCROW"));
     }
 
     @Override
     public List<HistoryEntry> getHistory(String memberId) {
-        return List.of(
-                new HistoryEntry("CBSTX-SAMPLE-1", 5_000L, Instant.now().minusSeconds(86_400), "DEPOSIT"),
-                new HistoryEntry("CBSTX-SAMPLE-2", 10_000L, Instant.now().minusSeconds(172_800), "DEPOSIT")
-        );
+        return ledgerRepository.findByMemberIdOrderByPostedAtDesc(memberId).stream()
+                .map(entry -> new HistoryEntry(entry.getReference(), entry.getAmountXaf(), entry.getPostedAt(), entry.getType()))
+                .toList();
     }
 
     @Override
     public ExportAckResult acknowledgeDailyExport(String branchId, String fileUri, String format) {
         log.info("Mock CBS acknowledging daily export for branch {} ({}, {})", branchId, fileUri, format);
-        return new ExportAckResult(true, "EXPACK-" + UUID.randomUUID());
+        return new ExportAckResult(true, newReference("EXPACK"));
     }
 }

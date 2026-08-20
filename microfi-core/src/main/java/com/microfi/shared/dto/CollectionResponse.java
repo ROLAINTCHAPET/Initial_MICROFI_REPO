@@ -13,10 +13,12 @@ public class CollectionResponse {
     private UUID id;
     private UUID agentId;
     private UUID clientId;
+    private String clientName;
     private long amountXaf;
     private double lat;
     private double lon;
     private Float accuracyM;
+    private String locationName;
     private Instant collectedAt;
     private String syncStatus;
     private String deviceTxId;

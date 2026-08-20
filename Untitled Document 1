@@ -1,0 +1,609 @@
+MICROFI
+UI/UX DESIGN HANDOFF
+Version 2.0 — Aligned to System Architecture & Software Design (SAD) v1.1
+August 2026
+Application: Digital Cash Collection Network — CEMAC Region
+Targets: Flutter Mobile App (Agent + Client) • Next.js 16 Back-Office
+Traceable to FR-01…FR-22, NFR-01…NFR-12, BR-01…BR-05, UC-01…UC-22
+Page 1MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+Table of Contents
+0. Purpose, Scope & Traceability.............................................................................................................................. 2
+1. Design Tokens......................................................................................................................................................... 2
+2. Component Library & Interaction States............................................................................................................. 4
+3. Accessibility Specification..................................................................................................................................... 5
+4. Agent Mobile App (Flutter) — Collection Zone................................................................................................ 6
+5. Client Mobile App (Digital Booklet)................................................................................................................... 7
+6. End-of-Day Cash Closeout Screens (OFJ).......................................................................................................... 8
+7. Web Management Portal (Next.js 16) — Back-Office..................................................................................... 9
+8. Error, Loading & Empty States............................................................................................................................. 9
+9. Motion & Interaction Specification.................................................................................................................... 10
+10. Localization & Content Strategy...................................................................................................................... 11
+11. Bluetooth Thermal Receipt Template (UC-09).............................................................................................. 11
+12. Asset Export Specification................................................................................................................................ 12
+13. Acceptance Criteria (Definition of Done)....................................................................................................... 12
+14. Traceability Matrix — UC → Screen → API → Entity............................................................................... 13
+15. Glossary................................................................................................................................................................ 14
+Page 2MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+0. Purpose, Scope & Traceability
+This handoff translates the MICROFI System Architecture and Software Design (SAD v1.1) into concrete screen-
+level UI specifications for three surfaces: the Flutter Agent app, the Flutter Client app, and the Next.js 16 Back-
+Office. Every screen in this document is traceable to a use case (UC), functional requirement (FR), non-functional
+requirement (NFR) or business rule (BR) defined in the SAD and its upstream Business Analysis.
+This document supersedes v1.1 of the UI/UX handoff. Notable corrections driven by the SAD: the client digital
+booklet token has four states (ACTIVE / GRACE / EXPIRED / REVOKED), not two; collection screens must reflect
+the mandatory GPS gate as a hard block (BR-05); tracking and session UI must respect branch working-hours
+windows (FR-15, NFR-10); and OFJ close must remain blocked while any collection is still sync_status =
+PENDING.
+See the Glossary (final section) for definitions of all acronyms and domain terms used throughout this document.
+1. Design Tokens
+1.1 Color System
+TokenColor name
+color/primary/
+navy
+Swat
+ch
+HexUsageData binding
+Deep Navy
+Blue#0A2540Brand, headers, primary
+actions—
+color/success/
+emeraldEmerald Green#00D4B2Synced, validated, success
+CTAsync_status =
+SYNCED
+color/warning/
+amberAmber#FFB800Offline, pending, ≥80%
+ceilingsync_status =
+PENDING
+color/danger/redSignal Red#FF453ABlocked, SOS, 100%
+ceiling, GPS failescrow ceiling
+reached
+color/surface/
+whiteWhite#FFFFFFApp/card backgrounds—
+color/surface/
+grey-100Light Grey#F2F2F2Section backgrounds,
+dividers—
+color/text/slateSlate Grey#334155Secondary text, captions—
+#9CA3AFDisabled labels, expired
+statesaccess_token.status
+=
+EXPIRED/REVOK
+ED
+color/text/grey-
+disabled
+Cool Grey
+Palette logic: a navy-and-neutral base (Deep Navy Blue, White, Light Grey, Slate Grey, Cool Grey) provides
+structure, while three traffic-light accents — Emerald Green, Amber, Signal Red — carry state (good / caution /
+stop). Amber is always paired with black text, never white, to hold contrast in direct sunlight. Status is never
+conveyed by color alone: every colored state pairs a color with an icon and a text label.
+Page 3MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+1.2 Typography Scale
+StyleSize / WeightMobile fontWeb fontUsage
+Display32 pt / BoldInter BoldRoboto BoldPassbook balance, OFJ totals
+H122 pt / BoldInter BoldRoboto BoldScreen titles
+H218 pt /
+SemiBoldInter SemiBoldRoboto MediumSection headers
+Body15 pt / RegularInter RegularRoboto RegularDefault reading text
+Caption12 pt / RegularInter RegularRoboto RegularHelper text, timestamps
+Numeric/Mono15 pt / TabularInter Tabular
+NumsRoboto Mono
+(receipts)XAF amounts, denomination
+grid
+Amount display rule (unchanged from BA): the currency code never precedes the amount. Strict format: [amount]
+[non-breaking space]XAF, e.g. 45 000 XAF.
+1.3 Spacing, Radius & Elevation
+TokenValueUsage
+space-14 dp/pxIcon-to-label gap
+space-28 dp/pxCompact list padding
+space-312 dp/pxDefault field padding
+space-416 dp/pxCard padding, section gaps
+space-624 dp/pxScreen margins (mobile)
+space-832 dp/pxSection separation (web)
+radius-sm6 pxInputs, chips
+radius-md12 pxCards, modals
+radius-full999 pxPills, status badges, FAB
+elevation-10 1px 2px
+rgba(0,0,0,.08)Cards at rest
+elevation-20 4px 12px
+rgba(0,0,0,.12)Modals, floating action button
+Page 4MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+1.4 Responsive Breakpoints (Next.js Back-Office)
+BreakpointWidthBack-Office (Next.js) layout
+sm< 640 pxNot supported for agent admin flows; redirect to
+mobile-friendly notice
+md640–1024 pxSingle-column dashboard, collapsible side nav,
+stacked map/table
+lg1024–1440 pxTwo-column dashboard, persistent side nav, side-
+by-side map/table
+xl> 1440 pxFull grid: nav + content + detail panel (agent drill-
+down)
+2. Component Library & Interaction States
+Every reusable component must ship all states below — not just the default appearance shown in mockups — so
+engineering can implement without guessing intermediate states.
+2.1 Buttons
+StateVisualTrigger
+FR/UC reference
+DefaultNavy fill, white text, radius-
+sm, 48 dp height min.Ready for input
+Fat-finger spec, all
+wizards
+DisabledGrey #E5E7EB fill, grey-
+disabled textPreconditions unmet
+(e.g. denomination sum
+≠ amount, GPS off,
+justification < 10 chars)
+BR-02, BR-05, UC-17
+LoadingNavy fill, inline spinner
+replaces label, button non-
+interactiveAwaiting server/CBS
+response
+NFR-05, UC-09
+SuccessEmerald fill, checkmark
+icon, auto-reverts after 2s or
+on navigationDelta == 0 close,
+collection validated
+UC-16, UC-07
+Danger/
+DestructiveRed outline or fill,
+confirmation required before
+commitSuspend agent, write
+off variance
+UC-02, UC-17
+StateVisualNotes
+Default1px grey-300 border, radius-
+sm, 48 dp heightNumeric fields restrict to integers (denomination grid,
+FR-08)
+2.2 Input Fields
+Page 5MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+StateVisualNotes
+Focus2px navy border, no shadow
+(avoid outer glow that
+reduces sunlight contrast)Focus ring must remain visible under direct sunlight
+Error2px red border + red helper
+text below fielde.g. denomination sum mismatch (BR-02),
+justification < 10 chars (UC-17)
+DisabledGrey-100 fill, grey-disabled
+text, no borderRead-only mode fields (expired/revoked token)
+Success1px emerald border, small
+check icon inside fieldConfirms client uniquely resolved (UC-06)
+2.3 Status Badges
+• SYNCED — Emerald pill, checkmark icon, label "Synced".
+• PENDING — Amber pill, clock icon, label "Pending sync".
+• BLOCKED — Red pill, lock icon, label "Blocked" (escrow ceiling or GPS gate).
+• Booklet token — ACTIVE (emerald), GRACE (amber, "Renew soon"), EXPIRED (grey, "Read-only"),
+REVOKED (red, "Access revoked").
+3. Accessibility Specification
+RequirementSpecification
+ContrastAll text/background pairs meet WCAG 2.1 AA (4.5:1 body, 3:1 large text).
+Amber (#FFB800) always paired with black text, never white, to hold contrast
+in direct sunlight.
+Touch targetsMinimum 48×48 dp for every interactive control on the Agent and Client apps
+(fat-finger spec); minimum 40×40 px on the web Back-Office.
+Screen reader labelsEvery icon-only control (SOS button, QR scan FAB, map markers) carries a
+semantic label — e.g. "Emergency SOS, activates after 3-second hold", "Scan
+client QR code".
+Focus orderCollection wizard steps are traversed in strict DOM/semantic order 1→2→3;
+modals trap focus and return it to the triggering element on close.
+Color independenceStatus is never conveyed by color alone: sync/ceiling/geofence states pair a
+color with an icon and a text label (e.g. lock icon + "Ceiling reached", not just
+red fill).
+Low-literacy supportPrimary flows (client lookup, denomination entry, GPS gate) rely on icons,
+numerals and color-coded states over dense text, consistent with the CEMAC
+field-literacy constraint noted in the SAD design principles.
+Motion sensitivityThe SOS long-press vibration and geofence-breach flash are capped to short,
+single-pulse patterns; no continuous flashing animations (seizure-safety).
+Page 6MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+4. Agent Mobile App (Flutter) — Collection Zone
+4.1 Authentication (UC-01)
+• Launch screen reads device IMEI silently in the background, then prompts PIN or biometric.
+• Unknown/unbound IMEI: full-screen red block — "This device is not registered to an agent account. Contact
+your branch manager." No retry loop offered on-device.
+• 3 failed PIN attempts locks the session for a cooldown period; a countdown is shown.
+• Offline authentication is supported against the encrypted local credential cache when no network is present.
+4.2 Session Window & Working Hours (UC-15, FR-15, NFR-10)
+• Outside the branch's configured open/close window, the app shows a locked dashboard state: "Collections are
+closed until [open_time]" with no wizard entry point.
+• GPS background tracking (UC-10) automatically stops outside the working window, per NFR-10; the
+connectivity/tracking icon in the header reflects this as a neutral grey "Tracking paused" chip rather than the
+amber offline state.
+4.3 "Fat-Finger" Accessibility Baseline
+• Minimum action button height: 48 dp, for use in open-air markets with hands often full or gloved.
+• Persistent top connectivity banner: hidden when online; amber "Offline Mode — [X] collections ready to
+sync" when offline; grey "Tracking paused" outside working hours.
+4.4 Escrow Wallet & Ceiling (UC-03, UC-04, UC-05)
+• Home dashboard shows a compact gauge for escrow_account.balance_xaf against ceiling_xaf, colored per the
+thresholds in Section 1.1.
+• At 100% of ceiling, new collections are blocked at the client-lookup step with a red banner and lock icon,
+before the agent invests time entering client/denomination data.
+• Remote ceiling overrides (UC-05, pushed from Back-Office) apply live without requiring an app restart, and
+display a countdown to valid_until.
+4.5 Three-Step Collection Wizard (UC-06, UC-07, UC-08, UC-12)
+[ Step 1: Client ] ──(resolved)──> [ Step 2: Denominations ] ──(GPS gate)──> [ Step 3: Confirmation ]
+Step 1 — Client Resolution (UC-06)
+• Search field supports QR scan, member ID, phone, or name; multiple matches present a disambiguation list
+rather than auto-selecting.
+• On unique match: display client_profile card (name, member number, photo, branch). "Next" activates only
+once exactly one client is locked.
+Step 2 — Denomination Breakdown (UC-08, BR-02)
+• CEMAC Grid: one row per BEAC denomination (10000 / 5000 / 2000 / 1000 / 500 XAF) plus a coins-total
+field, integer-only quantities.
+• Live running total = Σ(denomination × quantity); "Next" is disabled until this total equals the amount the agent
+intends to collect (BR-02).
+Page 7MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+Step 3 — GPS Gate & Submission (UC-12, BR-05)
+• On "Validate collection": query location services.
+◦ GPS active with valid fix: discreet loader, collection saved with lat/lon/accuracy/timestamp captured
+immutably (non-editable by the agent, FR-12).
+◦ GPS inactive or no fix: hard-blocking red pop-up — "Action impossible. GPS must be enabled to
+validate a collection." Submit stays disabled; this is a strict block, not a warning, per BR-05.
+• Successful submission triggers UC-09 notification (SMS + optional Bluetooth print) and writes core.collection
+with sync_status = PENDING until synced.
+4.6 Field Tracking & Emergency (UC-10, UC-11, UC-13, UC-14)
+• Background GPS pings (~5 min cadence) are invisible to the agent except for the header tracking indicator;
+battery impact is minimized per NFR-09 (no dedicated screen).
+• Geofence breach: agent-facing app does not need to surface the breach itself (this is a Back-Office concern)
+but should not alarm the agent — no pop-up interrupts their workflow.
+• SOS (UC-14): accessible via the side menu or a 3-second long-press on the app header. Triggers a single-pulse
+vibration and a discreet confirmation message; attempts SMS delivery even with no data connectivity. Cannot
+be disabled by the agent (FR-14).
+5. Client Mobile App (Digital Booklet)
+5.1 Activation & Renewal (UC-19)
+Activation is a three-party, in-person flow between the client and their sponsoring agent — the client never enters
+the temporary Activation ID directly on their own device.
+• Step 1 — Client initiates: the client tells the agent they want to activate (or renew) their digital booklet.
+• Step 2 — Client shares credentials with the agent: the client provides their temporary Activation ID
+(activation_id) and identity details to the agent in person.
+• Step 3 — Agent enters & validates: the agent enters the Activation ID and client details into their app; the app
+validates the ID against CBS before proceeding.
+• Step 4 — Client confirms payment: the activation fee is presented to the client, who confirms payment before
+anything is finalized.
+• Step 5 — Transaction validated: only after payment is confirmed is the activation completed — the token is
+issued (or renewed) and the fee is split automatically between agent commission and MFI share
+(activation_payment).
+• Activation ID not found: the agent's app redirects to physical branch registration; the app never creates a CBS
+customer record.
+5.2 Booklet Token State Machine (UC-20/21/22 — access_token.status)
+The SAD schema defines four token states, each requiring a distinct visual treatment — this corrects the two-state
+model in the prior handoff draft:
+• ACTIVE — full interface; all monetary actions available ("Request withdrawal", renewal not yet needed).
+• GRACE — non-blocking amber banner: "Your annual token expires soon — renew with your agent to keep
+full access." All actions remain enabled during grace.
+Page 8MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+• EXPIRED (read-only) — grey banner: "Annual token expired. Your data remains visible." Monetary action
+buttons drop to 30% opacity (inactive); balance and history stay sharp and fully legible (BR-04 — money is
+never locked by token status).
+• REVOKED — full-screen block distinct from EXPIRED: "Your digital access has been revoked. Please
+contact your branch." No balance or history is shown in this state, unlike EXPIRED.
+5.3 Home / Balance (UC-21)
+• Home screen visually echoes the traditional cardboard savings passbook (textured beige or brand-navy
+background).
+• Balance is shown in 32 pt bold regardless of token state (except REVOKED); falls back to last-cached balance
+when the CBS is unreachable, with a small "as of [timestamp]" caption.
+5.4 Contribution History / Mini-Statement (UC-22)
+• Filterable, append-only list of collections tied to the client; supports an offline cached view.
+• Empty state and USSD short-code equivalent are covered in Section 8.
+6. End-of-Day Cash Closeout Screens (OFJ)
+6.1 Reconciliation Interface (UC-16, BR-01)
+FieldValue
+TOTAL DIGITAL (core.ofj_agent_line.digital_total_xaf)450,000 XAF
+TOTAL PHYSICAL (cashier-entered, ofj_physical_denom)445,000 XAF
+Δ VARIANCE (physical − digital, BR-01)− 5,000 XAF
+• "Close day" is disabled — not merely unhighlighted — while any collection for the branch/day still has
+sync_status = PENDING, regardless of the Δ value.
+• Δ = physical − digital, computed live as the cashier enters ofj_physical_denom quantities.
+• Δ == 0: "Close day" activates in Emerald. Δ != 0: button stays locked and the variance modal opens
+automatically.
+6.2 Cash Variance / Agent Debt Modal (UC-17)
+• Orange-headed warning modal.
+◦ Required justification field — confirm stays inactive under 10 characters.
+◦ Confirm action: "Confirm transfer of the variance to the agent's debt account" — writes a variance_debt
+row; this action is restricted to Δ < 0 (shortages only, per FR-17); a Δ > 0 surplus is annotated but not
+turned into a debt.
+6.3 Daily CBS Export (UC-18)
+• Export action is available only after the OFJ session is closed (status = CLOSED).
+• Export screen shows format, generated_at, and ack_status; a mapping error surfaces inline with a retry action
+rather than silently failing.
+Page 9MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+7. Web Management Portal (Next.js 16) — Back-Office
+7.1 Agent Grid & Wallet Ceiling Alerts (UC-04)
+• Compact list: Name, Zone, Escrow Wallet Level, with the same gauge thresholds as the mobile app for visual
+consistency.
+• 100% ceiling shows a lock icon next to the agent's name, signalling their field collections are automatically
+blocked.
+7.2 Ceiling Waiver Modal (UC-05)
+• Fields: temp_ceiling_xaf, valid_until (date/time picker), and a required "Reason for waiver" text field.
+• Requires an approver role (approved_by) per the ceiling_override schema; the override auto-restores the
+original ceiling at valid_until.
+7.3 Agent Enrollment & Lifecycle (UC-02)
+• Admin form: identity, branch, escrow reference, IMEI — duplicate IMEI is rejected inline.
+• Suspend action invalidates all active sessions immediately; deletion is blocked while sessions are open or a
+variance_debt is unresolved (FR-02).
+7.4 Branch Working-Hours Configuration (UC-15)
+• Simple open/close/grace time picker per branch, with a history log of prior schedule changes retained for audit.
+7.5 Mapping & Field Tracking Module (UC-11, UC-13)
+• Full-screen Mapbox/Leaflet component.
+◦ Route trace: polyline connecting the day's location_ping records.
+◦ Transaction markers: clickable points opening the digital receipt.
+◦ Geofencing: translucent polygon per assigned geofence; a ping outside the polygon turns the route line
+red instantly and raises an entry in the notifications panel (geofence_alert).
+7.6 OFJ & Variance Oversight
+• Branch-scoped table of open/closed OFJ sessions, outstanding variance_debt, and export ack_status — mirrors
+the mobile OFJ data but read/oversight-only from this surface.
+8. Error, Loading & Empty States
+8.1 Network Error Dialogs (Flutter)
+In a context of intermittent connectivity, the UI must never alarm the agent or client. It must clearly distinguish a
+connectivity issue from a payment failure.
+Trigger
+Error A — Sync FailureError B — Core Banking Timeout
+Background sync call (POST
+/collections/sync) fails — agent is
+offlineAgent has connectivity, but
+Amplitude/FinanSoft does not respond
+within SLA
+Page 10MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+Error A — Sync FailureError B — Core Banking Timeout
+ComponentPersistent toast / top banner (Snackbar)Blocking modal, shown on collection
+submission
+ColorAmber #FFB800, black textNavy header #0A2540, discreet spinner
+Exact UI copy" Offline Mode enabled. Your
+collections are safely stored on the
+phone. They will be sent as soon as the
+network returns. (Tickets pending: X)"" Record saved successfully. The
+collection has been recorded. The
+client's official bank balance update is
+being processed (bank connection
+temporarily slow)."
+Action / iconStandard network icon replaced by a
+database icon with a small lock (AES-
+256 offline store, NFR-01)Single 48 dp button: [ Continue my
+collections ] in Emerald #00D4B2
+Underlying
+mechanismcore.collection row persists locally with
+sync_status = PENDING; unique
+(agent_id, device_tx_id) prevents
+duplicate posts on retryRabbitMQ decouples Core from CBS;
+mw.idempotency_key prevents double-
+posting once CBS recovers
+⚠️
+ℹ️
+8.2 Loading & Empty States by Screen
+ScreenLoading stateEmpty state
+Client lookup (UC-06)Skeleton row placeholders while
+querying by QR/ID/phone/name"No client found — try another
+search method or register
+offline."
+Escrow dashboard (UC-04)Gauge shimmer while balance/ceiling
+loadsNot applicable — every agent has
+an escrow_account
+Route map (UC-11)Grey polyline skeleton while pings
+load"No location pings recorded for
+this date."
+Contribution history (UC-
+22)3 skeleton rows"No contributions yet — your
+history will appear here after your
+first deposit."
+OFJ reconciliation (UC-16)Spinner on digital total while pending
+syncs finishBlocked state: "Reconciliation
+unavailable — pending offline
+collections must sync first."
+Geofence alerts panelSpinner on initial load"No active breaches — all agents
+within assigned zones."
+9. Motion & Interaction Specification
+• Standard transition: 150–200 ms ease-out for screen pushes and modal entry; no motion longer than 300 ms
+anywhere in the agent app (speed matters more than flourish in the field).
+• SOS long-press: a single, short vibration pulse (~150 ms) confirms activation — no repeating buzz pattern.
+Page 11MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+• Geofence breach: the route line color transition is instantaneous (no animation) since it functions as an alert,
+not decoration.
+• Loading spinners are discreet (16–20 px, single color) and never block the whole screen except for the two
+modal cases defined in Section 8.1.
+• Reduced-motion: respect the OS-level "reduce motion" accessibility setting by disabling non-essential
+transitions (card entrance animations) while preserving state-change indicators (spinners, badges).
+10. Localization & Content Strategy
+• Primary languages: French (default, CEMAC francophone zones) and English, selectable at first launch and in
+Settings; the Back-Office mirrors both.
+• All UI copy lives in externalized string tables (ARB for Flutter, i18n JSON for Next.js) — no hardcoded
+strings in the wizard, error dialogs, or receipt template.
+• Currency and number formatting always use the space-separated thousands rule (Section 1.2) in both locales;
+date/time follow ISO-derived local formats, stored in UTC (TIMESTAMPTZ) and rendered in branch-local
+time (branch.timezone).
+• Text expansion budget: French strings run ~15–20% longer than English; buttons and banners must
+accommodate this without truncation, especially the 48 dp action buttons.
+• Low-literacy support: icons and color coding (Section 1.1, 3) are treated as a first-class communication
+channel alongside text, not a decoration, consistent with the SAD's low-literacy field-user constraint.
+11. Bluetooth Thermal Receipt Template (UC-09)
+Printed via a portable Bluetooth thermal printer (58 mm width, monospace font) — the most effective way to build
+trust with merchants and savers in the field.
+========================================
+MICROFI
+DIGITAL CASH COLLECTION CEMAC
+========================================
+Branch : Yaounde - Central Market
+Date
+: 03/08/2026 09:30 UTC
+Agent : AF-042 (Fouda M.)
+----------------------------------------
+CLIENT ID : MFI-2026-88391
+NAME
+: KAMGA ADELE
+----------------------------------------
+AMOUNT COLLECTED : 25 000 XAF
+(Twenty-Five Thousand CFA Francs)
+Payment Method : CASH
+Ticket Status : RECORDED (*)
+----------------------------------------
+DENOMINATION BREAKDOWN (XAF)
+----------------------------------------
+10 000 x 2 = 20 000
+5 000 x 1 = 5 000
+2 000 x 0 =
+0
+1 000 x 0 =
+0
+500 x 0 =
+0
+----------------------------------------
+Page 12MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+UNIQUE REF : device_tx_id (local UUID)
+SECURE DIGITAL SIGNATURE:
+[XAF-GEOTAG-VALID-030826]
+----------------------------------------
+(*) This electronic receipt serves as proof
+of your deposit in case of temporary
+network outage.
+========================================
+THANK YOU FOR YOUR TRUST
+========================================
+• Denomination lines print only if quantity > 0, to conserve thermal paper in the field.
+• UNIQUE REF shows device_tx_id, generated locally, enabling immutable transaction traceability for
+COBAC/BEAC even if sync happens hours later.
+• Alignment: automatic centering for header blocks; right alignment for financial amounts.
+12. Asset Export Specification
+• Icons: single SVG source per icon, exported at 24×24 and 32×32 for mobile (@1x/2x/3x raster fallback),
+20×20/24×24 for web; stroke-based, 2 px stroke weight, consistent corner radius with the design-token radius
+scale.
+• Illustrations (empty states, onboarding): SVG, optimized (<15 KB), no embedded raster unless photographic
+(client profile photo placeholder).
+• Naming convention: icon/{name}/{size}, illustration/{context}/{name} — matches component/token naming
+so engineering can map 1:1 without a lookup table.
+• Map assets (geofence polygons, markers): exported as GeoJSON, not images, to stay editable in the
+Mapbox/Leaflet layer.
+13. Acceptance Criteria (Definition of Done)
+Each screen below must satisfy its checklist before engineering marks the corresponding UC as UI-complete.
+ScreenDefinition of Done (sign-off checklist)
+Collection Wizard (UC-
+06/07/08/12)☐ Client resolves to exactly one profile before Step 2 unlocks · ☐
+Denomination sum auto-updates on every keystroke and blocks submit on
+mismatch (BR-02) · ☐ Submit is disabled with red modal when GPS has no
+valid fix (BR-05) · ☐ Successful submit shows Emerald confirmation and
+queues SMS/print (UC-09) · ☐ Works fully offline with encrypted local
+write (NFR-01).
+Escrow Gauge (UC-04/05)☐ Gauge color matches balance/ceiling ratio thresholds exactly (<80 / ≥80 /
+100%) · ☐ Lock icon appears only at 100% · ☐ Override modal cannot
+submit without a reason and a valid_until date-time · ☐ Override auto-
+expires and reverts the ceiling.
+OFJ Reconciliation (UC-
+16/17)
+☐ Close button is disabled while any collection has sync_status =
+PENDING · ☐ Δ = physical − digital computed live · ☐ Δ ≠ 0 auto-opens
+the variance modal · ☐ Variance modal blocks confirm under 10 characters
+of justification · ☐ Confirmed variance creates a variance_debt row and
+Page 13MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+Screen
+Definition of Done (sign-off checklist)
+unblocks close.
+Client Digital Booklet (UC-
+19–22)☐ Activation/renewal only finalizes after the client confirms payment in
+front of the agent — never before · ☐ ACTIVE state shows full actions · ☐
+GRACE state shows a non-blocking renewal reminder banner but keeps
+actions enabled · ☐ EXPIRED state disables monetary actions at 30%
+opacity while balance stays sharp · ☐ REVOKED state fully locks the app
+to a support/contact message, distinct from EXPIRED · ☐ Balance and
+history remain visible in every state (BR-04).
+Geofencing & SOS (UC-
+13/14)☐ Breach turns the live route line red within one ping cycle · ☐ Alert is
+logged and shown in the Back-Office notification panel · ☐ SOS triggers on
+a 3-second long-press only, never on a single tap · ☐ SOS attempts SMS
+even with no data connectivity.
+14. Traceability Matrix — UC → Screen → API → Entity
+UCScreen / InteractionAPI endpointPrimary entity
+UC-01Agent login (IMEI + PIN/biometric)POST /auth/agent/logincore.agent
+UC-02Agent enrollment / suspend (Back-
+Office)GET/POST /admin/agents,
+PATCH .../statuscore.agent
+UC-03Escrow top-upPOST /agents/{id}/escrow/top-
+upcore.escrow_ledger
+UC-04Escrow ceiling gauge & lockoutGET /agents/{id}/escrowcore.escrow_account
+UC-05Temporary ceiling override modalPATCH
+/admin/agents/{id}/ceilingcore.ceiling_override
+UC-06Multi-channel client lookupGET /clients/lookupcore.client_profile
+UC-07Offline collection wizard step 2/3POST /collections, POST
+/collections/synccore.collection
+UC-08Denomination breakdown gridPOST /collections (nested)core.denomination_line
+UC-09Post-validation SMS/receiptPOST /collections/{id}/notifycore.notification_log
+UC-10Periodic GPS ping (background)POST /agents/{id}/locationcore.location_ping
+UC-11Route visualization mapGET /admin/agents/{id}/routecore.location_ping
+UC-12GPS gate + geotag on submitPOST /collectionscore.collection
+(lat/lon/accuracy)
+UC-13Geofence breach alertn/a (server-evaluated on ping
+ingest)core.geofence,
+core.geofence_alert
+UC-14SOS emergency buttonPOST /agents/{id}/soscore.sos_event
+UC-15Branch working-hours configGET/PUTcore.branch
+Page 14MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+UC
+Screen / Interaction
+API endpoint
+Primary entity
+/admin/branches/{id}/schedule
+UC-16OFJ reconciliation screenGET /ofj/{branchId}/summary,
+POST .../reconcilecore.ofj_session,
+ofj_agent_line
+UC-17Cash variance → agent debt modalPOST /ofj/{branchId}/variancecore.variance_debt
+UC-18Daily CBS exportPOST /ofj/{branchId}/exportcore.export_batch
+UC-19Client activation / renewalPOST /clients/activationcore.access_token,
+activation_payment
+UC-20Client profile self-serviceGET /clients/me/profilecore.client_profile
+UC-21Balance & summary (token-
+independent)GET /clients/me/balancecore.client_profile / CBS
+UC-22Contribution history / mini-statementGET /clients/me/historycore.collection (client-scoped)
+15. Glossary
+TermDefinition
+ACIDAtomicity, Consistency, Isolation, Durability — transactional guarantees used for
+money-moving paths (Spring Data JPA).
+AES-256Advanced Encryption Standard, 256-bit key — encrypts the offline collection
+queue on the agent's device (NFR-01).
+AMQPAdvanced Message Queuing Protocol — the messaging protocol used by
+RabbitMQ to decouple Core Backend from CBS Middleware.
+BEACBanque des États de l'Afrique Centrale — the central bank issuing CEMAC
+banknotes; defines the denomination set (500–10,000 XAF).
+BRBusiness Rule — a numbered rule from the Business Analysis (e.g. BR-05: GPS
+is mandatory before any collection).
+Back-OfficeThe Next.js 16 web application used by branch managers and administrators.
+CBSCore Banking System — the bank's system of record (e.g. Amplitude, FinanSoft)
+that MICROFI integrates with via the Middleware.
+CEMACCommunauté Économique et Monétaire de l'Afrique Centrale — the six-country
+monetary zone MICROFI operates in.
+COBACCommission Bancaire de l'Afrique Centrale — the regional banking regulator
+requiring transaction traceability.
+Ceiling (escrow ceiling)The maximum cash an agent may hold before collections are automatically
+blocked (BR-03).
+DenominationA single banknote or coin face value (e.g. 1,000 XAF); collections are broken
+down by denomination and quantity (FR-08).
+Page 15MICROFI — UI/UX Design Handoff v2.0 (SAD-aligned)
+TermDefinition
+Device TX ID
+(device_tx_id)A locally generated unique transaction identifier that lets a collection be traced
+even if sync happens hours later.
+Escrow accountThe agent's cash guarantee wallet (escrow_account.balance_xaf against
+ceiling_xaf) that limits field cash exposure.
+FRFunctional Requirement — a numbered requirement from the Business Analysis
+(e.g. FR-12: mandatory GPS geotagging).
+GeofenceA drawn geographic boundary an agent is expected to stay within; breaches raise
+a geofence_alert.
+GRACE (token state)A booklet-token state after ACTIVE and before EXPIRED, during which a
+renewal reminder is shown but no functionality is restricted.
+IMEI bindingLocking an agent's session to a single physical device's IMEI, part of
+authentication security (FR-01).
+JWTJSON Web Token — the signed token format used for agent, client and admin
+session authentication.
+MVPMinimum Viable Product — the reduced feature set targeted for the initial 6-
+week production window.
+NFRNon-Functional Requirement — a numbered quality attribute (e.g. NFR-09:
+battery-usage optimisation for GPS tracking).
+OFJOpération de Fin de Journée (End-of-Day operation) — the daily cash-
+reconciliation and closeout process.
+RabbitMQThe message broker that queues jobs between the Core Backend and the CBS
+Middleware so mobile requests are never blocked on the CBS.
+Sync status
+(sync_status)The state of a collection record: PENDING (not yet sent) or SYNCED
+(confirmed received by the server).
+STRIDEA threat-modeling framework — Spoofing, Tampering, Repudiation,
+Information disclosure, Denial of service, Elevation of privilege.
+UCUse Case — a numbered behavioural specification (e.g. UC-16: OFJ
+reconciliation) that this handoff's screens map to.
+Variance (Δ)The difference between the physically counted cash and the digitally recorded
+total at end-of-day (BR-01).
+Variance debtA formal debt recorded against an agent when a cash shortage (negative
+variance) is confirmed (UC-17).
+XAF / FCFAThe CFA franc (BEAC), the currency used across the CEMAC zone; displayed
+with a non-breaking space before the code, e.g. "45 000 XAF".

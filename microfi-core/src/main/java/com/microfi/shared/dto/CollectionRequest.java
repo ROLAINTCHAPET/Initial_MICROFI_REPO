@@ -37,6 +37,10 @@ public class CollectionRequest {
     @NotBlank
     private String deviceTxId;
 
+    /** Transaction confirmation — checked against the agent's own transaction PIN, independent of login (see AgentDirectoryService#verifyTransactionPin). */
+    @NotBlank
+    private String pin;
+
     /** FR-08: mandatory above the configured threshold; sum must equal amountXaf exactly (BR-02). */
     @Valid
     private List<DenominationLineDto> denominationLines;

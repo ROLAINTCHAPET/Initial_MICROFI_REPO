@@ -1,0 +1,169 @@
+package com.microfi.transactions.service;
+
+import com.microfi.shared.dto.GeofenceAlertResponse;
+import com.microfi.shared.dto.GeofenceRequest;
+import com.microfi.shared.dto.GeofenceResponse;
+import com.microfi.shared.dto.GeofenceVertexDto;
+import com.microfi.transactions.domain.Geofence;
+import com.microfi.transactions.domain.GeofenceAlert;
+import com.microfi.transactions.repository.GeofenceAlertRepository;
+import com.microfi.transactions.repository.GeofenceRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * UC-13 — Real-Time Geofence Breach Alert. {@link #evaluateLocation} is called from
+ * {@link TrackingService} after every GPS ping and runs a simple point-in-polygon check
+ * (ray-casting; see class javadoc on {@link Geofence} for why this isn't PostGIS). An agent must
+ * be outside continuously for {@code geofence.grace-period-seconds} (UC-13 A1, default 120s)
+ * before a breach becomes a visible alert — a single stray/inaccurate ping should never page a
+ * manager — and returning inside auto-resolves it (UC-13 A2) or, if it never cleared the grace
+ * period, discards it entirely since it was never actually an alert.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class GeofenceService {
+
+    private final GeofenceRepository geofenceRepository;
+    private final GeofenceAlertRepository geofenceAlertRepository;
+
+    @Value("${geofence.grace-period-seconds:120}")
+    private long gracePeriodSeconds;
+
+    /**
+     * Collection-time gate (distinct from {@link #evaluateLocation}'s async alerting): an agent
+     * with no geofence assigned is unrestricted (true); one with a geofence must be inside it.
+     * Read-only — never touches {@link GeofenceAlert} state.
+     */
+    public boolean isWithinAssignedGeofence(UUID agentId, double lat, double lon) {
+        return geofenceRepository.findByAgentId(agentId)
+                .map(geofence -> isInsidePolygon(lat, lon, parseVertexPairs(geofence.getVerticesCsv())))
+                .orElse(true);
+    }
+
+    public void evaluateLocation(UUID agentId, double lat, double lon) {
+        Optional<Geofence> geofenceOpt = geofenceRepository.findByAgentId(agentId);
+        if (geofenceOpt.isEmpty()) {
+            return;
+        }
+        Geofence geofence = geofenceOpt.get();
+        boolean inside = isInsidePolygon(lat, lon, parseVertexPairs(geofence.getVerticesCsv()));
+        Optional<GeofenceAlert> openBreach = geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agentId);
+
+        if (inside) {
+            openBreach.ifPresent(breach -> {
+                if (breach.getRaisedAt() != null) {
+                    breach.setResolvedAt(Instant.now());
+                    geofenceAlertRepository.save(breach);
+                } else {
+                    geofenceAlertRepository.delete(breach);
+                }
+            });
+            return;
+        }
+
+        Instant now = Instant.now();
+        if (openBreach.isEmpty()) {
+            geofenceAlertRepository.save(GeofenceAlert.builder()
+                    .id(UUID.randomUUID())
+                    .agentId(agentId)
+                    .geofenceId(geofence.getId())
+                    .firstDetectedOutsideAt(now)
+                    .build());
+            return;
+        }
+
+        GeofenceAlert breach = openBreach.get();
+        if (breach.getRaisedAt() == null
+                && Duration.between(breach.getFirstDetectedOutsideAt(), now).getSeconds() >= gracePeriodSeconds) {
+            breach.setRaisedAt(now);
+            geofenceAlertRepository.save(breach);
+        }
+    }
+
+    public GeofenceResponse setGeofence(UUID agentId, GeofenceRequest request) {
+        String csv = request.getVertices().stream()
+                .map(v -> v.getLat() + "," + v.getLon())
+                .collect(Collectors.joining(";"));
+        Geofence geofence = geofenceRepository.findByAgentId(agentId)
+                .orElseGet(() -> Geofence.builder().id(UUID.randomUUID()).agentId(agentId).build());
+        geofence.setVerticesCsv(csv);
+        geofenceRepository.save(geofence);
+        return toResponse(geofence);
+    }
+
+    public GeofenceResponse getGeofence(UUID agentId) {
+        Geofence geofence = geofenceRepository.findByAgentId(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No geofence assigned to agent: " + agentId));
+        return toResponse(geofence);
+    }
+
+    public List<GeofenceAlertResponse> listAlerts(UUID agentId) {
+        return geofenceAlertRepository.findByAgentIdOrderByFirstDetectedOutsideAtDesc(agentId).stream()
+                .map(this::toAlertResponse)
+                .toList();
+    }
+
+    /** Standard ray-casting point-in-polygon test; treats lat/lon as planar x/y, adequate at market/district scale. */
+    private boolean isInsidePolygon(double lat, double lon, List<double[]> vertices) {
+        boolean inside = false;
+        int n = vertices.size();
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            double latI = vertices.get(i)[0], lonI = vertices.get(i)[1];
+            double latJ = vertices.get(j)[0], lonJ = vertices.get(j)[1];
+            boolean edgeCrossesRay = ((lonI > lon) != (lonJ > lon))
+                    && (lat < (latJ - latI) * (lon - lonI) / (lonJ - lonI) + latI);
+            if (edgeCrossesRay) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    private List<double[]> parseVertexPairs(String verticesCsv) {
+        return Stream.of(verticesCsv.split(";"))
+                .map(pair -> {
+                    String[] parts = pair.split(",");
+                    return new double[]{Double.parseDouble(parts[0]), Double.parseDouble(parts[1])};
+                })
+                .toList();
+    }
+
+    private GeofenceResponse toResponse(Geofence geofence) {
+        List<GeofenceVertexDto> vertices = Arrays.stream(geofence.getVerticesCsv().split(";"))
+                .map(pair -> {
+                    String[] parts = pair.split(",");
+                    GeofenceVertexDto dto = new GeofenceVertexDto();
+                    dto.setLat(Double.parseDouble(parts[0]));
+                    dto.setLon(Double.parseDouble(parts[1]));
+                    return dto;
+                })
+                .toList();
+        return GeofenceResponse.builder().agentId(geofence.getAgentId()).vertices(vertices).build();
+    }
+
+    private GeofenceAlertResponse toAlertResponse(GeofenceAlert alert) {
+        return GeofenceAlertResponse.builder()
+                .id(alert.getId())
+                .agentId(alert.getAgentId())
+                .firstDetectedOutsideAt(alert.getFirstDetectedOutsideAt())
+                .raisedAt(alert.getRaisedAt())
+                .resolvedAt(alert.getResolvedAt())
+                .active(alert.getRaisedAt() != null && alert.getResolvedAt() == null)
+                .build();
+    }
+}

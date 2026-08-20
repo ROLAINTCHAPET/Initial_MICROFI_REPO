@@ -12,7 +12,11 @@ public class BranchResponse {
     private UUID id;
     private String code;
     private String name;
+    private String phone;
     private LocalTime openTime;
     private LocalTime closeTime;
     private String timezone;
+    private int maxCashiers;
+    private boolean requireImei;
+    private int defaultCeilingPct;
 }

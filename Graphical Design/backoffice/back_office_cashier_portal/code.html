@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-background antialiased" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi Cashier Dashboard - Agent Deposit</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#005142",
+                    "on-primary-container": "#768dad",
+                    "on-primary-fixed": "#001c37",
+                    "on-primary-fixed-variant": "#314865",
+                    "primary": "#000f22",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#e5e8eb",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#eef1f4",
+                    "on-secondary-container": "#00725f",
+                    "primary-container": "#0a2540",
+                    "secondary-container": "#55fcd8",
+                    "surface": "#f7fafd",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "on-surface-variant": "#43474d",
+                    "on-secondary-fixed": "#002019",
+                    "surface-tint": "#49607e",
+                    "outline-variant": "#c4c6ce",
+                    "tertiary-container": "#322100",
+                    "on-background": "#181c1e",
+                    "surface-variant": "#e0e3e6",
+                    "outline": "#74777e",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "error-container": "#ffdad6",
+                    "on-surface": "#181c1e",
+                    "on-tertiary": "#ffffff",
+                    "inverse-surface": "#2d3133",
+                    "surface-dim": "#d7dadd",
+                    "on-error": "#ffffff",
+                    "surface-container-highest": "#e0e3e6",
+                    "tertiary": "#170d00",
+                    "background": "#f7fafd",
+                    "on-tertiary-fixed": "#271900",
+                    "surface-container-low": "#f1f4f7",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-bright": "#f7fafd",
+                    "secondary-fixed": "#55fcd8",
+                    "secondary": "#006b59",
+                    "on-tertiary-container": "#b68200",
+                    "secondary-fixed-dim": "#27dfbc",
+                    "tertiary-fixed": "#ffdea8",
+                    "on-primary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "surface-container": "#ebeef1",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed": "#d2e4ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-md": "16px",
+                    "gutter": "16px",
+                    "stack-lg": "24px",
+                    "stack-sm": "8px",
+                    "margin-mobile": "20px",
+                    "touch-target": "48px"
+            },
+            "fontFamily": {
+                    "display": ["Inter"],
+                    "label-bold": ["Inter"],
+                    "caption": ["Inter"],
+                    "h2": ["Inter"],
+                    "h1": ["Inter"],
+                    "body": ["Inter"]
+            },
+            "fontSize": {
+                    "display": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-bold": ["13px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "h2": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "h1": ["22px", {"lineHeight": "28px", "fontWeight": "700"}],
+                    "body": ["15px", {"lineHeight": "22px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="flex h-full text-on-surface font-body overflow-hidden">
+<!-- SideNavBar -->
+<nav class="h-screen w-64 fixed left-0 top-0 bg-primary-container text-secondary-fixed border-r border-outline-variant z-20 flex flex-col py-6">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3">
+<img alt="Organization Logo" class="w-8 h-8 object-contain rounded" data-alt="A clean, modern corporate logo for a financial utility company named Microfi. The logo should feature a strong, geometric monogram or abstract vault icon in stark white and deep navy blue. The aesthetic is institutional, secure, and highly legible." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZ8uTYX8DCHGfPw_WnCAgkTiJUJH7ixd3lMos2qldPMMXgbiSAv3ZGlJJSU9Js5g5nYSESoO9EiqGYDlRBUYwybuAUhtFvxOOgfYZoDzrZ3yq0DaF9WVT0q9rlMYhhlouXPz4HvXdAodV0UjJVjAsrYHlROm4Qcv-zzy6_0mg_7mPQS3ztFaGCETov-rLYd2cZuLPpVcpYzwptZ_T8RdpA-0DeZ9sunuyKl-JAR7LUXSLN81JPsu4e"/>
+<div>
+<h1 class="text-h1 font-h1 text-surface-container-lowest">Microfi Admin</h1>
+<p class="text-caption font-caption text-on-primary-container">Regional Operations</p>
+</div>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full h-touch-target bg-secondary text-on-secondary font-label-bold text-label-bold rounded-lg flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                Collect Cash
+            </button>
+</div>
+<ul class="flex-1 flex flex-col gap-1 px-2">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container-lowest/10 text-secondary-fixed border-l-4 border-secondary-fixed hover:bg-surface-container-lowest/5 transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">groups</span>
+<span class="font-label-bold text-label-bold">Agents</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span class="font-label-bold text-label-bold">Branches</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-bold text-label-bold">Reports</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto px-2 border-t border-outline-variant/20 pt-4">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-bold text-label-bold">Settings</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors rounded-lg cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-bold text-label-bold">Support</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-64 flex flex-col h-screen overflow-hidden bg-background">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface-container-lowest border-b border-outline-variant z-10 flex justify-between items-center px-gutter">
+<div class="flex items-center gap-4 flex-1">
+<span class="font-display text-h2 text-primary hidden lg:block">Microfi Back-office</span>
+<div class="relative w-64 ml-4">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full h-10 pl-10 pr-4 bg-surface rounded border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-body font-body transition-all" placeholder="Search agents, transactions..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border border-surface-container-lowest"></span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-8 w-px bg-outline-variant mx-2"></div>
+<button class="flex items-center gap-3 text-primary font-bold border-b-2 border-primary pb-1 hover:bg-surface-container-low transition-colors cursor-pointer px-2 rounded-t">
+<img alt="User Avatar" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A professional headshot of an African male bank cashier in his 30s. He is wearing a crisp white shirt and a dark navy tie. The lighting is bright and even, suggesting a well-lit corporate banking environment. The background is slightly blurred but appears to be a clean, modern office setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDV-XETonrTJhfx6u_cYTkzndz-uNpptBg6K3A5UTO5Whn1nGuJPVU9ukgiHOvwMlSaGVmACt26jNY1JDydUz9g2-d92tZBQQLaTdeOZXgZ2v0zL4CkvKdjckKDBQvVBNCUgRcRDtjU_JzbDOGTSiRoSYfxyAMT9U9qbycFwo471p16Il4PrjH7hGSUOAdC-gROwlN8UapPb90JrlZC1kVugLQvDZqLXpId72DK1MJdrYGxdD21Kwl1"/>
+<span class="font-label-bold text-label-bold">Profile</span>
+</button>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex-1 mt-16 p-6 overflow-y-auto flex gap-6">
+<!-- Left Column: Active Queue -->
+<div class="w-80 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h2 class="font-h2 text-h2 text-primary">Active Queue</h2>
+<span class="bg-primary-container text-on-primary rounded-full px-2 py-0.5 font-label-bold text-caption">3 Waiting</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Queue Item 1 (Active) -->
+<div class="bg-surface-container-lowest border-2 border-primary rounded-xl p-4 shadow-sm cursor-pointer relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex justify-between items-start mb-2">
+<div>
+<p class="font-label-bold text-label-bold text-primary">AGT-4092</p>
+<p class="font-body text-body text-on-surface-variant">Moussa Diop</p>
+</div>
+<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded text-caption font-label-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer</span>
+                                5m
+                            </span>
+</div>
+<div class="flex items-center gap-2 mt-2 pt-2 border-t border-outline-variant/50">
+<span class="material-symbols-outlined text-outline">account_balance_wallet</span>
+<span class="font-h2 text-h2 text-primary">1,250,000 XAF</span>
+</div>
+</div>
+<!-- Queue Item 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary/50 transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<div>
+<p class="font-label-bold text-label-bold text-on-surface-variant">AGT-8812</p>
+<p class="font-body text-body text-on-surface">Fatou Ndiaye</p>
+</div>
+<span class="text-outline px-2 py-1 rounded text-caption font-label-bold">
+                                12m
+                            </span>
+</div>
+<div class="flex items-center gap-2 mt-2 pt-2 border-t border-outline-variant/50">
+<span class="material-symbols-outlined text-outline">account_balance_wallet</span>
+<span class="font-label-bold text-body text-on-surface">840,000 XAF</span>
+</div>
+</div>
+<!-- Queue Item 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary/50 transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<div>
+<p class="font-label-bold text-label-bold text-on-surface-variant">AGT-1104</p>
+<p class="font-body text-body text-on-surface">Jean-Baptiste Kona</p>
+</div>
+<span class="text-outline px-2 py-1 rounded text-caption font-label-bold">
+                                22m
+                            </span>
+</div>
+<div class="flex items-center gap-2 mt-2 pt-2 border-t border-outline-variant/50">
+<span class="material-symbols-outlined text-outline">account_balance_wallet</span>
+<span class="font-label-bold text-body text-on-surface">3,100,500 XAF</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Center Column: Deposit Processing Area -->
+<div class="flex-1 flex flex-col gap-6">
+<!-- Agent Info Header -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-primary-container text-on-primary rounded-full flex items-center justify-center font-display text-h2">
+                            MD
+                        </div>
+<div>
+<h2 class="font-display text-h2 text-primary">Moussa Diop</h2>
+<p class="font-body text-caption text-on-surface-variant">Agent ID: AGT-4092 • Region: Central</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-label-bold text-caption text-on-surface-variant uppercase tracking-wider mb-1">Expected Deposit</p>
+<p class="font-display text-display text-primary">1,250,000 XAF</p>
+</div>
+</div>
+<!-- Denomination Grid -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex-1 flex flex-col">
+<h3 class="font-h2 text-h2 text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">calculate</span>
+                        Physical Cash Count
+                    </h3>
+<div class="grid grid-cols-2 gap-x-8 gap-y-4 flex-1 content-start">
+<!-- 10,000 Note -->
+<div class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface">
+<span class="font-h2 text-body text-primary w-24">10,000 XAF</span>
+<div class="flex items-center gap-3">
+<span class="text-outline font-label-bold text-caption">x</span>
+<input class="w-24 h-touch-target text-center font-h2 text-h2 rounded border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary bg-surface-container-lowest" type="number" value="100"/>
+<span class="font-label-bold text-body text-on-surface-variant w-28 text-right">= 1,000,000</span>
+</div>
+</div>
+<!-- 5,000 Note -->
+<div class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface">
+<span class="font-h2 text-body text-primary w-24">5,000 XAF</span>
+<div class="flex items-center gap-3">
+<span class="text-outline font-label-bold text-caption">x</span>
+<input class="w-24 h-touch-target text-center font-h2 text-h2 rounded border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary bg-surface-container-lowest" type="number" value="50"/>
+<span class="font-label-bold text-body text-on-surface-variant w-28 text-right">= 250,000</span>
+</div>
+</div>
+<!-- 2,000 Note -->
+<div class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface">
+<span class="font-h2 text-body text-primary w-24">2,000 XAF</span>
+<div class="flex items-center gap-3">
+<span class="text-outline font-label-bold text-caption">x</span>
+<input class="w-24 h-touch-target text-center font-h2 text-h2 rounded border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary bg-surface-container-lowest" placeholder="0" type="number"/>
+<span class="font-label-bold text-body text-outline w-28 text-right">= 0</span>
+</div>
+</div>
+<!-- 1,000 Note -->
+<div class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface">
+<span class="font-h2 text-body text-primary w-24">1,000 XAF</span>
+<div class="flex items-center gap-3">
+<span class="text-outline font-label-bold text-caption">x</span>
+<input class="w-24 h-touch-target text-center font-h2 text-h2 rounded border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary bg-surface-container-lowest" placeholder="0" type="number"/>
+<span class="font-label-bold text-body text-outline w-28 text-right">= 0</span>
+</div>
+</div>
+<!-- 500 Note -->
+<div class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface">
+<span class="font-h2 text-body text-primary w-24">500 XAF</span>
+<div class="flex items-center gap-3">
+<span class="text-outline font-label-bold text-caption">x</span>
+<input class="w-24 h-touch-target text-center font-h2 text-h2 rounded border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary bg-surface-container-lowest" placeholder="0" type="number"/>
+<span class="font-label-bold text-body text-outline w-28 text-right">= 0</span>
+</div>
+</div>
+</div>
+<!-- Totalizer & Actions -->
+<div class="mt-6 pt-6 border-t border-outline-variant flex items-end justify-between">
+<div>
+<p class="font-label-bold text-caption text-on-surface-variant uppercase tracking-wider mb-1">Physical Count Total</p>
+<div class="flex items-center gap-4">
+<p class="font-display text-display text-primary">1,250,000 XAF</p>
+<!-- Discrepancy Alert (Hidden by default, shown here for matched state) -->
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-caption font-label-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                                    Match
+                                </span>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="h-touch-target px-6 rounded-lg border-2 border-primary text-primary font-label-bold text-label-bold hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined">flag</span>
+                                Flag Issue
+                            </button>
+<button class="h-touch-target px-8 rounded-lg bg-primary text-on-primary font-label-bold text-label-bold hover:bg-primary/90 transition-colors shadow-[0_4px_10px_rgba(0,15,34,0.1)] flex items-center gap-2">
+<span class="material-symbols-outlined">verified</span>
+                                Verify &amp; Post
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Recent History -->
+<div class="w-72 flex flex-col gap-4">
+<h2 class="font-h2 text-h2 text-primary">Today's Validated</h2>
+<div class="flex flex-col gap-2 overflow-y-auto pr-2">
+<!-- History Item 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-bold text-caption text-on-surface-variant">AGT-2199</span>
+<span class="text-caption text-outline">10:42 AM</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-h2 text-body text-primary">450,000 XAF</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+</div>
+<!-- History Item 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-bold text-caption text-on-surface-variant">AGT-5510</span>
+<span class="text-caption text-outline">09:15 AM</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-h2 text-body text-primary">2,100,000 XAF</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+</div>
+<!-- History Item 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-bold text-caption text-on-surface-variant">AGT-1022</span>
+<span class="text-caption text-outline">08:30 AM</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-h2 text-body text-primary">80,000 XAF</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

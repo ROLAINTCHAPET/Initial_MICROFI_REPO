@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,6 +45,15 @@ public class CollectionController {
         return resolveAgentId(authenticationMono)
                 .flatMap(agentId -> Mono.fromCallable(() -> collectionService.recordCollection(agentId, request))
                         .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping
+    @Operation(summary = "My Recent Collections", description = "The calling agent's own last 50 collections, newest first, with client names resolved — powers the mobile Home/History views.")
+    public Flux<CollectionResponse> myCollections(Mono<Authentication> authenticationMono) {
+        return resolveAgentId(authenticationMono)
+                .flatMapMany(agentId -> Mono.fromCallable(() -> collectionService.findRecentByAgent(agentId))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
     }
 
     @PostMapping("/sync")

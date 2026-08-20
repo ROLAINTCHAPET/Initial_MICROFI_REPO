@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,7 @@ import java.util.UUID;
 public interface OfjSessionRepository extends JpaRepository<OfjSession, UUID> {
     /** (branchId, businessDate) is the natural key for the day's session (partial-unique excluding CANCELLED). */
     Optional<OfjSession> findByBranchIdAndBusinessDate(UUID branchId, LocalDate businessDate);
+
+    /** For the Back-Office reports/history screen — past sessions, most recent business date first. */
+    List<OfjSession> findByBranchIdOrderByBusinessDateDesc(UUID branchId);
 }

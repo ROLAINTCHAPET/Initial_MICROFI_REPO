@@ -6,6 +6,7 @@ import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.shared.dto.LocationPingResponse;
@@ -52,6 +53,9 @@ class TrackingControllerTest {
 
     @MockitoBean
     private ClientDetailsService clientDetailsService;
+
+    @MockitoBean
+    private AgentDirectoryService agentDirectoryService;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID otherAgentId = UUID.randomUUID();
@@ -159,5 +163,50 @@ class TrackingControllerTest {
                 .bodyValue("{}")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testSyncStatusSuccess_resolvesAgentFromPrincipal() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .patch()
+                .uri("/api/v1/agents/" + agentId + "/sync-status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pendingCount\":3}")
+                .exchange()
+                .expectStatus().isNoContent();
+
+        org.mockito.Mockito.verify(agentDirectoryService).updateSyncStatus(agentId, 3);
+    }
+
+    @Test
+    void testSyncStatusUnauthenticatedRejected() {
+        webTestClient.patch()
+                .uri("/api/v1/agents/" + agentId + "/sync-status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pendingCount\":0}")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void testSyncStatusForAnotherAgentForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .patch()
+                .uri("/api/v1/agents/" + otherAgentId + "/sync-status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pendingCount\":0}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testSyncStatusNegativeCountRejected() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .patch()
+                .uri("/api/v1/agents/" + agentId + "/sync-status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pendingCount\":-1}")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 }

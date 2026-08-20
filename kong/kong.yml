@@ -1,0 +1,93 @@
+_format_version: "3.0"
+_transform: true
+
+# MICROFI API Gateway (architecture.txt section 3.3): TLS termination, rate-limiting, JWT
+# validation and routing in front of Core Backend. DB-less mode — this file is the single source
+# of truth, no separate Kong control-plane database needed. The CBS Middleware is NOT exposed
+# here: architecture.txt describes it as "called by Core only", an internal service.
+
+services:
+  - name: microfi-core
+    url: http://microfi-core:8080
+    routes:
+      # More specific path prefix always wins Kong's routing, regardless of declaration order —
+      # so /api/v1/auth/* always matches this route (no JWT required to log in), never the
+      # catch-all below.
+      - name: public-auth
+        paths:
+          - /api/v1/auth
+          - /v3/api-docs
+          - /actuator
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              fault_tolerant: true
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+              headers: [Authorization, Content-Type]
+
+      # Everything else requires a valid, non-expired MICROFI-issued JWT before it ever reaches
+      # Core — Core's own JwtAuthenticationFilter still runs too (defense in depth: Kong checks
+      # the token is genuine and current, Core still resolves the specific principal/role and
+      # enforces per-endpoint authorization).
+      - name: protected
+        paths:
+          - /
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              claims_to_verify:
+                - exp
+              key_claim_name: iss
+          - name: rate-limiting
+            config:
+              minute: 600
+              # Every MICROFI JWT shares one `iss` (see consumers below), so Kong's default
+              # limit_by: consumer collapses every admin/agent/client in the system into a single
+              # shared budget — one Back-Office session loading a few pages was enough to 429
+              # everyone else. Key by IP instead so one device's traffic can't starve the rest.
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              fault_tolerant: true
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+              headers: [Authorization, Content-Type]
+          # BR (security.txt "Gateway rate-limiting and IP allow-list"): no real branch/back-office
+          # IP ranges exist anywhere in this project's docs, so this is scaffolded but permissive
+          # (allows everything) rather than guessing values that would silently lock out agents in
+          # the field. Replace `allow` with real ranges per deployment, or drop the plugin block
+          # entirely if IP allow-listing isn't wanted for a mobile-agent-facing API.
+          - name: ip-restriction
+            config:
+              allow:
+                - "0.0.0.0/0"
+                - "::/0"
+
+# Every MICROFI-issued JWT carries iss=microfi-core (see JwtService.ISSUER) — Kong uses that claim
+# to look up which consumer's secret to verify the signature against. Kong doesn't need to know
+# about individual agents/admins/clients; Core still does all real per-principal authorization.
+consumers:
+  - username: microfi-clients
+    jwt_secrets:
+      - key: microfi-core
+        algorithm: HS384
+        # Must be byte-identical to application.security.jwt.secret-key in microfi-core's
+        # application.properties (or the MICROFI_JWT_SECRET env var if overridden) — both sides
+        # now derive the HMAC key from this string's raw UTF-8 bytes (see JwtService#getSignInKey).
+        secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"

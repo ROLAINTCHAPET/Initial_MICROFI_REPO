@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Microfi - Digital Booklet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#002019",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "on-surface-variant": "#43474d",
+                    "tertiary-fixed": "#ffdea8",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e0e3e6",
+                    "on-tertiary-fixed": "#271900",
+                    "primary-container": "#0a2540",
+                    "on-primary-container": "#768dad",
+                    "surface-container-highest": "#e0e3e6",
+                    "on-secondary-fixed-variant": "#005142",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#e5e8eb",
+                    "surface-bright": "#f7fafd",
+                    "on-background": "#181c1e",
+                    "error": "#ba1a1a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "primary": "#000f22",
+                    "inverse-on-surface": "#eef1f4",
+                    "inverse-surface": "#2d3133",
+                    "secondary-fixed-dim": "#27dfbc",
+                    "on-tertiary-container": "#b68200",
+                    "surface-tint": "#49607e",
+                    "on-surface": "#181c1e",
+                    "secondary-container": "#55fcd8",
+                    "tertiary": "#170d00",
+                    "on-primary-fixed": "#001c37",
+                    "surface-container-low": "#f1f4f7",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "outline": "#74777e",
+                    "outline-variant": "#c4c6ce",
+                    "tertiary-container": "#322100",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#d7dadd",
+                    "background": "#f7fafd",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "secondary": "#006b59",
+                    "on-secondary-container": "#00725f",
+                    "primary-fixed": "#d2e4ff",
+                    "surface-container": "#ebeef1",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#b0c8eb",
+                    "on-secondary": "#ffffff",
+                    "secondary-fixed": "#55fcd8",
+                    "on-primary-fixed-variant": "#314865",
+                    "surface": "#f7fafd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-md": "16px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "stack-lg": "24px",
+                    "stack-sm": "8px",
+                    "touch-target": "48px"
+            },
+            "fontFamily": {
+                    "label-bold": [
+                            "Inter"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "caption": [
+                            "Inter"
+                    ],
+                    "h2": [
+                            "Inter"
+                    ],
+                    "h1": [
+                            "Inter"
+                    ],
+                    "display": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "label-bold": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body": [
+                            "15px",
+                            {
+                                    "lineHeight": "22px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "caption": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "h2": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "h1": [
+                            "22px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "display": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .texture-bg {
+            background-color: #F4F7FA;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body antialiased texture-bg min-h-screen flex flex-col pt-[72px] pb-[80px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile h-touch-target bg-primary dark:bg-primary-container border-b border-outline dark:border-outline-variant flat no shadows scale-95 duration-75">
+<button class="h-touch-target w-touch-target flex items-center justify-center text-on-primary dark:text-on-primary-container hover:bg-primary-fixed-dim/10">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display text-display text-on-primary dark:text-on-primary-container tracking-tighter">Microfi</h1>
+<button class="h-touch-target w-touch-target flex items-center justify-center text-on-primary dark:text-on-primary-container hover:bg-primary-fixed-dim/10">
+<span class="material-symbols-outlined" data-icon="signal_wifi_4_bar">signal_wifi_4_bar</span>
+</button>
+</header>
+<main class="flex-grow px-margin-mobile pt-stack-lg pb-stack-lg flex flex-col gap-stack-lg max-w-md mx-auto w-full">
+<!-- Header Section -->
+<section class="flex justify-between items-start">
+<div>
+<h2 class="font-h2 text-h2 text-primary">Jean Dupont</h2>
+<p class="font-caption text-caption text-on-surface-variant">Member ID: MF-4829-X</p>
+</div>
+<div class="bg-secondary text-on-secondary px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-bold text-label-bold uppercase">Active</span>
+</div>
+</section>
+<!-- Balance Card (Bento Style) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-lg shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-[120px]">account_balance_wallet</span>
+</div>
+<div class="relative z-10 flex flex-col gap-stack-sm">
+<p class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Current Balance</p>
+<h3 class="font-display text-display text-primary">145 000 XAF</h3>
+<p class="font-caption text-caption text-outline flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+                    As of today, 09:30
+                </p>
+</div>
+</section>
+<!-- Recent Activity List -->
+<section class="flex flex-col gap-stack-sm">
+<h4 class="font-h2 text-h2 text-primary pb-2 border-b border-outline-variant">Recent Activity</h4>
+<div class="flex flex-col">
+<!-- Transaction Item -->
+<div class="flex justify-between items-center py-stack-md border-b border-outline-variant/50 min-h-[64px]">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-primary">Deposit</p>
+<p class="font-caption text-caption text-on-surface-variant">Oct 24, 08:15 AM</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end">
+<p class="font-body text-body text-primary font-semibold">+ 15 000 XAF</p>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">cloud_sync</span>
+</div>
+</div>
+<!-- Transaction Item -->
+<div class="flex justify-between items-center py-stack-md border-b border-outline-variant/50 min-h-[64px]">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-primary">Deposit</p>
+<p class="font-caption text-caption text-on-surface-variant">Oct 22, 14:30 PM</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end">
+<p class="font-body text-body text-primary font-semibold">+ 10 000 XAF</p>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">cloud_sync</span>
+</div>
+</div>
+<!-- Transaction Item -->
+<div class="flex justify-between items-center py-stack-md min-h-[64px]">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-primary">Deposit</p>
+<p class="font-caption text-caption text-on-surface-variant">Oct 18, 09:00 AM</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end">
+<p class="font-body text-body text-primary font-semibold">+ 25 000 XAF</p>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">cloud_sync</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Action Area -->
+<section class="mt-auto pt-stack-lg">
+<button class="w-full h-touch-target bg-primary text-on-primary rounded-full font-label-bold text-label-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-md">
+<span class="material-symbols-outlined">payments</span>
+                Request Withdrawal
+            </button>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface dark:bg-surface-container-lowest border-t border-outline-variant dark:border-outline flat no shadows md:hidden">
+<button class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full h-[48px] w-full mx-1 hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-bold text-label-bold">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-bold text-label-bold">History</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-bold text-label-bold">Wallet</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline h-[48px] w-full hover:bg-surface-variant active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-label-bold text-label-bold">Emergency</span>
+</button>
+</nav>
+</body></html>

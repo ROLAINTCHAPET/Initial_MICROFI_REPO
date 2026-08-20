@@ -1,10 +1,12 @@
 package com.microfi.cbsclient;
 
 import com.microfi.shared.dto.MiddlewareBalance;
+import com.microfi.shared.dto.MiddlewareCollectionLine;
 import com.microfi.shared.dto.MiddlewareExportAck;
 import com.microfi.shared.dto.MiddlewareFeeSplit;
 import com.microfi.shared.dto.MiddlewareHistoryEntry;
 import com.microfi.shared.dto.MiddlewareMemberVerification;
+import com.microfi.shared.dto.MiddlewareTransactionPostResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -82,5 +85,16 @@ public class CbsClientService {
                 .retrieve()
                 .bodyToFlux(MiddlewareHistoryEntry.class)
                 .doOnError(e -> log.error("Middleware history lookup failed for member {}: {}", memberId, e.getMessage()));
+    }
+
+    /** FR-18/UC-19: posts a day's collections to the CBS ledger so member balance/history reflect them. */
+    public Mono<MiddlewareTransactionPostResult> postTransactions(List<MiddlewareCollectionLine> collections, String idempotencyKey) {
+        return webClient.post()
+                .uri("/mw/v1/transactions/post")
+                .header("Idempotency-Key", idempotencyKey)
+                .bodyValue(Map.of("collections", collections))
+                .retrieve()
+                .bodyToMono(MiddlewareTransactionPostResult.class)
+                .doOnError(e -> log.error("Middleware transaction posting failed: {}", e.getMessage()));
     }
 }

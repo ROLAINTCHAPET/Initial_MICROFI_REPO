@@ -10,6 +10,7 @@ import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.savings.service.ClientSelfService;
 import com.microfi.shared.dto.ClientProfileSelfResponse;
+import com.microfi.shared.dto.ClientRecentCollectionResponse;
 import com.microfi.shared.dto.MiddlewareBalance;
 import com.microfi.shared.dto.MiddlewareHistoryEntry;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
@@ -100,6 +102,27 @@ class ClientSelfServiceControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.balanceXaf").isEqualTo(45000);
+    }
+
+    @Test
+    void testRecentCollectionsSuccess() {
+        when(clientSelfService.getRecentCollections(clientId)).thenReturn(
+                List.of(ClientRecentCollectionResponse.builder().id(UUID.randomUUID()).amountXaf(5000).locationName("Akwa, Douala").collectedAt(Instant.now()).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(clientAuthentication()))
+                .get()
+                .uri("/api/v1/clients/me/recent-collections")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void testRecentCollectionsUnauthenticatedRejected() {
+        webTestClient.get()
+                .uri("/api/v1/clients/me/recent-collections")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     @Test

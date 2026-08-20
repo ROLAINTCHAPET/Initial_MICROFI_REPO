@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,5 +37,12 @@ public class ActivationDirectoryService {
      */
     public boolean hasPendingActivation(UUID agentId) {
         return activationRequestRepository.existsByAgentIdAndStatus(agentId, ActivationRequestStatus.PENDING);
+    }
+
+    /** UC-16/18: line-level detail (not just a sum) for posting a branch's activation-fee cash to the CBS on export, same as Collection. */
+    public List<ActivationCashLine> findByAgentIdsAndWindow(List<UUID> agentIds, Instant start, Instant end) {
+        return activationPaymentRepository.findByAgentIdInAndPaidAtBetween(agentIds, start, end).stream()
+                .map(payment -> new ActivationCashLine(payment.getId(), payment.getClientId(), payment.getAmountXaf(), payment.getPaidAt()))
+                .toList();
     }
 }

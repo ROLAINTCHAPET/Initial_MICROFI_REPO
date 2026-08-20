@@ -1,0 +1,440 @@
+<!DOCTYPE html><html class="h-full bg-surface" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Microfi Back-office - Agent Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#e5e8eb",
+                    "on-primary-container": "#768dad",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "surface-container-low": "#f1f4f7",
+                    "outline-variant": "#c4c6ce",
+                    "on-secondary-container": "#00725f",
+                    "outline": "#74777e",
+                    "primary-container": "#0a2540",
+                    "on-primary-fixed": "#001c37",
+                    "secondary-fixed-dim": "#27dfbc",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed": "#271900",
+                    "secondary": "#006b59",
+                    "primary-fixed": "#d2e4ff",
+                    "on-secondary": "#ffffff",
+                    "secondary-fixed": "#55fcd8",
+                    "on-secondary-fixed-variant": "#005142",
+                    "inverse-on-surface": "#eef1f4",
+                    "on-error": "#ffffff",
+                    "on-background": "#181c1e",
+                    "on-tertiary-container": "#b68200",
+                    "on-primary": "#ffffff",
+                    "surface-bright": "#f7fafd",
+                    "surface-variant": "#e0e3e6",
+                    "surface-container-highest": "#e0e3e6",
+                    "error": "#ba1a1a",
+                    "surface-tint": "#49607e",
+                    "tertiary-fixed": "#ffdea8",
+                    "background": "#f7fafd",
+                    "surface-dim": "#d7dadd",
+                    "on-surface-variant": "#43474d",
+                    "tertiary": "#170d00",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "on-surface": "#181c1e",
+                    "primary": "#000f22",
+                    "surface": "#f7fafd",
+                    "on-secondary-fixed": "#002019",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#55fcd8",
+                    "surface-container": "#ebeef1",
+                    "tertiary-container": "#322100",
+                    "on-error-container": "#93000a",
+                    "inverse-surface": "#2d3133",
+                    "on-primary-fixed-variant": "#314865"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-lg": "24px",
+                    "margin-mobile": "20px",
+                    "stack-md": "16px",
+                    "gutter": "16px",
+                    "stack-sm": "8px",
+                    "touch-target": "48px"
+            },
+            "fontFamily": {
+                    "display": [
+                            "Inter"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "h1": [
+                            "Inter"
+                    ],
+                    "h2": [
+                            "Inter"
+                    ],
+                    "label-bold": [
+                            "Inter"
+                    ],
+                    "caption": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "display": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body": [
+                            "15px",
+                            {
+                                    "lineHeight": "22px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "h1": [
+                            "22px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "h2": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-bold": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "caption": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="font-body text-body text-on-surface bg-surface h-full flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="h-screen w-64 fixed left-0 top-0 bg-primary-container dark:bg-primary-container font-body text-body text-secondary-fixed dark:text-secondary-fixed-dim border-r border-outline-variant dark:border-outline-variant flat no shadows flex flex-col h-full py-6 z-20">
+<div class="px-6 mb-8">
+<h1 class="text-h1 font-h1 text-surface-container-lowest dark:text-surface-container-lowest">Microfi Admin</h1>
+<p class="font-caption text-caption text-on-primary-container mt-1">Regional Operations</p>
+</div>
+<ul class="flex flex-col gap-1 px-2 flex-grow">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="">Dashboard</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container-lowest/10 text-secondary-fixed border-l-4 border-secondary-fixed hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT rounded-l-none" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="">Agents</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="">Branches</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="">Reports</span>
+</a>
+</li>
+</ul>
+<div class="px-6 mb-4">
+<button class="w-full bg-secondary-fixed text-on-secondary-fixed font-label-bold text-label-bold h-touch-target rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">payments</span>
+                Collect Cash
+            </button>
+</div>
+<ul class="flex flex-col gap-1 px-2 border-t border-on-primary-container/20 pt-4">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="">Settings</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="">Support</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface-container-lowest dark:bg-surface-dim font-h1 text-h1 text-primary dark:text-primary-fixed border-b border-outline-variant dark:border-outline-variant flat no shadows flex justify-between items-center px-gutter h-full z-10">
+<div class="flex items-center gap-4">
+<h2 class="font-h2 text-h2 text-on-surface hidden md:block">Agent Management</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden md:block w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 h-10 border border-outline-variant rounded-DEFAULT bg-surface focus:border-primary focus:ring-1 focus:ring-primary font-body text-body text-on-surface" placeholder="Search agents..." type="text">
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-DEFAULT cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-DEFAULT cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+</div>
+<div class="h-8 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-3 cursor-pointer hover:bg-surface-container-low transition-colors p-2 rounded-DEFAULT">
+<img alt="User Avatar" class="w-8 h-8 rounded-full object-cover" data-alt="Professional headshot of a corporate user in a well-lit office setting, clear neutral background, high resolution, soft lighting emphasizing a trustworthy and stable appearance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKhVkRbwsbsIulgReyms8tpw9HtAPahTE7Wpoun-LBUPm_0dkKaCsy5OauaHx6pIepg4pSwNKJBYetVYpTpFWf-Z8Eu89JHtpV5SeBB7E68y25plKmMhATE_spv8YQuMdyqS6t_2wx1D0nNTL1gVosYUY_9_73146SH3S3-EnkDuJnOUDGO-x1Q7GTQFN0pt9DoThkRJ9DT4KZBhfz1LD3dVFl3IyiTY5d98Jl905pTTFKeTlPOZd8">
+<span class="font-label-bold text-label-bold text-on-surface hidden md:block">Profile</span>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-64 mt-16 p-stack-lg w-full overflow-y-auto bg-surface">
+<div class="max-w-7xl mx-auto">
+<!-- Header Actions -->
+<div class="flex justify-between items-center mb-stack-lg">
+<div>
+<h2 class="font-display text-display text-on-surface">Agents Overview</h2>
+<p class="font-body text-body text-on-surface-variant mt-1">Manage field agents, monitor escrow levels, and handle suspensions.</p>
+</div>
+<button class="bg-primary text-on-primary h-touch-target px-6 rounded-DEFAULT font-label-bold text-label-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined">person_add</span>
+                    Register New Agent
+                </button>
+</div>
+<!-- Stats Overview (Bento Grid Style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-stack-lg">
+<div class="bg-surface-container-lowest p-stack-md rounded-lg border border-outline-variant shadow-sm flex flex-col gap-2">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Total Active Agents</span>
+<div class="flex items-end justify-between">
+<span class="font-display text-display text-primary">1,248</span>
+<span class="font-caption text-caption text-secondary flex items-center"><span class="material-symbols-outlined text-sm">trending_up</span> +12%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-stack-md rounded-lg border border-outline-variant shadow-sm flex flex-col gap-2">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Agents Near Ceiling</span>
+<div class="flex items-end justify-between">
+<span class="font-display text-display text-tertiary-fixed-dim">84</span>
+<span class="font-caption text-caption text-on-surface-variant">Requires attention</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-stack-md rounded-lg border border-outline-variant shadow-sm flex flex-col gap-2">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Suspended Accounts</span>
+<div class="flex items-end justify-between">
+<span class="font-display text-display text-error">12</span>
+<span class="font-caption text-caption text-on-surface-variant">Pending review</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-stack-md rounded-lg border border-outline-variant shadow-sm flex flex-col gap-2">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Total Escrow Value</span>
+<div class="flex items-end justify-between">
+<span class="font-display text-display text-primary">42.5M <span class="text-h2">XAF</span></span>
+</div>
+</div>
+</div>
+<!-- Data Table Container -->
+<div class="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-sm overflow-hidden flex flex-col">
+<!-- Table Filters / Toolbar -->
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-bright">
+<div class="flex gap-4">
+<div class="relative w-48">
+<select class="w-full h-10 pl-3 pr-8 border border-outline-variant rounded-DEFAULT bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary font-body text-body text-on-surface appearance-none">
+<option>All Zones</option>
+<option>North Region</option>
+<option>South Region</option>
+<option>Littoral</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+</div>
+<div class="relative w-48">
+<select class="w-full h-10 pl-3 pr-8 border border-outline-variant rounded-DEFAULT bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary font-body text-body text-on-surface appearance-none">
+<option>Any Status</option>
+<option>Active</option>
+<option>Suspended</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+<button class="font-label-bold text-label-bold text-primary flex items-center gap-2 hover:bg-surface-container-low px-3 py-2 rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+                        More Filters
+                    </button>
+</div>
+<!-- The Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant"><th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Name</th>
+<th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">ID</th>
+<th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Zone</th>
+<th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Status</th>
+<th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider w-64">Escrow Wallet Level</th>
+<th class="p-4 font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider text-right">Actions</th></tr>
+</thead>
+<tbody class="divide-y divide-outline-variant"><!-- Row 1 (Jean-Paul Kameni - Near Limit) -->
+<tr class="hover:bg-error-container/20 transition-colors group bg-error-container/10">
+  <td class="p-4 min-h-[64px]">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center font-h2 text-h2 text-on-error-container">
+        JK
+      </div>
+      <div>
+        <p class="font-h2 text-h2 text-on-surface flex items-center gap-2">Jean-Paul Kameni <span class="material-symbols-outlined text-error text-[16px]" data-weight="fill">warning</span></p>
+        <p class="font-caption text-caption text-on-surface-variant">Senior Agent</p>
+      </div>
+    </div>
+  </td>
+  <td class="p-4">
+    <p class="font-caption text-caption text-outline font-mono">AGT-4492-K</p>
+  </td>
+  <td class="p-4">
+    <p class="font-body text-body text-on-surface">Douala Central</p>
+  </td>
+  <td class="p-4">
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-bold text-label-bold">
+      <span class="material-symbols-outlined text-[14px]">pause_circle</span>
+      Near Limit
+    </span>
+  </td>
+  <td class="p-4">
+    <div class="flex flex-col gap-1 w-full">
+      <div class="flex justify-between font-caption text-caption">
+        <span class="text-error font-label-bold">980,000 XAF</span>
+        <span class="text-error font-label-bold">98%</span>
+      </div>
+      <div class="w-full bg-surface-variant rounded-full h-2 overflow-hidden">
+        <div class="bg-error h-2 rounded-full" style="width: 98%"></div>
+      </div>
+    </div>
+  </td>
+  <td class="p-4 text-right">
+    <div class="flex items-center justify-end gap-2">
+      <button class="p-2 text-primary hover:bg-primary-fixed rounded-DEFAULT transition-colors" title="View Profile">
+        <span class="material-symbols-outlined">person</span>
+      </button>
+      <button class="bg-primary text-on-primary h-10 px-4 rounded-DEFAULT font-label-bold text-label-bold hover:bg-primary/90 transition-colors">
+        Adjust Ceiling
+      </button>
+    </div>
+  </td>
+</tr>
+<!-- Row 2 (Agent 118 - Safe) -->
+<tr class="hover:bg-surface-bright transition-colors group">
+  <td class="p-4 min-h-[64px]">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-h2 text-h2 text-on-primary-fixed">
+        118
+      </div>
+      <div>
+        <p class="font-h2 text-h2 text-on-surface">Agent 118</p>
+        <p class="font-caption text-caption text-on-surface-variant">Field Agent</p>
+      </div>
+    </div>
+  </td>
+  <td class="p-4">
+    <p class="font-caption text-caption text-outline font-mono">AGT-0118-S</p>
+  </td>
+  <td class="p-4">
+    <p class="font-body text-body text-on-surface">Douala Sector 2</p>
+  </td>
+  <td class="p-4">
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-bold text-label-bold">
+      <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+      Active
+    </span>
+  </td>
+  <td class="p-4">
+    <div class="flex flex-col gap-1 w-full">
+      <div class="flex justify-between font-caption text-caption">
+        <span class="text-on-surface">450,000 XAF</span>
+        <span class="text-on-surface-variant">45%</span>
+      </div>
+      <div class="w-full bg-surface-variant rounded-full h-2 overflow-hidden">
+        <div class="bg-primary h-2 rounded-full" style="width: 45%"></div>
+      </div>
+    </div>
+  </td>
+  <td class="p-4 text-right">
+    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button class="p-2 text-primary hover:bg-primary-fixed rounded-DEFAULT transition-colors" title="View Profile">
+        <span class="material-symbols-outlined">person</span>
+      </button>
+      <button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-DEFAULT transition-colors" title="Adjust Ceiling">
+        <span class="material-symbols-outlined">settings_suggest</span>
+      </button>
+    </div>
+  </td>
+</tr></tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-stack-md border-t border-outline-variant bg-surface-container-lowest flex justify-between items-center">
+<p class="font-caption text-caption text-on-surface-variant">Showing 1 to 4 of 1,248 entries</p>
+<div class="flex gap-2">
+<button class="h-10 w-10 flex items-center justify-center border border-outline-variant rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="h-10 w-10 flex items-center justify-center bg-primary text-on-primary rounded-DEFAULT font-label-bold text-label-bold">
+                            1
+                        </button>
+<button class="h-10 w-10 flex items-center justify-center border border-outline-variant rounded-DEFAULT text-on-surface hover:bg-surface-container-low transition-colors font-label-bold text-label-bold">
+                            2
+                        </button>
+<button class="h-10 w-10 flex items-center justify-center border border-outline-variant rounded-DEFAULT text-on-surface hover:bg-surface-container-low transition-colors font-label-bold text-label-bold">
+                            3
+                        </button>
+<button class="h-10 w-10 flex items-center justify-center border border-outline-variant rounded-DEFAULT text-on-surface hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+
+</body></html>
