@@ -4,7 +4,10 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,12 +23,25 @@ public class RabbitMQConfig {
     // UC-06/07/08 burst protection: a wave of agents reconnecting at once each trigger a
     // reverse-geocoding call to OpenStreetMap's rate-limited free Nominatim service
     // (GeocodingService) — synchronously in the request meant every one of those burst requests
-    // held a Core thread open for up to Nominatim's 5s timeout. Collection recording itself (the
-    // escrow-ceiling check included) stays fully synchronous — only this non-critical, already
-    // best-effort/nullable enrichment moves off the request path.
+    // held a Core thread open for up to Nominatim's 5s timeout. This non-critical, already
+    // best-effort/nullable enrichment moves off the request path entirely (fire-and-forget).
     public static final String COLLECTION_EXCHANGE = "microfi.collection";
     public static final String COLLECTION_GEOCODE_QUEUE = "collection.geocode.queue";
     public static final String COLLECTION_GEOCODE_KEY = "collection.geocode";
+
+    // The actual burst-protection this system was designed around: many agents reconnecting
+    // together each submit a batch of offline collections at once. Recording a collection can't
+    // be fire-and-forget the way geocoding is — the caller needs a real pass/fail per item
+    // (duplicate/rejected/succeeded) to manage its own offline queue, and the escrow-ceiling
+    // check has to run before any answer is given. So this uses RabbitMQ's request-reply
+    // pattern (RabbitTemplate#convertSendAndReceive, direct reply-to — no manual reply queue) —
+    // the HTTP caller still gets a synchronous per-item answer, but the actual processing is
+    // funneled through collectionRecordContainerFactory's *bounded* consumer pool below, so a
+    // burst durably queues in the broker instead of every concurrent request racing directly for
+    // Core's thread pool and Postgres connections the way it does today. See
+    // CollectionRecordDispatcher/CollectionRecordListener.
+    public static final String COLLECTION_RECORD_QUEUE = "collection.record.queue";
+    public static final String COLLECTION_RECORD_KEY = "collection.record";
 
     @Bean
     public TopicExchange authExchange() {
@@ -65,6 +81,38 @@ public class RabbitMQConfig {
     @Bean
     public Binding collectionGeocodeBinding(Queue collectionGeocodeQueue, TopicExchange collectionExchange) {
         return BindingBuilder.bind(collectionGeocodeQueue).to(collectionExchange).with(COLLECTION_GEOCODE_KEY);
+    }
+
+    @Bean
+    public Queue collectionRecordQueue() {
+        return new Queue(COLLECTION_RECORD_QUEUE, true);
+    }
+
+    @Bean
+    public Binding collectionRecordBinding(Queue collectionRecordQueue, TopicExchange collectionExchange) {
+        return BindingBuilder.bind(collectionRecordQueue).to(collectionExchange).with(COLLECTION_RECORD_KEY);
+    }
+
+    /**
+     * The actual throttle: no matter how many agents hit /collections or /collections/sync at
+     * once, only this many collection-record messages are processed at the same time — the rest
+     * durably wait in {@link #COLLECTION_RECORD_QUEUE} instead of every request racing directly
+     * for Core's thread pool and the Postgres connection pool. Deliberately separate from the
+     * default listener container (which the geocode/auth listeners use unbounded) since this is
+     * the one queue where the concurrency limit is the entire point.
+     */
+    @Bean
+    public SimpleRabbitListenerContainerFactory collectionRecordContainerFactory(
+            ConnectionFactory connectionFactory,
+            Jackson2JsonMessageConverter jsonMessageConverter,
+            @Value("${collection.record.consumer.concurrency:5}") int concurrency,
+            @Value("${collection.record.consumer.max-concurrency:20}") int maxConcurrency) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(jsonMessageConverter);
+        factory.setConcurrentConsumers(concurrency);
+        factory.setMaxConcurrentConsumers(maxConcurrency);
+        return factory;
     }
 
     @Bean

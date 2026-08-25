@@ -5,6 +5,7 @@ import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
+import com.microfi.events.CollectionRecordDispatcher;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
@@ -22,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +42,9 @@ class CollectionControllerTest {
 
     @MockitoBean
     private CollectionService collectionService;
+
+    @MockitoBean
+    private CollectionRecordDispatcher collectionRecordDispatcher;
 
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.
@@ -74,7 +79,7 @@ class CollectionControllerTest {
     void testCreateSuccess_resolvesAgentFromPrincipal() {
         CollectionResponse response = CollectionResponse.builder()
                 .id(UUID.randomUUID()).agentId(agentId).clientId(clientId).amountXaf(5000).build();
-        when(collectionService.recordCollection(eq(agentId), any())).thenReturn(response);
+        when(collectionRecordDispatcher.dispatch(eq(agentId), any())).thenReturn(Mono.just(response));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
@@ -116,9 +121,9 @@ class CollectionControllerTest {
     void testSyncProcessesEachItemIndependently() {
         CollectionResponse okResponse = CollectionResponse.builder()
                 .id(UUID.randomUUID()).agentId(agentId).clientId(clientId).amountXaf(5000).deviceTxId("DEV-OK").build();
-        when(collectionService.recordCollection(eq(agentId), argThatDeviceTxId("DEV-OK"))).thenReturn(okResponse);
-        when(collectionService.recordCollection(eq(agentId), argThatDeviceTxId("DEV-FAIL")))
-                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling"));
+        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-OK"))).thenReturn(Mono.just(okResponse));
+        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-FAIL")))
+                .thenReturn(Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling")));
 
         String batch = "[" +
                 "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-OK\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}," +

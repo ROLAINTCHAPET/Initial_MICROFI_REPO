@@ -59,6 +59,14 @@ services:
       - SPRING_RABBITMQ_PASSWORD=microfi_password
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
+      # How long POST /collections and /collections/sync will wait for
+      # CollectionRecordListener's reply before giving up (503) — generous enough to ride out
+      # queueing delay from a real reconnection burst, short enough that a genuinely stuck
+      # consumer pool fails fast instead of hanging the caller indefinitely.
+      - SPRING_RABBITMQ_TEMPLATE_REPLY_TIMEOUT=20000
+      # Collection-record consumer pool size — the actual burst throttle (RabbitMQConfig).
+      - COLLECTION_RECORD_CONSUMER_CONCURRENCY=5
+      - COLLECTION_RECORD_CONSUMER_MAX_CONCURRENCY=20
       - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
       # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
       # Change these before any real deployment.

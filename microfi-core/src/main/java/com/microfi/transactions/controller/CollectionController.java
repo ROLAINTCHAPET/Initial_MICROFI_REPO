@@ -1,6 +1,7 @@
 package com.microfi.transactions.controller;
 
 import com.microfi.authentication.AgentDetails;
+import com.microfi.events.CollectionRecordDispatcher;
 import com.microfi.transactions.service.CollectionService;
 import com.microfi.shared.dto.CollectionRequest;
 import com.microfi.shared.dto.CollectionResponse;
@@ -30,6 +31,12 @@ import java.util.UUID;
  * The acting agent is always resolved from the authenticated principal, never from a
  * client-supplied field — a collection must be attributable to whoever actually holds the
  * session, not whoever the caller claims to be.
+ * <p>
+ * Both writes go through {@link CollectionRecordDispatcher} rather than calling
+ * {@link CollectionService#recordCollection} in-process — that's what gives a burst of agents
+ * reconnecting at once real broker-buffered throttling instead of every request racing directly
+ * for Core's thread pool. {@code myCollections} is a read with no burst-safety concern, so it
+ * still calls {@code CollectionService} directly.
  */
 @RestController
 @RequestMapping("/api/v1/collections")
@@ -38,13 +45,13 @@ import java.util.UUID;
 public class CollectionController {
 
     private final CollectionService collectionService;
+    private final CollectionRecordDispatcher collectionRecordDispatcher;
 
     @PostMapping
     @Operation(summary = "Record a Collection", description = "Deposit + mandatory denomination breakdown + mandatory geotag (BR-05/FR-12); rejected if it would exceed the agent's escrow ceiling (FR-04). Idempotent on (agent, deviceTxId).")
     public Mono<CollectionResponse> create(@Valid @RequestBody CollectionRequest request, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
-                .flatMap(agentId -> Mono.fromCallable(() -> collectionService.recordCollection(agentId, request))
-                        .subscribeOn(Schedulers.boundedElastic()));
+                .flatMap(agentId -> collectionRecordDispatcher.dispatch(agentId, request));
     }
 
     @GetMapping
@@ -61,8 +68,13 @@ public class CollectionController {
     public Flux<CollectionSyncResult> sync(@Valid @RequestBody List<CollectionRequest> requests, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
                 .flatMapMany(agentId -> Flux.fromIterable(requests)
-                        .concatMap(request -> Mono.fromCallable(() -> collectionService.recordCollection(agentId, request))
-                                .subscribeOn(Schedulers.boundedElastic())
+                        // concatMap, not flatMap: this agent's own items must still be recorded
+                        // one at a time — the escrow-ceiling check reads today's cumulative total,
+                        // so two of this same agent's items racing each other could both read the
+                        // total before either commits and both pass individually even though their
+                        // sum shouldn't. Cross-agent throttling now comes from the broker's bounded
+                        // consumer pool instead, not from any ordering here.
+                        .concatMap(request -> collectionRecordDispatcher.dispatch(agentId, request)
                                 .map(response -> CollectionSyncResult.builder()
                                         .deviceTxId(request.getDeviceTxId())
                                         .success(true)
