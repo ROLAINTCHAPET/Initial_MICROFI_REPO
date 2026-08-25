@@ -1,7 +1,7 @@
 package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
-import com.microfi.events.CollectionGeocodePublisher;
+import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.CollectionRequest;
@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
@@ -48,7 +49,7 @@ class CollectionServiceTest {
     @Mock
     private GeofenceService geofenceService;
     @Mock
-    private CollectionGeocodePublisher collectionGeocodePublisher;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private CollectionService collectionService;
 
@@ -58,7 +59,7 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, collectionGeocodePublisher);
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, applicationEventPublisher);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
         when(geofenceService.isWithinAssignedGeofence(any(), anyDouble(), anyDouble())).thenReturn(true);
@@ -187,6 +188,9 @@ class CollectionServiceTest {
 
     @Test
     void publishesGeocodeEventAfterSavingTheCollection() {
+        // Published as a Spring application event, not sent to RabbitMQ directly — see
+        // CollectionGeocodeEventRelay's own doc comment for why (a fast consumer could otherwise
+        // race this method's own transaction commit under burst load).
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
@@ -194,7 +198,7 @@ class CollectionServiceTest {
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
-        org.mockito.Mockito.verify(collectionGeocodePublisher).publish(response.getId(), 4.05, 9.70);
+        org.mockito.Mockito.verify(applicationEventPublisher).publishEvent(new CollectionGeocodeEvent(response.getId(), 4.05, 9.70));
     }
 
     @Test
@@ -205,7 +209,7 @@ class CollectionServiceTest {
 
         collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1))));
 
-        org.mockito.Mockito.verifyNoInteractions(collectionGeocodePublisher);
+        org.mockito.Mockito.verifyNoInteractions(applicationEventPublisher);
     }
 
     @Test

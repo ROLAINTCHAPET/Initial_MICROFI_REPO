@@ -1,7 +1,7 @@
 package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
-import com.microfi.events.CollectionGeocodePublisher;
+import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
@@ -14,6 +14,7 @@ import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.EscrowResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +50,7 @@ public class CollectionService {
     private final ActivationDirectoryService activationDirectoryService;
     private final AgentDirectoryService agentDirectoryService;
     private final GeofenceService geofenceService;
-    private final CollectionGeocodePublisher collectionGeocodePublisher;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
@@ -98,7 +99,13 @@ public class CollectionService {
             }
         }
 
-        collectionGeocodePublisher.publish(collection.getId(), collection.getLat(), collection.getLon());
+        // A Spring application event, not a direct RabbitMQ send: recordCollection runs inside
+        // this class's @Transactional boundary, and rabbitTemplate.convertAndSend doesn't wait
+        // for that transaction to commit — publishing straight to the broker here let the
+        // consumer occasionally race the commit under burst load (query the row before it was
+        // actually visible). CollectionGeocodeEventRelay only forwards this to RabbitMQ
+        // @TransactionalEventListener(AFTER_COMMIT), so the row is guaranteed visible first.
+        applicationEventPublisher.publishEvent(new CollectionGeocodeEvent(collection.getId(), collection.getLat(), collection.getLon()));
 
         return toResponse(collection, false);
     }
