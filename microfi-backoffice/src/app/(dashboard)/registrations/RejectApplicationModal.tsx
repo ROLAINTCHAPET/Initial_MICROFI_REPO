@@ -6,9 +6,11 @@ import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { ErrorDialog } from "@/components/ErrorDialog";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export function RejectApplicationModal({ applicationId }: { applicationId: string }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,14 +28,14 @@ export function RejectApplicationModal({ applicationId }: { applicationId: strin
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to reject");
+        setError(body?.message ?? dict.registrations.reject.failedToReject);
         return;
       }
       setOpen(false);
       setReason("");
       router.refresh();
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -43,13 +45,13 @@ export function RejectApplicationModal({ applicationId }: { applicationId: strin
     <>
       <Button variant="danger" onClick={() => setOpen(true)}>
         <Icon name="warning" className="size-5" />
-        Reject
+        {dict.registrations.reject.button}
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Reject Application">
+      <Modal open={open} onClose={() => setOpen(false)} title={dict.registrations.reject.modalTitle}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor="reject-reason" className="text-sm font-semibold text-on-surface">
-              Reason
+              {dict.registrations.reject.reasonLabel}
             </label>
             <textarea
               id="reject-reason"
@@ -58,20 +60,20 @@ export function RejectApplicationModal({ applicationId }: { applicationId: strin
               required
               rows={4}
               className="w-full p-3 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-sm outline-none focus-visible:border-primary"
-              placeholder="e.g. Criminal record scan illegible, resubmission required"
+              placeholder={dict.registrations.reject.reasonPlaceholder}
             />
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+              {dict.common.cancel}
             </Button>
             <Button type="submit" variant="danger" loading={loading}>
-              Reject Application
+              {dict.registrations.reject.modalTitle}
             </Button>
           </div>
         </form>
       </Modal>
-      <ErrorDialog open={error !== null} message={error} onClose={() => setError(null)} title="Rejection Failed" />
+      <ErrorDialog open={error !== null} message={error} onClose={() => setError(null)} title={dict.registrations.reject.rejectionFailedTitle} />
     </>
   );
 }

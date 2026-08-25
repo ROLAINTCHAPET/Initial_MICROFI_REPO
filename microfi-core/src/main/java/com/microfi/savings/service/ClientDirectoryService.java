@@ -48,6 +48,16 @@ public class ClientDirectoryService {
                 .getPhone();
     }
 
+    /** UC-09 Bluetooth thermal receipt template's "Client ID" / "Name" lines. */
+    public ClientReceiptInfo findReceiptInfo(UUID clientId) {
+        ClientProfile client = clientProfileRepository.findById(clientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + clientId));
+        return new ClientReceiptInfo(client.getMfiMemberNo(), client.getFullName());
+    }
+
+    public record ClientReceiptInfo(String mfiMemberNo, String fullName) {
+    }
+
     /** Batch name resolution for a collections list (mobile Recent Collections/History) — never throws on a missing id. */
     public Map<UUID, String> findFullNames(Collection<UUID> clientIds) {
         return clientProfileRepository.findAllById(clientIds).stream()

@@ -4,14 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AdminRole } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
 import { Icon } from "./Icon";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { usePageHeaderValue } from "./PageHeaderContext";
-
-const ROLE_LABELS: Record<AdminRole, string> = {
-  ADMIN: "Administrator",
-  BRANCH_MANAGER: "Branch Manager",
-  BRANCH_CASHIER: "Branch Cashier",
-};
 
 function initials(name: string) {
   const parts = name.trim().split(/[.\s]+/).filter(Boolean);
@@ -22,6 +19,8 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
   const router = useRouter();
   const pageHeader = usePageHeaderValue();
   const [menuOpen, setMenuOpen] = useState(false);
+  const dict = useDictionary();
+  const roleLabels: Record<AdminRole, string> = dict.roles;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -43,7 +42,7 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
         <Link
           href="/sos"
           className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-[var(--radius-sm)] transition-[background-color,transform] duration-150 ease-out hover:scale-110 active:scale-90"
-          title={unresolvedSosCount > 0 ? `${unresolvedSosCount} unresolved SOS alert(s)` : "SOS Console"}
+          title={unresolvedSosCount > 0 ? t(dict.header.sosTooltipUnresolved, { count: unresolvedSosCount }) : dict.header.sosTooltipNone}
         >
           <Icon name="bell" className="size-5" />
           {unresolvedSosCount > 0 && (
@@ -52,6 +51,8 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
             </span>
           )}
         </Link>
+        <div className="h-8 w-px bg-outline-variant mx-2" />
+        <LanguageSwitcher />
         <div className="h-8 w-px bg-outline-variant mx-2" />
 
         <div className="relative">
@@ -66,7 +67,7 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
             <div className="text-left">
               <p className="text-sm font-semibold text-on-surface leading-tight">{login}</p>
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--radius-full)] bg-secondary-fixed/50 text-on-secondary-fixed-variant text-[10px] font-semibold uppercase tracking-wide leading-none">
-                {ROLE_LABELS[role]}
+                {roleLabels[role]}
               </span>
             </div>
             <Icon name="chevron-right" className={`size-4 text-outline transition-transform duration-200 ${menuOpen ? "rotate-90" : ""}`} />
@@ -79,7 +80,7 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
                 className="w-full flex items-center gap-2 px-4 py-3 text-sm text-danger-red cursor-pointer hover:bg-error-container/40 transition-colors duration-150 active:bg-error-container/60"
               >
                 <Icon name="sign-out" className="size-4" />
-                Sign out
+                {dict.header.signOut}
               </button>
             </div>
           )}

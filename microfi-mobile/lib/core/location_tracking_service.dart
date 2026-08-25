@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../features/home/branch_repository.dart';
 import '../features/home/location_repository.dart';
+import '../l10n/app_localizations.dart';
 
 /// UC-10 — periodic GPS position reporting while the agent's session is open, which is what
 /// actually feeds server-side geofence breach evaluation (UC-13/GeofenceService.evaluateLocation)
@@ -9,31 +11,64 @@ import '../features/home/location_repository.dart';
 /// NFR-09 battery optimisation) and the schedule-window stop (NFR-10) are deliberately the mobile
 /// client's job, not the server's (see TrackingService's own doc comment) — this is that job.
 ///
-/// Foreground-only: ticks while this app instance is alive, same as the rest of this app's
-/// networking. There's no native background-execution plumbing (WorkManager/BGTaskScheduler) in
-/// this project yet, so pings stop once the app is fully backgrounded/killed by the OS, not just
-/// when the screen locks — a real limitation, not a corner deliberately cut invisibly.
+/// Runs as a genuine Android foreground service (geolocator's built-in
+/// ForegroundNotificationConfig), not a plain in-app Timer + one-shot fetch as this used to be.
+/// Verified via logcat on a real Redmi/MIUI device that a bare Timer got killed by MIUI's
+/// ProcessSceneCleaner ~13s after the app lost foreground focus — not "eventually while
+/// backgrounded", almost immediately on any momentary focus loss (a call, a notification, the
+/// screen locking) — silently ending tracking/geofence-alerting for the rest of the agent's day
+/// with no indication to them. A foreground service earns elevated process priority that a plain
+/// activity-bound Timer never gets. This is a mitigation, not an absolute guarantee — the plugin's
+/// own docs are explicit that it "does not prevent Android from killing the activity", and MIUI's
+/// battery manager in particular can still override it unless the agent has also granted this app
+/// "No restrictions" under Settings > Battery > App battery saver (a device-provisioning step, not
+/// something this app can force programmatically).
 class LocationTrackingService {
   static const _interval = Duration(minutes: 5);
 
   final String token;
   final String agentId;
+  final AppLocalizations l10n;
 
-  Timer? _timer;
+  StreamSubscription<Position>? _subscription;
   AgentBranch? _branch;
 
-  LocationTrackingService({required this.token, required this.agentId});
+  LocationTrackingService({required this.token, required this.agentId, required this.l10n});
 
-  void start() {
-    if (_timer != null) return;
-    _refreshBranchSchedule();
-    unawaited(_tick());
-    _timer = Timer.periodic(_interval, (_) => _tick());
+  Future<void> start() async {
+    if (_subscription != null) return;
+    await _refreshBranchSchedule();
+
+    // Best-effort: on Android 13+ this gates whether the foreground-service notification is
+    // actually shown, not whether the service itself can start — never worth blocking on.
+    try {
+      await [Permission.notification].request();
+    } catch (_) {}
+
+    if (!await Geolocator.isLocationServiceEnabled()) return;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    _subscription = Geolocator.getPositionStream(
+      locationSettings: AndroidSettings(
+        accuracy: LocationAccuracy.medium,
+        intervalDuration: _interval,
+        distanceFilter: 0,
+        foregroundNotificationConfig: ForegroundNotificationConfig(
+          notificationTitle: l10n.ltsNotificationTitle,
+          notificationText: l10n.ltsNotificationText,
+          notificationChannelName: l10n.ltsNotificationChannelName,
+          setOngoing: true,
+        ),
+      ),
+    ).listen(_onPosition, onError: (_) {});
   }
 
   void stop() {
-    _timer?.cancel();
-    _timer = null;
+    _subscription?.cancel();
+    _subscription = null;
   }
 
   Future<void> _refreshBranchSchedule() async {
@@ -44,31 +79,14 @@ class LocationTrackingService {
     }
   }
 
-  Future<void> _tick() async {
+  Future<void> _onPosition(Position position) async {
     if (!_withinScheduleWindow()) return;
     try {
-      final position = await _capturePassively();
-      if (position == null) return;
       await LocationRepository(token).sendPing(agentId, position.latitude, position.longitude);
     } catch (_) {
-      // Best-effort: a missed ping (no fix, offline, transient server error) is just one fewer
-      // trail point — never worth surfacing to the agent mid-collection-round.
+      // Best-effort: a missed ping (offline, transient server error) is just one fewer trail
+      // point — never worth surfacing to the agent mid-collection-round.
     }
-  }
-
-  /// Unlike core/location.dart's captureCurrentLocation (used for the mandatory collection GPS
-  /// gate), this never *requests* permission — a passive background-ish ping popping a permission
-  /// dialog out of nowhere every 5 minutes would be a genuinely bad experience. If permission was
-  /// never granted, pings are simply skipped; the agent already sees why via the collection flow.
-  Future<Position?> _capturePassively() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return null;
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      return null;
-    }
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
-    );
   }
 
   /// Compares the device's local wall-clock time against the branch's configured hours. This

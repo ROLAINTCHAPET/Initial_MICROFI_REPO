@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export function AcknowledgeButton({ eventId }: { eventId: string }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [loading, setLoading] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export function AcknowledgeButton({ eventId }: { eventId: string }) {
       const res = await fetch(`/api/sos-events/${eventId}/acknowledge`, { method: "PATCH" });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to acknowledge");
+        setError(body?.message ?? dict.sos.failedToAcknowledge);
         return;
       }
       setSucceeded(true);
@@ -26,7 +28,7 @@ export function AcknowledgeButton({ eventId }: { eventId: string }) {
         router.refresh();
       }, 500);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -38,10 +40,10 @@ export function AcknowledgeButton({ eventId }: { eventId: string }) {
         {succeeded ? (
           <>
             <Icon name="check-circle" className="size-5" />
-            Acknowledged
+            {dict.common.status.ACKNOWLEDGED}
           </>
         ) : (
-          "Acknowledge"
+          dict.sos.acknowledgeAction
         )}
       </Button>
       {error && <p role="alert" className="text-xs text-danger-red">{error}</p>}

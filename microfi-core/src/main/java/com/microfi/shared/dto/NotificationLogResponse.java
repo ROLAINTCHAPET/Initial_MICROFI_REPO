@@ -21,4 +21,6 @@ public class NotificationLogResponse {
     private Instant sentAt;
     /** BR-Notif-01-compliant receipt text (MFI name, amount, date, agent ID) for the mobile app to hand to its Bluetooth thermal printer SDK. */
     private String receiptText;
+    /** Structured fields for the mobile app's downloadable PDF receipt — see ReceiptDataComposer. Unset (like receiptText) on past audit-log entries. */
+    private ReceiptDataResponse receiptData;
 }

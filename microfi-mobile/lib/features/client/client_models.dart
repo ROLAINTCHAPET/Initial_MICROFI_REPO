@@ -28,6 +28,19 @@ class ClientSelfProfile {
       );
 }
 
+/// Result of confirming the client's own half of UC-19's two-party activation gate — `status` is
+/// `AWAITING_SPONSORSHIP` if the agent hasn't sponsored yet, or `ACTIVE` once both sides are done
+/// and the booklet token is issued (agent-side status also stops at `AWAITING_PAYMENT` if the
+/// client hasn't confirmed yet — see ClientActivationResponse on the backend).
+class ClientActivationConfirmation {
+  final String status;
+
+  ClientActivationConfirmation({required this.status});
+
+  factory ClientActivationConfirmation.fromJson(Map<String, dynamic> json) =>
+      ClientActivationConfirmation(status: json['status'] as String);
+}
+
 class ClientBalance {
   final int balanceXaf;
   final DateTime asOf;

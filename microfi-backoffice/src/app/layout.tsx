@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import "./globals.css";
 
 // DESIGN.md specifies Inter exclusively ("tall x-height and exceptional legibility on
@@ -17,14 +20,19 @@ export const metadata: Metadata = {
   description: "MICROFI Back-Office — branch, agent and field-operations console",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+
   return (
-    <html lang="en" className={`h-full antialiased ${inter.variable}`}>
+    <html lang={locale} className={`h-full antialiased ${inter.variable}`}>
       <body
         className="min-h-full flex flex-col bg-surface-grey-100"
         style={{ backgroundImage: "url('/backgrounds/pattern.jpg')", backgroundRepeat: "repeat", backgroundAttachment: "fixed" }}
       >
-        {children}
+        <I18nProvider locale={locale} dict={dict}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

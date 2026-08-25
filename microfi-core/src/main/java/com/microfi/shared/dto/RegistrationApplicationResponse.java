@@ -17,6 +17,7 @@ public class RegistrationApplicationResponse {
     private UUID branchId;
     private String firstName;
     private String lastName;
+    private LocalDate dateOfBirth;
     private String phone;
     private String login;
     private String email;

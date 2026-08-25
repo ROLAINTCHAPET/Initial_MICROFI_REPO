@@ -9,42 +9,40 @@ import { ErrorDialog } from "@/components/ErrorDialog";
 import { Icon, type IconName } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeaderContext";
 import { kycFormatFor, matchesKycFormat } from "@/lib/kycFormats";
+import { COUNTRY_CODES } from "@/lib/countryCodes";
 import type { AdminRole, BranchResponse, RegistrationTargetRole } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 type WizardStep = "role-branch" | "identity" | "documents" | "review";
 
-const STEPS: { key: WizardStep; label: string }[] = [
-  { key: "role-branch", label: "Role & Branch" },
-  { key: "identity", label: "Identity" },
-  { key: "documents", label: "Documents" },
-  { key: "review", label: "Review" },
-];
+function stepsList(dict: Dictionary): { key: WizardStep; label: string }[] {
+  return [
+    { key: "role-branch", label: dict.registrations.newForm.steps.roleBranch },
+    { key: "identity", label: dict.registrations.newForm.steps.identity },
+    { key: "documents", label: dict.registrations.newForm.steps.documents },
+    { key: "review", label: dict.registrations.newForm.steps.review },
+  ];
+}
 
-// CEMAC member states — the platform's actual deployment zone, not a generic country list. `iso`
-// doubles as the key into kycFormats.ts, so National ID/Tax ID validation follows whichever
-// country is selected here.
-const COUNTRY_CODES: { code: string; iso: string; flag: string; label: string }[] = [
-  { code: "+237", iso: "CM", flag: "🇨🇲", label: "Cameroon" },
-  { code: "+241", iso: "GA", flag: "🇬🇦", label: "Gabon" },
-  { code: "+235", iso: "TD", flag: "🇹🇩", label: "Chad" },
-  { code: "+236", iso: "CF", flag: "🇨🇫", label: "Central African Republic" },
-  { code: "+242", iso: "CG", flag: "🇨🇬", label: "Congo" },
-  { code: "+240", iso: "GQ", flag: "🇬🇶", label: "Equatorial Guinea" },
-];
+function roleMeta(dict: Dictionary): Record<RegistrationTargetRole, { label: string; icon: IconName }> {
+  return {
+    AGENT: { label: dict.agents.fieldAgentLabel, icon: "person" },
+    BRANCH_MANAGER: { label: dict.roles.BRANCH_MANAGER, icon: "agents" },
+    BRANCH_CASHIER: { label: dict.roles.BRANCH_CASHIER, icon: "account-balance-wallet" },
+  };
+}
 
-const ROLE_META: Record<RegistrationTargetRole, { label: string; icon: IconName }> = {
-  AGENT: { label: "Field Agent", icon: "person" },
-  BRANCH_MANAGER: { label: "Branch Manager", icon: "agents" },
-  BRANCH_CASHIER: { label: "Branch Cashier", icon: "account-balance-wallet" },
-};
-
-const DOCUMENT_FIELDS: { key: keyof WizardFiles; label: string }[] = [
-  { key: "nationalId", label: "National ID / Passport scan" },
-  { key: "criminalRecord", label: "Criminal record (casier judiciaire)" },
-  { key: "medicalFitness", label: "Medical fitness certificate" },
-  { key: "locationPlan", label: "Location / home plan sketch" },
-  { key: "passportPhoto", label: "Passport photo" },
-];
+function documentFields(dict: Dictionary): { key: keyof WizardFiles; label: string }[] {
+  return [
+    { key: "nationalId", label: dict.registrations.documents.nationalId },
+    { key: "criminalRecord", label: dict.registrations.documents.criminalRecord },
+    { key: "medicalFitness", label: dict.registrations.documents.medicalFitness },
+    { key: "locationPlan", label: dict.registrations.documents.locationPlan },
+    { key: "passportPhoto", label: dict.registrations.documents.passportPhoto },
+  ];
+}
 
 interface WizardFiles {
   nationalId: File | null;
@@ -108,8 +106,9 @@ function useAvailability(field: AvailabilityField, rawValue: string): { taken: b
 }
 
 // Red asterisk — the visual marker for every mandatory field on this form (Role, Branch, First/Last
-// Name, Phone, Username, Email for agents, all five documents). Everything else (Employee Code,
-// National ID/Tax ID Number, Place of Residence, Criminal Record Issue Date) is optional and left unmarked.
+// Name, Phone, Username, Email for agents, National ID Number, Unique Identification Number (UIN),
+// all five documents). Everything else (Employee Code, Place of Residence, Date of Birth, Criminal
+// Record Issue Date) is optional and left unmarked.
 function Req() {
   return (
     <span className="text-danger-red ml-0.5" aria-hidden>
@@ -128,6 +127,10 @@ export function NewRegistrationForm({
   callerBranchId: string | null;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
+  const STEPS = stepsList(dict);
+  const ROLE_META = roleMeta(dict);
+  const DOCUMENT_FIELDS = documentFields(dict);
   const availableRoles: RegistrationTargetRole[] =
     callerRole === "ADMIN" ? ["AGENT", "BRANCH_MANAGER", "BRANCH_CASHIER"] : ["AGENT", "BRANCH_CASHIER"];
   const selectableBranches = callerRole === "BRANCH_MANAGER" ? branches.filter((b) => b.id === callerBranchId) : branches;
@@ -137,6 +140,7 @@ export function NewRegistrationForm({
   const [branchId, setBranchId] = useState(selectableBranches[0]?.id ?? "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [countryCode, setCountryCode] = useState(COUNTRY_CODES[0].code);
   const [localNumber, setLocalNumber] = useState("");
   const [login, setLogin] = useState("");
@@ -158,36 +162,36 @@ export function NewRegistrationForm({
   const isAgent = targetRole === "AGENT";
   const stepIndex = STEPS.findIndex((s) => s.key === step);
 
-  // National ID/Tax ID are optional — format is only checked once something is actually typed, an
-  // unmatched/future country still falls back to a generous check rather than ever hard-blocking.
+  // National ID/UIN are mandatory, but format is only checked once something is actually typed —
+  // an unmatched/future country still falls back to a generous check rather than ever hard-blocking.
   const countryIso = COUNTRY_CODES.find((c) => c.code === countryCode)?.iso ?? "";
   const kycFormat = kycFormatFor(countryIso);
   const nationalIdError =
     nationalIdNumber.trim() !== "" && !matchesKycFormat(nationalIdNumber, kycFormat.nationalId.pattern)
-      ? `Expected format: ${kycFormat.nationalId.hint}`
+      ? t(dict.registrations.newForm.expectedFormat, { hint: kycFormat.nationalId.hint })
       : undefined;
   const taxIdError =
     taxIdNumber.trim() !== "" && !matchesKycFormat(taxIdNumber, kycFormat.taxId.pattern)
-      ? `Expected format: ${kycFormat.taxId.hint}`
+      ? t(dict.registrations.newForm.expectedFormat, { hint: kycFormat.taxId.hint })
       : undefined;
   const emailFormatError =
     isAgent && email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-      ? "Enter a valid email address, e.g. name@example.com"
+      ? dict.registrations.newForm.invalidEmail
       : undefined;
 
   // No two agents/cashiers/managers may share a username, phone, email, National ID Number, or
-  // Tax ID Number — checked live as each field is filled in, not only at the final submit.
+  // Unique Identification Number (UIN) — checked live as each field is filled in, not only at the final submit.
   const loginAvailability = useAvailability("LOGIN", login);
   const phoneAvailability = useAvailability("PHONE", localNumber.trim() ? countryCode + localNumber.replace(/\D/g, "") : "");
   const emailAvailability = useAvailability("EMAIL", isAgent && !emailFormatError ? email : "");
   const nationalIdAvailability = useAvailability("NATIONAL_ID", nationalIdError ? "" : nationalIdNumber);
   const taxIdAvailability = useAvailability("TAX_ID", taxIdError ? "" : taxIdNumber);
 
-  const loginError = loginAvailability.taken ? "This username is already in use or pending review" : undefined;
-  const phoneError = phoneAvailability.taken ? "This phone number is already in use or pending review" : undefined;
-  const emailError = emailFormatError ?? (emailAvailability.taken ? "This email address is already in use or pending review" : undefined);
-  const nationalIdDisplayError = nationalIdError ?? (nationalIdAvailability.taken ? "This National ID Number is already in use or pending review" : undefined);
-  const taxIdDisplayError = taxIdError ?? (taxIdAvailability.taken ? "This Tax ID Number is already in use or pending review" : undefined);
+  const loginError = loginAvailability.taken ? dict.registrations.newForm.usernameTaken : undefined;
+  const phoneError = phoneAvailability.taken ? dict.registrations.newForm.phoneTaken : undefined;
+  const emailError = emailFormatError ?? (emailAvailability.taken ? dict.registrations.newForm.emailTaken : undefined);
+  const nationalIdDisplayError = nationalIdError ?? (nationalIdAvailability.taken ? dict.registrations.newForm.nationalIdTaken : undefined);
+  const taxIdDisplayError = taxIdError ?? (taxIdAvailability.taken ? dict.registrations.newForm.taxIdTaken : undefined);
 
   const identityValid =
     firstName.trim() !== "" &&
@@ -195,6 +199,8 @@ export function NewRegistrationForm({
     localNumber.trim() !== "" &&
     login.trim() !== "" &&
     (!isAgent || email.trim() !== "") &&
+    nationalIdNumber.trim() !== "" &&
+    taxIdNumber.trim() !== "" &&
     !nationalIdDisplayError &&
     !taxIdDisplayError &&
     !emailError &&
@@ -221,6 +227,7 @@ export function NewRegistrationForm({
         branchId,
         firstName,
         lastName,
+        dateOfBirth: dateOfBirth || undefined,
         phone: countryCode + localNumber.replace(/\D/g, ""),
         login,
         email: isAgent ? email : undefined,
@@ -239,7 +246,7 @@ export function NewRegistrationForm({
       const res = await fetch("/api/registration-applications", { method: "POST", body: formData });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to submit application");
+        setError(body?.message ?? dict.registrations.newForm.failedToSubmit);
         return;
       }
       setSucceeded(true);
@@ -248,7 +255,7 @@ export function NewRegistrationForm({
         router.refresh();
       }, 800);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -258,9 +265,9 @@ export function NewRegistrationForm({
     <div className="max-w-4xl mx-auto w-full flex flex-col gap-6">
       <Link href="/registrations" className="text-sm text-primary hover:underline underline-offset-2 font-medium flex items-center gap-1 w-fit">
         <Icon name="arrow-upward" className="size-4 -rotate-90" />
-        Back to Registrations
+        {dict.registrations.backToRegistrations}
       </Link>
-      <PageHeader title="New Registration Application" subtitle="Compliance-gated enrollment — no account is created until an ADMIN approves it." />
+      <PageHeader title={dict.registrations.newForm.pageTitle} subtitle={dict.registrations.newForm.pageSubtitle} />
 
       <div className="bg-surface-container-lowest rounded-[var(--radius-md)] border-2 border-outline-variant p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -270,14 +277,14 @@ export function NewRegistrationForm({
             ))}
           </div>
           <p className="text-sm font-semibold text-on-surface-variant uppercase tracking-widest">
-            Step {stepIndex + 1} of {STEPS.length}: {STEPS[stepIndex].label}
+            {t(dict.registrations.newForm.stepIndicator, { current: stepIndex + 1, total: STEPS.length, label: STEPS[stepIndex].label })}
           </p>
 
           {step === "role-branch" && (
             <>
               <div>
                 <p className="text-base font-semibold text-on-surface mb-2">
-                  Role
+                  {dict.registrations.newForm.roleLabel}
                   <Req />
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -302,7 +309,7 @@ export function NewRegistrationForm({
               </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="wizard-branch" className="text-base font-semibold text-on-surface">
-                  Branch
+                  {dict.registrations.newForm.branchLabel}
                   <Req />
                 </label>
                 <select
@@ -325,16 +332,24 @@ export function NewRegistrationForm({
 
           {step === "identity" && (
             <div className="grid grid-cols-2 gap-4">
-              <Input label={<>First Name<Req /></>} labelClassName="!text-base" className="!text-base" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-              <Input label={<>Last Name<Req /></>} labelClassName="!text-base" className="!text-base" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-              <div className="flex flex-col gap-1 col-span-2">
+              <Input label={<>{dict.registrations.fields.firstName}<Req /></>} labelClassName="!text-base" className="!text-base" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+              <Input label={<>{dict.registrations.fields.lastName}<Req /></>} labelClassName="!text-base" className="!text-base" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+              <Input
+                label={dict.registrations.fields.dateOfBirth}
+                labelClassName="!text-base"
+                className="!text-base"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+              />
+              <div className="flex flex-col gap-1">
                 <label htmlFor="wizard-phone" className="text-base font-semibold text-on-surface">
-                  Phone
+                  {dict.registrations.fields.phone}
                   <Req />
                 </label>
                 <div className="flex gap-2">
                   <select
-                    aria-label="Country code"
+                    aria-label={dict.registrations.newForm.countryCodeAriaLabel}
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
                     className="min-h-12 px-2 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-base shrink-0"
@@ -360,7 +375,7 @@ export function NewRegistrationForm({
               </div>
               <div className="col-span-2">
                 <Input
-                  label={<>Username (for eventual account access)<Req /></>}
+                  label={<>{dict.registrations.fields.username}<Req /></>}
                   labelClassName="!text-base"
                   className="!text-base"
                   value={login}
@@ -373,7 +388,7 @@ export function NewRegistrationForm({
               {isAgent && (
                 <>
                   <Input
-                    label={<>Email<Req /></>}
+                    label={<>{dict.registrations.fields.email}<Req /></>}
                     labelClassName="!text-base"
                     className="!text-base"
                     type="email"
@@ -382,51 +397,53 @@ export function NewRegistrationForm({
                     error={emailError}
                     required
                   />
-                  <Input label="Employee Code" labelClassName="!text-base" className="!text-base" value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} />
+                  <Input label={dict.registrations.fields.employeeCode} labelClassName="!text-base" className="!text-base" value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} />
                 </>
               )}
               <div>
                 <Input
-                  label="National ID Number"
+                  label={<>{dict.registrations.fields.nationalIdNumber}<Req /></>}
                   labelClassName="!text-base"
                   className="!text-base"
                   value={nationalIdNumber}
                   onChange={(e) => setNationalIdNumber(e.target.value)}
                   error={nationalIdDisplayError}
+                  required
                 />
-                {!nationalIdDisplayError && <p className="text-sm text-on-surface-variant mt-1">Format: {kycFormat.nationalId.hint}</p>}
+                {!nationalIdDisplayError && <p className="text-sm text-on-surface-variant mt-1">{t(dict.registrations.newForm.formatHint, { hint: kycFormat.nationalId.hint })}</p>}
               </div>
               <div>
                 <Input
-                  label="Tax ID Number"
+                  label={<>{dict.registrations.fields.taxIdNumber}<Req /></>}
                   labelClassName="!text-base"
                   className="!text-base"
                   value={taxIdNumber}
                   onChange={(e) => setTaxIdNumber(e.target.value)}
                   error={taxIdDisplayError}
+                  required
                 />
-                {!taxIdDisplayError && <p className="text-sm text-on-surface-variant mt-1">Format: {kycFormat.taxId.hint}</p>}
+                {!taxIdDisplayError && <p className="text-sm text-on-surface-variant mt-1">{t(dict.registrations.newForm.formatHint, { hint: kycFormat.taxId.hint })}</p>}
               </div>
               <div className="col-span-2">
-                <Input label="Place of Residence (e.g. Akwa, Douala)" labelClassName="!text-base" className="!text-base" value={placeOfResidence} onChange={(e) => setPlaceOfResidence(e.target.value)} />
+                <Input label={dict.registrations.newForm.placeOfResidenceLabel} labelClassName="!text-base" className="!text-base" value={placeOfResidence} onChange={(e) => setPlaceOfResidence(e.target.value)} />
               </div>
               <div className="col-span-2">
                 <Input
-                  label="Criminal Record Issue Date"
+                  label={dict.registrations.newForm.criminalRecordIssueDateLabel}
                   labelClassName="!text-base"
                   className="!text-base"
                   type="date"
                   value={criminalRecordIssuedDate}
                   onChange={(e) => setCriminalRecordIssuedDate(e.target.value)}
                 />
-                <p className="text-sm text-on-surface-variant mt-1">If provided, must be within the last 90 days.</p>
+                <p className="text-sm text-on-surface-variant mt-1">{dict.registrations.newForm.criminalRecordHint}</p>
               </div>
             </div>
           )}
 
           {step === "documents" && (
             <div className="grid grid-cols-2 gap-4">
-              <p className="text-sm text-on-surface-variant col-span-2">PDF or JPEG only, up to 10MB each. All five are required.</p>
+              <p className="text-sm text-on-surface-variant col-span-2">{dict.registrations.newForm.documentsIntro}</p>
               {DOCUMENT_FIELDS.map(({ key, label }) => (
                 <div key={key} className="flex flex-col gap-1">
                   <label className="text-base font-semibold text-on-surface">
@@ -447,22 +464,23 @@ export function NewRegistrationForm({
 
           {step === "review" && (
             <div className="grid grid-cols-2 gap-3 text-base">
-              <p><span className="text-on-surface-variant">Role:</span> {ROLE_META[targetRole].label}</p>
-              <p><span className="text-on-surface-variant">Branch:</span> {selectableBranches.find((b) => b.id === branchId)?.name}</p>
-              <p><span className="text-on-surface-variant">Name:</span> {firstName} {lastName}</p>
-              <p><span className="text-on-surface-variant">Phone:</span> {countryCode}{localNumber}</p>
-              <p><span className="text-on-surface-variant">Username:</span> {login}</p>
-              {isAgent && <p><span className="text-on-surface-variant">Email:</span> {email}</p>}
-              <p className="col-span-2"><span className="text-on-surface-variant">Documents attached:</span> {Object.values(files).filter(Boolean).length} / 5</p>
+              <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.role}</span> {ROLE_META[targetRole].label}</p>
+              <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.branch}</span> {selectableBranches.find((b) => b.id === branchId)?.name}</p>
+              <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.name}</span> {firstName} {lastName}</p>
+              {dateOfBirth && <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.dateOfBirth}</span> {dateOfBirth}</p>}
+              <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.phone}</span> {countryCode}{localNumber}</p>
+              <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.username}</span> {login}</p>
+              {isAgent && <p><span className="text-on-surface-variant">{dict.registrations.newForm.review.email}</span> {email}</p>}
+              <p className="col-span-2"><span className="text-on-surface-variant">{dict.registrations.newForm.review.documentsAttached}</span> {Object.values(files).filter(Boolean).length} / 5</p>
               <p className="text-sm text-on-surface-variant col-span-2 mt-1">
-                Submitting sends this to compliance review — no account is created until an ADMIN approves it.
+                {dict.registrations.newForm.review.complianceNotice}
               </p>
             </div>
           )}
 
           <div className="flex justify-between gap-2 mt-2">
             <Button type="button" variant="ghost" onClick={stepIndex === 0 ? () => router.push("/registrations") : goBack} disabled={succeeded}>
-              {stepIndex === 0 ? "Cancel" : "Back"}
+              {stepIndex === 0 ? dict.common.cancel : dict.common.back}
             </Button>
             {step !== "review" ? (
               <Button
@@ -470,24 +488,24 @@ export function NewRegistrationForm({
                 onClick={goNext}
                 disabled={(step === "identity" && !identityValid) || (step === "documents" && !documentsValid)}
               >
-                Next
+                {dict.registrations.newForm.next}
               </Button>
             ) : (
               <Button type="submit" variant={succeeded ? "success" : "primary"} loading={loading} disabled={succeeded}>
                 {succeeded ? (
                   <>
                     <Icon name="check-circle" className="size-5" />
-                    Submitted
+                    {dict.registrations.newForm.submitted}
                   </>
                 ) : (
-                  "Submit for Review"
+                  dict.registrations.newForm.submitForReview
                 )}
               </Button>
             )}
           </div>
         </form>
       </div>
-      <ErrorDialog open={error !== null} message={error} onClose={() => setError(null)} title="Submission Failed" />
+      <ErrorDialog open={error !== null} message={error} onClose={() => setError(null)} title={dict.registrations.newForm.submissionFailedTitle} />
     </div>
   );
 }

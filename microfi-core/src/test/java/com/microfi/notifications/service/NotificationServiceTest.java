@@ -1,14 +1,17 @@
 package com.microfi.notifications.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.AgentDirectoryService.AgentReceiptInfo;
 import com.microfi.notifications.domain.NotificationChannel;
 import com.microfi.notifications.domain.NotificationLog;
 import com.microfi.notifications.domain.NotificationStatus;
 import com.microfi.notifications.gateway.SmsGateway;
 import com.microfi.notifications.gateway.SmsGatewayFactory;
 import com.microfi.notifications.gateway.SmsSendResult;
+import com.microfi.notifications.repository.BranchNoticeRepository;
 import com.microfi.notifications.repository.NotificationLogRepository;
 import com.microfi.savings.service.ClientDirectoryService;
+import com.microfi.savings.service.ClientDirectoryService.ClientReceiptInfo;
 import com.microfi.shared.dto.NotificationLogResponse;
 import com.microfi.shared.dto.NotifyCollectionRequest;
 import com.microfi.transactions.service.CollectionDirectoryService;
@@ -35,6 +38,8 @@ class NotificationServiceTest {
     @Mock
     private NotificationLogRepository notificationLogRepository;
     @Mock
+    private BranchNoticeRepository branchNoticeRepository;
+    @Mock
     private CollectionDirectoryService collectionDirectoryService;
     @Mock
     private ClientDirectoryService clientDirectoryService;
@@ -56,7 +61,7 @@ class NotificationServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        notificationService = new NotificationService(notificationLogRepository, collectionDirectoryService,
+        notificationService = new NotificationService(notificationLogRepository, branchNoticeRepository, collectionDirectoryService,
                 clientDirectoryService, agentDirectoryService, smsGatewayFactory, mfiSettingsService);
         when(smsGatewayFactory.getActiveGateway()).thenReturn(smsGateway);
         when(mfiSettingsService.getName()).thenReturn("MICROFI");
@@ -64,14 +69,20 @@ class NotificationServiceTest {
     }
 
     private CollectionSummary collectionOwnedBy(UUID owningAgentId) {
-        return new CollectionSummary(collectionId, owningAgentId, clientId, 5000L, null, Instant.now());
+        return new CollectionSummary(collectionId, owningAgentId, clientId, 5000L, null, Instant.now(), 3.87, 11.52, "device-tx-1");
+    }
+
+    private void stubReceiptLookups(UUID owningAgentId) {
+        when(agentDirectoryService.findReceiptInfo(owningAgentId)).thenReturn(new AgentReceiptInfo("AGT001", "Test Agent", "Test Branch"));
+        when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientReceiptInfo("MFI-001", "Test Client"));
+        when(collectionDirectoryService.findDenominationLines(collectionId)).thenReturn(java.util.List.of());
     }
 
     @Test
     void notifySendsAndLogsSuccess() {
         when(collectionDirectoryService.findById(collectionId)).thenReturn(collectionOwnedBy(agentId));
         when(clientDirectoryService.findPhone(clientId)).thenReturn("237611111111");
-        when(agentDirectoryService.findEmployeeCode(agentId)).thenReturn("AGT001");
+        stubReceiptLookups(agentId);
         when(smsGateway.send(anyString(), anyString())).thenReturn(Mono.just(new SmsSendResult(true, "ref-1", null)));
 
         NotifyCollectionRequest request = new NotifyCollectionRequest();
@@ -83,7 +94,7 @@ class NotificationServiceTest {
         assertThat(response.getStatus()).isEqualTo("SENT");
         assertThat(response.isPrintedReceipt()).isTrue();
         assertThat(response.getCollectionId()).isEqualTo(collectionId);
-        assertThat(response.getReceiptText()).contains("5000 XAF").contains("AGT001");
+        assertThat(response.getReceiptText()).contains("5 000 XAF").contains("AGT001");
 
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
         org.mockito.Mockito.verify(notificationLogRepository).save(captor.capture());
@@ -95,7 +106,7 @@ class NotificationServiceTest {
     void notifyLogsFailureWithoutThrowingWhenGatewayFails() {
         when(collectionDirectoryService.findById(collectionId)).thenReturn(collectionOwnedBy(agentId));
         when(clientDirectoryService.findPhone(clientId)).thenReturn("237611111111");
-        when(agentDirectoryService.findEmployeeCode(agentId)).thenReturn("AGT001");
+        stubReceiptLookups(agentId);
         when(smsGateway.send(anyString(), anyString())).thenReturn(Mono.just(new SmsSendResult(false, null, "timeout")));
 
         NotificationLogResponse response = notificationService.notifyCollection(collectionId, agentId, new NotifyCollectionRequest()).block();

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
@@ -6,13 +7,16 @@ import { Icon } from "@/components/Icon";
 import type { AdminUserResponse, AgentResponse, BranchResponse } from "@/lib/types";
 import { TeamDirectory, type TeamRow } from "./TeamDirectory";
 import { TeamBranchSelector } from "./TeamBranchSelector";
-import { RegisterUserModal } from "../agents/RegisterUserModal";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
 export default async function TeamPage({
   searchParams,
 }: {
   searchParams: Promise<{ branchId?: string }>;
 }) {
+  const dict = getDictionary(await getLocale());
   const [session, users, agents, branches] = await Promise.all([
     getSession(),
     api.get<AdminUserResponse[]>("/admin/users"),
@@ -23,7 +27,7 @@ export default async function TeamPage({
   const branchId = session?.role === "ADMIN" ? params.branchId ?? branches[0]?.id : session?.branchId ?? branches[0]?.id;
 
   if (!branchId) {
-    return <EmptyState>No branches exist yet — create one first.</EmptyState>;
+    return <EmptyState>{dict.team.noBranchesYet}</EmptyState>;
   }
 
   const branch = branches.find((b) => b.id === branchId);
@@ -66,28 +70,28 @@ export default async function TeamPage({
 
   const subtitle =
     session?.role === "BRANCH_CASHIER"
-      ? "Field agents in your branch."
+      ? dict.team.subtitleCashier
       : session?.role === "BRANCH_MANAGER"
-        ? "Your branch's cashiers and field agents."
-        : "Back-office accounts and field agents for the selected branch.";
+        ? dict.team.subtitleManager
+        : dict.team.subtitleAdmin;
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
-      <PageHeader title="Team" subtitle={subtitle} />
+      <PageHeader title={dict.sidebar.team} subtitle={subtitle} />
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         {session?.role === "ADMIN" ? (
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
               <Icon name="location-on" className="size-5 text-primary" />
-              Viewing branch
+              {dict.team.viewingBranch}
             </span>
             <TeamBranchSelector branches={branches} selectedBranchId={branchId} />
           </div>
         ) : (
           <div className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
             <Icon name="location-on" className="size-5 text-primary" />
-            {branch ? `${branch.name} (${branch.code})` : "Branch"}
+            {branch ? t(dict.team.branchNameCode, { name: branch.name, code: branch.code }) : dict.team.branchFallback}
           </div>
         )}
       </div>
@@ -95,8 +99,14 @@ export default async function TeamPage({
       <TeamDirectory
         rows={rows}
         actions={
-          canCreate && session ? (
-            <RegisterUserModal branches={branches} users={users} callerRole={session.role} callerBranchId={session.branchId} />
+          canCreate ? (
+            <Link
+              href="/registrations/new"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+            >
+              <Icon name="plus" className="size-5" />
+              {dict.registrations.newApplication}
+            </Link>
           ) : undefined
         }
       />

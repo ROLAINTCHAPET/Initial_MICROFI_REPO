@@ -163,6 +163,7 @@ public class RegistrationApplicationController {
                 .branchId(application.getBranchId())
                 .firstName(application.getFirstName())
                 .lastName(application.getLastName())
+                .dateOfBirth(application.getDateOfBirth())
                 .phone(application.getPhone())
                 .login(application.getLogin())
                 .email(application.getEmail())

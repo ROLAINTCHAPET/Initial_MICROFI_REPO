@@ -4,18 +4,25 @@ import 'package:flutter/material.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
+import '../../core/local_ceiling_cache.dart';
 import '../../core/location.dart';
+import '../../core/receipt_context_cache.dart';
 import '../../core/status_components.dart';
 import '../activation/sponsor_activation_screen.dart';
 import '../collection/collection_repository.dart';
 import '../collection/collection_stepper_screen.dart';
+import '../collection/notification_repository.dart';
 import '../collection/offline_queue_repository.dart';
+import '../emergency/sos_ack_notification_cache.dart';
 import '../emergency/sos_repository.dart';
 import '../history/history_screen.dart';
 import '../route/route_screen.dart';
 import 'agent_profile.dart';
+import 'branch_notice_repository.dart';
+import 'branch_repository.dart';
 import 'contact_branch.dart';
 import 'home_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Graphical Design/agent/agent_dashboard — the Home tab body (no Scaffold/AppBar of its own;
 /// AppShell supplies those). Agent header, escrow/ceiling gauge, primary CTA, quick actions and
@@ -48,6 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
   SosStatus? _pendingSos;
   Timer? _sosPollTimer;
 
+  BranchNotice? _bannerNotice;
+  String? _dismissedNoticeId;
+  Timer? _noticePollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _connectivitySub = ConnectivityService.instance.onOnlineChanged.listen((online) {
       if (mounted) setState(() => _online = online);
+      // The moment the network comes back, push the queue up automatically — no reason to wait
+      // for the agent to open Home and notice the pending badge, let alone tap a button.
+      if (online) _syncNow();
     });
   }
 
@@ -64,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _connectivitySub?.cancel();
     _sosPollTimer?.cancel();
+    _noticePollTimer?.cancel();
     super.dispose();
   }
 
@@ -80,22 +95,49 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
       final pending = await OfflineQueueRepository(profile.id).list();
       if (!mounted) return;
+      final escrow = results[0] as EscrowStatus;
       setState(() {
         _profile = profile;
-        _escrow = results[0] as EscrowStatus;
+        _escrow = escrow;
         _recent = (results[1] as List<CollectionSummary>).take(5).toList();
         _pendingCount = pending.length;
       });
+      LocalCeilingCache(profile.id).save(effectiveCeilingXaf: escrow.effectiveCeilingXaf, cumulativeTodayXaf: escrow.cumulativeTodayXaf);
+      _refreshReceiptContext();
       _checkSosStatus();
+      _checkBranchNotices();
+      _noticePollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkBranchNotices());
+      if (pending.isNotEmpty && await ConnectivityService.instance.isOnline()) _syncNow();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  // Best-effort refresh of the branch/org name an offline-composed receipt needs (see
+  // OfflineReceiptComposer + ReceiptContextCache) — these change rarely, so a failure here just
+  // means a slightly stale (or, on a fresh install before the first successful Home load, absent)
+  // cache, never something worth surfacing as a Home-load error.
+  Future<void> _refreshReceiptContext() async {
+    try {
+      final branchRepository = BranchRepository(widget.token);
+      final results = await Future.wait([branchRepository.fetchMyBranch(), branchRepository.fetchMfiName()]);
+      final branch = results[0] as AgentBranch;
+      final mfiName = results[1] as String;
+      await ReceiptContextCache().save(mfiName: mfiName, branchName: branch.name);
+    } catch (_) {
+      // Best-effort — retried on the next Home load.
+    }
+  }
+
+  // Fully automatic (FR-07): each queued collection already carries the PIN the agent entered the
+  // moment they made it (see PendingCollection.pin) — by sync time the cash is already collected
+  // and the receipt already handed to the client, so re-confirming here would protect nothing that
+  // PIN didn't already cover. Sync just uploads already-authorized data; no prompt, no tap needed.
   Future<void> _syncNow() async {
+    if (_syncing) return;
     final profile = _profile;
     if (profile == null) return;
     final queueRepo = OfflineQueueRepository(profile.id);
@@ -103,28 +145,39 @@ class _HomeScreenState extends State<HomeScreen> {
     if (pending.isEmpty) return;
     if (!mounted) return;
 
-    // The PIN is never stored with the queued items (see PendingCollection) — prompted once here
-    // and applied to every item in this batch instead.
-    final pin = await promptForPin(
-      context,
-      message: 'Confirm ${pending.length} pending collection${pending.length == 1 ? '' : 's'} totaling '
-          '${pending.fold(0, (sum, c) => sum + c.amountXaf)} XAF.',
-    );
-    if (pin == null || pin.isEmpty) return;
-
     setState(() => _syncing = true);
     try {
       final results = await _collectionRepository.syncBatch(
-        pending.map((c) => {...c.toRequestBody(), 'pin': pin}).toList(),
+        pending.map((c) => c.toRequestBody()).toList(),
       );
       final succeeded = results.where((r) => r.success).map((r) => r.deviceTxId).toSet();
       await queueRepo.removeByDeviceTxIds(succeeded);
+      // The client never got their SMS/notification for these at collection time (there was no
+      // connectivity to send it) — fire it now that the server actually has the record, same call
+      // an online collection makes right after it succeeds. Best-effort: a notify failure here
+      // must never re-queue a collection that already synced successfully.
+      final notificationRepository = NotificationRepository(widget.token);
+      for (final result in results) {
+        final collectionId = result.collectionId;
+        if (result.success && collectionId != null) {
+          unawaited(_notifyBestEffort(notificationRepository, collectionId));
+        }
+      }
       if (!mounted) return;
       await _load();
     } catch (_) {
-      // Stays queued — will retry on next Sync Now or next successful submit's connectivity check.
+      // Stays queued — will retry on the next connectivity change or app open.
     } finally {
       if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  Future<void> _notifyBestEffort(NotificationRepository repository, String collectionId) async {
+    try {
+      await repository.notifyCollection(collectionId, printedReceipt: false);
+    } catch (_) {
+      // The collection already synced successfully — a notify failure here is not retried and
+      // must never be treated as a sync failure.
     }
   }
 
@@ -132,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_profile == null) return;
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => CollectionStepperScreen(token: widget.token, agentId: _profile!.id),
+        builder: (_) => CollectionStepperScreen(token: widget.token, profile: _profile!),
       ),
     );
     if (result == true) _load();
@@ -143,10 +196,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openHistory() {
+    final l10n = AppLocalizations.of(context)!;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Collection History')),
+        appBar: AppBar(title: Text(l10n.hsCollectionHistoryTitle)),
         body: SafeArea(child: HistoryScreen(token: widget.token)),
       ),
     ));
@@ -172,13 +226,13 @@ class _HomeScreenState extends State<HomeScreen> {
       await SosRepository(widget.token, _profile!.id).raise(lat: lat, lon: lon);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SOS sent — your branch has been alerted.'), backgroundColor: MicrofiColors.error),
+        SnackBar(content: Text(AppLocalizations.of(context)!.hsSosSentMessage), backgroundColor: MicrofiColors.error),
       );
       _startSosPolling();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to send SOS — check your connection and try again.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.hsSosSendFailedMessage)),
       );
     } finally {
       if (mounted) setState(() => _sendingSos = false);
@@ -186,58 +240,78 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // UC-14: an agent who raised an SOS otherwise has no way to know their branch actually saw it
-  // — this app has no push notifications, so a short foreground poll is what stands in for one.
-  // Checked once on every screen load (catches an alert raised in a previous session) and, while
-  // one is still unacknowledged, again every 20s until it is.
+  // — this app has no push infrastructure, so a short foreground poll stands in for one. Checked
+  // once on every screen load (catches an alert raised in a previous session, or acknowledged
+  // while this screen wasn't mounted at all) and, while one is still unacknowledged, again every
+  // 20s until it is — the same method handles both, via _startSosPolling calling this again.
+  //
+  // The "was this newly acknowledged" check is deliberately NOT based on comparing against
+  // _pendingSos (in-memory state) — AppShell rebuilds HomeScreen from scratch on every tab
+  // switch, which would silently destroy that in-memory "it was pending a moment ago" signal the
+  // instant the agent glanced at another tab. SosAckNotificationCache persists that instead, so
+  // the confirmation survives exactly that rebuild.
   Future<void> _checkSosStatus() async {
     final profile = _profile;
     if (profile == null) return;
     try {
       final events = await SosRepository(widget.token, profile.id).listMine();
-      final unacknowledged = events.where((e) => !e.acknowledged).toList();
       if (!mounted) return;
+
+      final acknowledgedIds = events.where((e) => e.acknowledged).map((e) => e.id).toList();
+      final newlyAcknowledged = await SosAckNotificationCache(profile.id).diffNewlyAcknowledged(acknowledgedIds);
+      if (newlyAcknowledged.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.hsSosAcknowledgedMessage), backgroundColor: MicrofiColors.secondary),
+        );
+      }
+
+      final unacknowledged = events.where((e) => !e.acknowledged).toList();
       if (unacknowledged.isNotEmpty) {
         setState(() => _pendingSos = unacknowledged.first);
         _startSosPolling();
-      } else if (_pendingSos != null) {
-        setState(() => _pendingSos = null);
+      } else {
+        _sosPollTimer?.cancel();
+        if (_pendingSos != null) setState(() => _pendingSos = null);
       }
     } catch (_) {
       // Best-effort status check — silently retried on the next poll/screen load.
     }
   }
 
-  void _startSosPolling() {
-    _sosPollTimer?.cancel();
-    _sosPollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _pollSosAcknowledgement());
+  // UC-15: no push infrastructure here either — same reasoning as SOS above, just for operational
+  // notices like a same-day closing-time change. Polled less aggressively than SOS since these
+  // aren't time-critical to the second; the SMS sent alongside this is what carries the urgency.
+  Future<void> _checkBranchNotices() async {
+    final profile = _profile;
+    if (profile == null) return;
+    try {
+      final notices = await BranchNoticeRepository(widget.token).listMine();
+      if (!mounted || notices.isEmpty) return;
+      final latest = notices.first;
+      if (latest.id == _dismissedNoticeId) return;
+      setState(() => _bannerNotice = latest);
+    } catch (_) {
+      // Best-effort — silently retried on the next poll/screen load.
+    }
   }
 
-  Future<void> _pollSosAcknowledgement() async {
-    final profile = _profile;
-    final pending = _pendingSos;
-    if (profile == null || pending == null) {
-      _sosPollTimer?.cancel();
-      return;
-    }
-    try {
-      final events = await SosRepository(widget.token, profile.id).listMine();
-      final matches = events.where((e) => e.id == pending.id);
-      final match = matches.isEmpty ? null : matches.first;
-      if (match != null && match.acknowledged) {
-        _sosPollTimer?.cancel();
-        if (!mounted) return;
-        setState(() => _pendingSos = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Your SOS was acknowledged by your branch.'), backgroundColor: MicrofiColors.secondary),
-        );
-      }
-    } catch (_) {
-      // Try again on the next tick.
-    }
+  void _dismissBranchNotice() {
+    final notice = _bannerNotice;
+    if (notice == null) return;
+    setState(() {
+      _dismissedNoticeId = notice.id;
+      _bannerNotice = null;
+    });
+  }
+
+  void _startSosPolling() {
+    _sosPollTimer?.cancel();
+    _sosPollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _checkSosStatus());
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading && _profile == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -250,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 12),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: MicrofiColors.error)),
           const SizedBox(height: 16),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
@@ -295,6 +369,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _SosPendingBanner(),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
+          if (_bannerNotice != null) ...[
+            _BranchNoticeBanner(notice: _bannerNotice!, onDismiss: _dismissBranchNotice),
+            const SizedBox(height: MicrofiSpacing.gapLg),
+          ],
           if (_pendingCount > 0) ...[
             OfflineBanner(
               pendingCount: _pendingCount,
@@ -314,12 +392,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 backgroundColor: MicrofiColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle, size: 20, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('New Collection', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  const Icon(Icons.add_circle, size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(l10n.hsNewCollection, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -327,9 +405,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: MicrofiSpacing.gapLg),
           Row(
             children: [
-              Expanded(child: _QuickAction(icon: Icons.map, label: 'My Route', onTap: _openMyRoute)),
+              Expanded(child: _QuickAction(icon: Icons.map, label: l10n.hsMyRoute, onTap: _openMyRoute)),
               const SizedBox(width: MicrofiSpacing.gapLg),
-              Expanded(child: _QuickAction(icon: Icons.history, label: 'Collection History', onTap: _openHistory)),
+              Expanded(child: _QuickAction(icon: Icons.history, label: l10n.hsCollectionHistoryTitle, onTap: _openHistory)),
             ],
           ),
           const SizedBox(height: MicrofiSpacing.gap),
@@ -338,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: OutlinedButton.icon(
               onPressed: _openSponsorActivation,
               icon: const Icon(Icons.how_to_reg, size: 16),
-              label: const Text('Sponsor Client Activation', style: TextStyle(fontSize: 13)),
+              label: Text(l10n.hsSponsorClientActivation, style: const TextStyle(fontSize: 13)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: MicrofiColors.primary,
                 side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
@@ -353,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: FilledButton.icon(
               onPressed: () => contactBranch(context, widget.token),
               icon: const Icon(Icons.call, size: 16),
-              label: const Text('Contact Branch', style: TextStyle(fontSize: 13)),
+              label: Text(l10n.commonContactBranch, style: const TextStyle(fontSize: 13)),
               style: FilledButton.styleFrom(
                 backgroundColor: MicrofiColors.secondary,
                 foregroundColor: Colors.white,
@@ -366,15 +444,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Collections', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-              TextButton(onPressed: _openHistory, child: const Text('See all', style: TextStyle(fontSize: 13))),
+              Text(l10n.hsRecentCollections, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+              TextButton(onPressed: _openHistory, child: Text(l10n.hsSeeAll, style: const TextStyle(fontSize: 13))),
             ],
           ),
           const Divider(color: MicrofiColors.outlineVariant, height: 1),
           if (_recent.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('No collections recorded yet.', style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(l10n.hsNoCollectionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
             )
           else
             ..._recent.map((c) => _RecentCollectionRow(collection: c)),
@@ -391,6 +469,7 @@ class _CeilingGaugeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
       decoration: BoxDecoration(
@@ -408,7 +487,7 @@ class _CeilingGaugeCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("TODAY'S COLLECTIONS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.4)),
+                  Text(l10n.hsTodaysCollections, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.4)),
                   const SizedBox(height: 3),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -424,8 +503,8 @@ class _CeilingGaugeCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Ceiling', style: TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
-                  Text('${_fmt(escrow.effectiveCeilingXaf)} XAF', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                  Text(l10n.hsCeilingLabel, style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                  Text(l10n.amountXaf(_fmt(escrow.effectiveCeilingXaf)), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
                 ],
               ),
             ],
@@ -448,8 +527,8 @@ class _CeilingGaugeCard extends StatelessWidget {
           Center(
             child: Text(
               escrow.nearLimit
-                  ? '${(escrow.utilization * 100).round()}% capacity reached. Deposit soon.'
-                  : '${(escrow.utilization * 100).round()}% capacity reached. Safe to continue.',
+                  ? l10n.hsCapacityReachedDepositSoon((escrow.utilization * 100).round())
+                  : l10n.hsCapacityReachedSafe((escrow.utilization * 100).round()),
               style: TextStyle(fontSize: 11, color: escrow.nearLimit ? MicrofiColors.error : MicrofiColors.outline),
             ),
           ),
@@ -511,6 +590,7 @@ class _RecentCollectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final time = TimeOfDay.fromDateTime(collection.collectedAt.toLocal()).format(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -527,12 +607,12 @@ class _RecentCollectionRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(collection.clientName ?? 'Unknown client', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-                Text('$time • Cash', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                Text(collection.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                Text(l10n.hsTimeCashLine(time), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
               ],
             ),
           ),
-          Text('+${_fmt(collection.amountXaf)} XAF', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+          Text(l10n.hsAmountCollectedPlus(_fmt(collection.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
         ],
       ),
     );
@@ -556,6 +636,7 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final active = status == 'ACTIVE';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -569,7 +650,47 @@ class _StatusPill extends StatelessWidget {
         children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? MicrofiColors.secondary : MicrofiColors.error, shape: BoxShape.circle)),
           const SizedBox(width: 5),
-          Text(active ? 'Online' : 'Suspended', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? MicrofiColors.secondary : MicrofiColors.error)),
+          Text(active ? l10n.hsStatusActive : l10n.hsStatusSuspended, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? MicrofiColors.secondary : MicrofiColors.error)),
+        ],
+      ),
+    );
+  }
+}
+
+/// UC-15 — a same-day schedule change surfaced here since there's no push channel to rely on;
+/// dismissible since, unlike the SOS banner, there's nothing further for the agent to do about it.
+class _BranchNoticeBanner extends StatelessWidget {
+  final BranchNotice notice;
+  final VoidCallback onDismiss;
+
+  const _BranchNoticeBanner({required this.notice, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: MicrofiColors.secondaryContainer,
+        borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: MicrofiColors.onSecondaryContainer, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              notice.message,
+              style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onSecondaryContainer, fontWeight: FontWeight.w600),
+            ),
+          ),
+          InkWell(
+            onTap: onDismiss,
+            borderRadius: BorderRadius.circular(MicrofiRadius.full),
+            child: const Padding(
+              padding: EdgeInsets.all(2),
+              child: Icon(Icons.close, color: MicrofiColors.onSecondaryContainer, size: 16),
+            ),
+          ),
         ],
       ),
     );
@@ -588,14 +709,14 @@ class _SosPendingBanner extends StatelessWidget {
         color: MicrofiColors.errorContainer,
         borderRadius: BorderRadius.circular(MicrofiRadius.sm),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.emergency, color: MicrofiColors.onErrorContainer, size: 18),
-          SizedBox(width: 8),
+          const Icon(Icons.emergency, color: MicrofiColors.onErrorContainer, size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'SOS pending — awaiting acknowledgement from your branch.',
-              style: TextStyle(fontSize: 12.5, color: MicrofiColors.onErrorContainer, fontWeight: FontWeight.w600),
+              AppLocalizations.of(context)!.hsSosPendingBanner,
+              style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onErrorContainer, fontWeight: FontWeight.w600),
             ),
           ),
         ],

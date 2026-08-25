@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/design_tokens.dart';
 import '../../core/device_id_service.dart';
+import '../../core/location.dart';
 import '../../core/session_entry.dart';
 import '../../core/session_storage.dart';
 import 'auth_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,11 +35,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      // BR-05/FR-12's mandatory-GPS rule applied at the front door too, not just at the
+      // collection step — an agent whose location isn't on/available can't get into the app
+      // at all, so it can never be forgotten once they're already inside for the day.
+      await captureCurrentLocation();
       // Device id is captured automatically, never typed by the agent — see DeviceIdService.
       final deviceId = await _deviceIdService.getDeviceId();
       final token = await _authRepository.login(
@@ -50,10 +57,12 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => SessionEntry(token: token)),
       );
+    } on LocationUnavailable catch (e) {
+      setState(() => _error = e.message(l10n));
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = 'Unable to reach the server.');
+      setState(() => _error = l10n.errorUnableToReachServerShort);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -61,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: MicrofiColors.primary, elevation: 0),
@@ -85,16 +95,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Icon(Icons.account_balance, color: Colors.white, size: 26),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Microfi Agent',
+                  Text(
+                    l10n.lgMicrofiAgent,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
                   ),
                   const SizedBox(height: 3),
-                  const Text(
-                    'Field collection & cash desk',
+                  Text(
+                    l10n.lgFieldCollectionCashDesk,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
+                    style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -112,22 +122,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           TextFormField(
                             controller: _usernameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                              prefixIcon: Icon(Icons.person_outline),
+                            decoration: InputDecoration(
+                              labelText: l10n.lgUsernameLabel,
+                              prefixIcon: const Icon(Icons.person_outline),
                             ),
                             autocorrect: false,
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? l10n.commonRequiredField : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _passwordController,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: Icon(Icons.lock_outline),
+                            decoration: InputDecoration(
+                              labelText: l10n.lgPasswordLabel,
+                              prefixIcon: const Icon(Icons.lock_outline),
                             ),
                             obscureText: true,
-                            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                            validator: (v) => (v == null || v.isEmpty) ? l10n.commonRequiredField : null,
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: 12),
@@ -157,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     height: 20,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Text('Sign In'),
+                                : Text(l10n.clSignInButton),
                           ),
                         ],
                       ),
@@ -166,14 +176,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.shield_outlined, size: 16, color: MicrofiColors.onSurfaceVariant),
-                      SizedBox(width: 6),
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 16, color: MicrofiColors.onSurfaceVariant),
+                      const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'Secure field-agent access only.',
+                          l10n.lgSecureAccessOnly,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+                          style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
                         ),
                       ),
                     ],

@@ -1,0 +1,556 @@
+<title>MICROFI COLLECT Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F7F5F0;
+    --card: #FFFFFF;
+    --ink: #17222C;
+    --ink-soft: #57626B;
+    --ink-faint: #8B9298;
+    --navy: #10314F;
+    --navy-soft: #2C4C6B;
+    --mint: #1F6B45;
+    --mint-bg: #E4F0E8;
+    --amber: #9A6A22;
+    --amber-bg: #F3E7D3;
+    --line: #DEDACD;
+    --shadow: 0 1px 2px rgba(23,34,44,.04), 0 8px 24px -12px rgba(23,34,44,.12);
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Inter", -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12181C;
+      --card: #171E23;
+      --ink: #ECEAE3;
+      --ink-soft: #A7ADAE;
+      --ink-faint: #6E7679;
+      --navy: #8FBEE8;
+      --navy-soft: #6C9CC4;
+      --mint: #5CD09B;
+      --mint-bg: rgba(92,208,155,.14);
+      --amber: #E0AE6C;
+      --amber-bg: rgba(224,174,108,.14);
+      --line: #2A3238;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12181C;
+    --card: #171E23;
+    --ink: #ECEAE3;
+    --ink-soft: #A7ADAE;
+    --ink-faint: #6E7679;
+    --navy: #8FBEE8;
+    --navy-soft: #6C9CC4;
+    --mint: #5CD09B;
+    --mint-bg: rgba(92,208,155,.14);
+    --amber: #E0AE6C;
+    --amber-bg: rgba(224,174,108,.14);
+    --line: #2A3238;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--mint-bg); color: var(--mint); }
+
+  a { color: var(--navy-soft); }
+
+  .nav {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; gap: 2px; overflow-x: auto;
+    padding: 10px 16px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .02em;
+    text-decoration: none;
+    color: var(--ink-soft);
+    padding: 6px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+    transition: background .15s ease, color .15s ease;
+  }
+  .nav a:hover { background: var(--mint-bg); color: var(--mint); }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px 96px; }
+
+  header.hero {
+    max-width: 760px; margin: 0 auto; padding: 56px 24px 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--mint); margin: 0 0 14px;
+  }
+  h1.title {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(34px, 5.5vw, 46px);
+    line-height: 1.08; letter-spacing: -.01em; color: var(--navy); margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .dek {
+    font-size: 17px; color: var(--ink-soft); max-width: 62ch; margin: 0;
+  }
+
+  .metabar {
+    display: flex; flex-wrap: wrap; gap: 22px; margin-top: 28px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint);
+  }
+  .metabar b { color: var(--ink-soft); font-weight: 600; }
+
+  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+
+  .section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .section-num { font-family: var(--mono); font-size: 13px; color: var(--mint); }
+  h2 {
+    font-family: var(--serif); font-weight: 600; font-size: 27px; color: var(--navy);
+    margin: 0; letter-spacing: -.005em; text-wrap: balance;
+  }
+  .section-sub { color: var(--ink-soft); font-size: 15px; margin: 10px 0 28px; max-width: 62ch; }
+
+  h3 {
+    font-family: var(--sans); font-weight: 700; font-size: 15.5px; color: var(--ink);
+    margin: 0 0 10px;
+  }
+  p { margin: 0 0 14px; max-width: 66ch; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  /* Agenda table */
+  table.agenda { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  table.agenda th {
+    text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-faint); font-weight: 500;
+    padding: 0 12px 10px 0; border-bottom: 1px solid var(--line);
+  }
+  table.agenda td {
+    padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  table.agenda tr:last-child td { border-bottom: none; }
+  .agenda-time { font-family: var(--mono); color: var(--mint); white-space: nowrap; font-size: 13px; }
+
+  /* Say-this callouts */
+  .say {
+    background: var(--amber-bg); border-left: 3px solid var(--amber);
+    border-radius: 4px; padding: 14px 16px; margin: 16px 0;
+  }
+  .say-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--amber); display: block; margin-bottom: 6px; font-weight: 600;
+  }
+  .say p { margin: 0; font-style: italic; color: var(--ink); }
+  .say p + p { margin-top: 8px; }
+
+  /* Use-case cards */
+  .uc { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+        box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden; }
+  .uc-head { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+  .uc-tag {
+    font-family: var(--mono); font-size: 11px; color: var(--mint); letter-spacing: .04em;
+  }
+  .uc-title { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--navy); margin: 4px 0 0; }
+  .uc-body { padding: 20px 24px 24px; display: grid; gap: 22px; }
+  @media (min-width: 640px) { .uc-body { grid-template-columns: 1fr 1fr; } }
+
+  .uc-block-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 10px; display: block;
+  }
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step; position: relative; padding-left: 26px; margin-bottom: 10px;
+    font-size: 14px; color: var(--ink);
+  }
+  ol.steps li::before {
+    content: counter(step); position: absolute; left: 0; top: 1px;
+    font-family: var(--mono); font-size: 11px; color: var(--mint); font-weight: 700;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--mint-bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .impl {
+    background: color-mix(in srgb, var(--navy) 5%, var(--paper));
+    border-radius: 8px; padding: 14px 16px; font-size: 13px; color: var(--ink-soft);
+  }
+  .impl p { margin: 0 0 10px; }
+  .impl p:last-child { margin-bottom: 0; }
+  code, .impl code {
+    font-family: var(--mono); font-size: 12px; background: var(--mint-bg); color: var(--mint);
+    padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+  }
+
+  /* Insight grid */
+  .insight { display: grid; gap: 14px; margin-bottom: 14px; }
+  @media (min-width: 640px) { .insight { grid-template-columns: 1fr 1fr; } }
+  .insight-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px;
+  }
+  .insight-card h3 { color: var(--navy); }
+  .insight-card p { font-size: 14px; color: var(--ink-soft); margin: 0; }
+
+  /* Q&A */
+  .qa { border-bottom: 1px solid var(--line); padding: 16px 0; }
+  .qa:last-child { border-bottom: none; }
+  .q { font-weight: 700; font-size: 14.5px; margin-bottom: 6px; }
+  .q::before { content: "Q — "; color: var(--mint); font-family: var(--mono); font-size: 12px; }
+  .a { font-size: 14px; color: var(--ink-soft); margin: 0; }
+
+  /* Gap list */
+  .gap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .gap-item { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; }
+  .gap-mark {
+    font-family: var(--mono); font-size: 11px; color: var(--amber); background: var(--amber-bg);
+    padding: 2px 7px; border-radius: 4px; flex: none; margin-top: 2px;
+  }
+
+  footer.end {
+    max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; text-align: center;
+    color: var(--ink-faint); font-family: var(--mono); font-size: 12px;
+  }
+</style>
+
+<nav class="nav">
+  <a href="#pitch">Pitch</a>
+  <a href="#agenda">Agenda</a>
+  <a href="#uc-auth">Auth</a>
+  <a href="#uc-collection">Collection</a>
+  <a href="#uc-escrow">Escrow</a>
+  <a href="#uc-receipt">Receipt</a>
+  <a href="#uc-ofj">EOD/OFJ</a>
+  <a href="#uc-booklet">Client Booklet</a>
+  <a href="#uc-tracking">Tracking</a>
+  <a href="#insight">Engineering Bets</a>
+  <a href="#qa">Q&amp;A Prep</a>
+  <a href="#gaps">Honest Gaps</a>
+</nav>
+
+<header class="hero">
+  <p class="eyebrow">Presentation briefing — speaker notes</p>
+  <h1 class="title">MICROFI COLLECT</h1>
+  <p class="dek">A working reference for presenting MICROFI COLLECT to an audience that has built systems like this before — the plan, what to say, the workflows underneath each use case, and exactly how each one is implemented in the code.</p>
+  <div class="metabar">
+    <span><b>Audience</b> — engineers, prior builders of similar platforms</span>
+    <span><b>Suggested length</b> — 20 minutes + Q&amp;A</span>
+    <span><b>Register</b> — technical peer-to-peer, not investor pitch</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section id="pitch">
+  <div class="section-head"><span class="section-num">01</span><h2>The pitch — first two minutes</h2></div>
+  <p class="section-sub">Open with the problem, not the product. This audience has built collection/ledger systems before — they'll trust you faster if you show you understand the domain pain before the tech.</p>
+
+  <div class="prose">
+    <p><strong>The problem.</strong> Across CEMAC-region microfinance institutions, field agents still collect client cash the old way: a paper booklet, a physical stamp, a walk back to the branch at day's end. Cash discrepancies surface days later, if at all. There's no live visibility into where an agent is, what they're holding, or whether today's cash matches what the ledger expects — until someone manually counts.</p>
+    <p><strong>What MICROFI COLLECT is.</strong> A digital layer in front of the institution's existing Core Banking System — not a replacement for it. An offline-first Flutter app for field agents, a matching client-facing digital booklet, and a Next.js Back-Office for supervision and end-of-day reconciliation. The CBS stays authoritative for the actual ledger; MICROFI owns the field-collection workflow, escrow accountability, and real-time oversight around it.</p>
+  </div>
+
+  <div class="say">
+    <span class="say-label">Say this</span>
+    <p>"Everything you're about to see assumes the network isn't reliable and the phone might die mid-collection — because in the field, both of those are the normal case, not the edge case."</p>
+  </div>
+</section>
+
+<section id="agenda">
+  <div class="section-head"><span class="section-num">02</span><h2>Suggested run of show</h2></div>
+  <p class="section-sub">Scaled for a 20-minute slot. Compress the workflow walk-through first if you're cut shorter — the engineering bets section is what this specific audience remembers.</p>
+  <table class="agenda">
+    <thead><tr><th>Time</th><th>Segment</th></tr></thead>
+    <tbody>
+      <tr><td class="agenda-time">0:00–2:00</td><td>The problem, positioning against the CBS (§1)</td></tr>
+      <tr><td class="agenda-time">2:00–5:00</td><td>Architecture at a glance — modular monolith, mobile, Back-Office, gateway</td></tr>
+      <tr><td class="agenda-time">5:00–14:00</td><td>Walk the core loop: auth → collection → escrow → receipt → EOD → client view</td></tr>
+      <tr><td class="agenda-time">14:00–17:00</td><td>What's technically interesting here (§ Engineering Bets)</td></tr>
+      <tr><td class="agenda-time">17:00–19:00</td><td>Honest gaps — what's mocked, what's not built yet</td></tr>
+      <tr><td class="agenda-time">19:00+</td><td>Q&amp;A</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="architecture">
+  <div class="section-head"><span class="section-num">03</span><h2>Architecture, in one breath</h2></div>
+  <div class="prose">
+    <p>One Spring Boot 4 core backend owns every business rule — agents, escrow, collections, tracking, OFJ, client tokens. A <em>separate</em> Spring Boot service, the CBS Middleware, owns only vendor-specific mapping to whichever core banking system the institution runs (Amplitude, FinanSoft, or others) — so the core never hard-codes one bank's wire format. Kong sits in front as the API gateway (TLS, rate-limiting, JWT). Postgres is the single source of truth; RabbitMQ decouples the core from the CBS so a slow bank integration never blocks a mobile request.</p>
+  </div>
+  <div class="say">
+    <span class="say-label">Say this</span>
+    <p>"We chose a modular monolith with one isolated adapter, not microservices — and I'll come back to why that was deliberate, not a shortcut, in a few minutes."</p>
+  </div>
+</section>
+
+<section id="uc-auth">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-01 · FR-01</span>
+      <h3 class="uc-title">Agent Authentication &amp; Device Binding</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Agent logs in with a username/password issued at enrollment — no separate "register this device" step exists.</li>
+          <li>Their very first successful login <em>is</em> the enrollment: whichever phone sent it gets its IMEI bound automatically.</li>
+          <li>Every login after that must present the same IMEI, or it's rejected outright — a stolen password alone is not enough.</li>
+          <li>Phone lost or broken → an ADMIN/BRANCH_MANAGER runs Reset Binding with a mandatory reason on file.</li>
+          <li>Agent's next successful login, from whatever phone they now have, re-binds automatically — no code sent, nothing out of band.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p><code>AuthenticationController.login()</code> branches three ways on <code>agent.imei</code>: already bound → strict match or reject; unbound + branch requires binding → bind whatever device just authenticated; unbound + not required → skip entirely.</p>
+          <p>Reset is <code>PATCH /agents/{id}/device-binding</code> — clears <code>imei</code>, stamps <code>deviceResetReason</code> + <code>deviceResetAt</code> for audit. Password and PIN are untouched by design; this is purely a device concern.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-collection">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-06 – UC-08, UC-12 · FR-06, FR-07, FR-08, FR-12</span>
+      <h3 class="uc-title">Cash Collection — the core loop</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Agent searches and locks a single client before anything else can happen.</li>
+          <li>GPS is checked first — if there's no valid fix, the collection wizard simply doesn't open.</li>
+          <li>Agent counts physical notes/coins by denomination; the running total previews against their remaining daily ceiling live.</li>
+          <li>Confirms with their own transaction PIN (never the login password).</li>
+          <li>Online → posts immediately. Offline → the record sits in an encrypted local queue and syncs the moment connectivity returns.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p>The server never trusts the client's GPS gate alone — <code>CollectionService.recordCollection()</code> re-validates coordinates and re-enforces the escrow ceiling independently.</p>
+          <p><code>(agentId, deviceTxId)</code> is a unique constraint, so a retried offline sync can never double-count. Denomination counts are normalized rows, not a JSON blob, so end-of-day can reconcile line by line.</p>
+          <p>Offline queue moved this session from plaintext <code>shared_preferences</code> to AES-encrypted <code>flutter_secure_storage</code> — cash data sitting unencrypted on a lost phone was a real compliance gap.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-escrow">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-03 – UC-05 · FR-03, FR-04, FR-05</span>
+      <h3 class="uc-title">Escrow Wallet &amp; Ceiling</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Every new agent starts with a zero-balance escrow account — they can log in, but can't collect a single franc yet.</li>
+          <li>An admin funds it with the agent's real cash security deposit, and must attach proof of that deposit — mandatory, every top-up.</li>
+          <li>Funding for the first time is what activates the agent — there is no separate "activate" button.</li>
+          <li>Collection ceiling tracks the deposit 1:1 by default, adjustable per branch policy.</li>
+          <li>An admin can grant a temporary ceiling override for a single day, with a mandatory justification on file.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p><code>EscrowService.topUp()</code> credits balance and raises ceiling in one transaction, then calls <code>activateIfPendingCeiling()</code> as a side effect the moment ceiling crosses zero — activation isn't a separate code path, it falls out of the funding logic.</p>
+          <p>Deposit proof is a multipart upload stored per <code>EscrowLedger</code> row via a small dedicated storage service. The ledger itself is append-only — no updates, no deletes on financial facts, ever.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-receipt">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-09 · FR-09</span>
+      <h3 class="uc-title">Multi-Channel Notification &amp; Receipt</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>The instant a collection validates, a Flash SMS attempt fires to the client.</li>
+          <li>The agent can print a receipt on a paired Bluetooth thermal printer, or download a styled PDF straight to the phone.</li>
+          <li>Either channel failing never invalidates the collection — it already succeeded before notification was attempted.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p><code>NotificationService.prepare()</code> composes two representations from the same data: a fixed 32-column plain-text block for ESC/POS thermal printing, and structured JSON that the app renders into a real PDF client-side — brand mark, denomination table, a scannable QR of the transaction reference.</p>
+          <p>Built the whole PDF path this session, and hit a genuine library pitfall along the way: <code>BorderRadius.circular(999)</code> — the usual CSS "always fully rounded" trick — isn't clamped by the PDF renderer the way a browser clamps it, so it briefly drew as giant distorted spikes instead of pill badges. Fixed by sizing the radius to the actual element height instead of a large constant.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-ofj">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-16 – UC-18 · FR-16, FR-17, FR-18</span>
+      <h3 class="uc-title">End of Day — the Digital Cash Desk (OFJ)</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Cashier opens the desk and sees each agent's digital total — what the app recorded all day.</li>
+          <li>Physically counts the cash each agent hands in and enters it.</li>
+          <li>System computes Δ = physical − digital, per agent, live.</li>
+          <li>Zero delta closes clean; a shortage becomes a formal debt against that agent with a mandatory comment and an immutable audit trail.</li>
+          <li>The session can't close with a pending offline queue anywhere in the branch, or an unresolved shortage.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p>One <code>OfjSession</code> per branch per business date, auto-created on the day's first read. Close is gated by two independent checks: <code>hasPendingUnsyncedCollections()</code> — a cross-module read, since an unsynced device is invisible to the digital total and would silently understate it — and every line resolved.</p>
+          <p>Variance recording only accepts negative deltas (shortages) by rule, and writes an immutable <code>VarianceDebt</code> row.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-booklet">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-19 – UC-22 · FR-19 – FR-22, BR-04</span>
+      <h3 class="uc-title">Client Digital Booklet &amp; Two-Party Activation</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Client sets their own login/PIN using a CBS-issued Activation ID — proves they're really who the ID says.</li>
+          <li>Independently, the field agent who took their activation cash sponsors it — either action can happen first.</li>
+          <li>The digital token — and the balance/history it unlocks — is issued only once <em>both</em> sides are done.</li>
+          <li>After the annual token expires, the client can still view profile, balance, and history read-only — visibility of money is never gated by token status.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p>Both actions write to the same <code>ActivationRequest</code> row (<code>sponsoredAt</code> / <code>paidAt</code>); a shared <code>finalizeIfReady()</code> fires from whichever side lands second, issuing the token and triggering the CBS fee split exactly once regardless of order.</p>
+          <p>Caught and fixed a real cross-module bug here this session — a "has this already happened" check was inferring the answer from local data instead of querying the module that actually owns it. The unit-test mock had the same blind spot the code did, which is why it slipped through the first time.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="uc-tracking">
+  <div class="uc">
+    <div class="uc-head">
+      <span class="uc-tag">UC-10, UC-11, UC-13, UC-14 · FR-10, FR-11, FR-13, FR-14</span>
+      <h3 class="uc-title">Field Tracking, Geofencing &amp; SOS</h3>
+    </div>
+    <div class="uc-body">
+      <div>
+        <span class="uc-block-label">The workflow</span>
+        <ol class="steps">
+          <li>Agent app pings location periodically in the field — not a continuous stream.</li>
+          <li>Back-Office renders each agent's route plus that day's collection markers on a live map.</li>
+          <li>A branch manager can draw a geofence polygon per agent; stepping outside it raises an alert with elapsed time tracked until they return.</li>
+          <li>A dedicated SOS button sends a high-priority distress signal with location — separate from routine tracking, and the agent can't disable it.</li>
+        </ol>
+      </div>
+      <div>
+        <span class="uc-block-label">How it's built</span>
+        <div class="impl">
+          <p>Pings are periodic by design, explicitly to protect the ≥8h battery-autonomy target — continuous streaming was ruled out early. Geofence breach is a standard point-in-polygon test against stored vertices.</p>
+          <p>Fixed the live map's sidebar ordering this session too: suspended agents are excluded from the field-units list entirely, and agents who've just collected now surface first, most-recent collection at the top.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="insight">
+  <div class="section-head"><span class="section-num">04</span><h2>What's actually interesting here</h2></div>
+  <p class="section-sub">This is the section this specific audience will remember. Lead with the trade-offs, not the feature list.</p>
+
+  <div class="insight">
+    <div class="insight-card">
+      <h3>Modular monolith, isolated CBS adapter</h3>
+      <p>One deployable owns every business rule; only vendor-specific CBS wire formats live in a separate service. The core never depends on one bank's API shape — swapping CBS vendors touches the adapter, not the platform.</p>
+    </div>
+    <div class="insight-card">
+      <h3>Hybrid reactive / ACID</h3>
+      <p>WebFlux for high-concurrency, low-stakes paths — auth, sync, notifications. Spring Data JPA with strict transactions for anything money-moving. Throughput where it's cheap, consistency where it's not negotiable.</p>
+    </div>
+    <div class="insight-card">
+      <h3>Offline-first as architecture, not fallback</h3>
+      <p>The phone is the system of record during the business day; the server reconciles at sync and at EOD. This one decision shapes idempotent device-tx-ids, server-side re-validation of client-captured GPS, and the encrypted local queue.</p>
+    </div>
+    <div class="insight-card">
+      <h3>Layered accountability</h3>
+      <p>IMEI binding, transaction PIN, and login password are three independent factors across device / transaction / account. Financial facts are immutable — no soft-deletes, no updates on ledger rows — by design, not convention.</p>
+    </div>
+  </div>
+</section>
+
+<section id="qa">
+  <div class="section-head"><span class="section-num">05</span><h2>Anticipated questions</h2></div>
+  <p class="section-sub">This audience has built similar systems — expect these specifically.</p>
+
+  <div class="qa">
+    <p class="q">Why not microservices?</p>
+    <p class="a">One team, one deployable, one database — the actual complexity here is business-rule complexity, not scaling complexity. The one place vendor lock-in genuinely bites (CBS wire formats) is already isolated into its own service. Splitting further would buy deployment overhead without buying anything real.</p>
+  </div>
+  <div class="qa">
+    <p class="q">What happens if an agent's phone dies mid-collection, with unsynced data?</p>
+    <p class="a">The queue is encrypted at rest, so a lost device isn't a data-leak risk. End-of-day close is hard-blocked while any agent in the branch still has a pending offline queue — the branch physically cannot close the books on cash the server hasn't seen yet.</p>
+  </div>
+  <div class="qa">
+    <p class="q">How do you stop a retried offline sync from double-counting?</p>
+    <p class="a">Every collection carries a client-generated device transaction ID; <code>(agentId, deviceTxId)</code> is a unique constraint server-side. A retry is a no-op, not a duplicate.</p>
+  </div>
+  <div class="qa">
+    <p class="q">How do you actually reconcile against the bank?</p>
+    <p class="a">The CBS Middleware adapter owns that mapping, and RabbitMQ decouples it from the core — a slow or down CBS integration never blocks a mobile request. Daily export posts the closed OFJ session's totals once reconciliation is done, not before.</p>
+  </div>
+  <div class="qa">
+    <p class="q">What stops a cloned app or shared password from being used?</p>
+    <p class="a">IMEI binding. A correct password alone doesn't get you in from a second device — the account is locked to whichever phone it first bound to, until an admin explicitly resets it with a reason on file.</p>
+  </div>
+</section>
+
+<section id="gaps">
+  <div class="section-head"><span class="section-num">06</span><h2>Honest gaps — say these before they ask</h2></div>
+  <p class="section-sub">A peer audience trusts candor about known gaps more than a polished claim of completeness.</p>
+  <ul class="gap-list">
+    <li class="gap-item"><span class="gap-mark">FR-06</span> QR-code client identification isn't built yet — the one remaining MVP functional requirement still open.</li>
+    <li class="gap-item"><span class="gap-mark">CBS</span> Core banking integration is currently mocked. The client app's account balance is deliberately hidden right now specifically <em>because</em> it isn't backed by a real CBS yet — a recent, intentional call, not an oversight.</li>
+    <li class="gap-item"><span class="gap-mark">SMS</span> No real carrier credentials wired up locally — sends are best-effort no-ops in this environment. The gateway abstraction is ready for real Orange/MTN endpoints; it's a config change, not a rebuild.</li>
+  </ul>
+</section>
+
+</div>
+
+<footer class="end">MICROFI COLLECT — briefing prepared for today's presentation</footer>

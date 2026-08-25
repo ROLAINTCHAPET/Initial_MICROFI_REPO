@@ -35,6 +35,9 @@ public class EscrowLedger {
 
     private String ref;
 
+    /** Proof of the cash deposit (receipt, deposit slip, counted-cash acknowledgment) — always set by EscrowService#topUp; nullable at the schema level only because pre-existing rows predate this requirement. */
+    private String proofDocPath;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 }

@@ -32,6 +32,8 @@
 	<string>MICROFI needs Bluetooth to connect to your thermal receipt printer.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>MICROFI needs Bluetooth to print collection receipts on your thermal printer.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MICROFI needs the camera to scan a receipt QR code from your agent.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

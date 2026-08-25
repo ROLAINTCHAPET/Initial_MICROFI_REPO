@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'branch_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Opens the phone dialer for the agent's own branch (GET /agents/me/branch), with a graceful
 /// message if the branch has no number on file. Shared by every "Contact Branch" entry point —
@@ -12,7 +13,7 @@ Future<void> contactBranch(BuildContext context, String token) async {
     if (!context.mounted) return;
     if (branch.phone == null || branch.phone!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No phone number on file for ${branch.name}.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.cbNoPhoneOnFile(branch.name))),
       );
       return;
     }
@@ -21,7 +22,7 @@ Future<void> contactBranch(BuildContext context, String token) async {
   } catch (_) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Unable to open the phone dialer.')),
+      SnackBar(content: Text(AppLocalizations.of(context)!.cbUnableToOpenDialer)),
     );
   }
 }

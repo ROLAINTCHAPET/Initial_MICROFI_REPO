@@ -218,3 +218,14 @@ dialog.modal-transition[open]::backdrop {
 .success-pop {
   animation: successPop 350ms ease-out both;
 }
+
+/* Input.tsx renders its own explicit, obviously-clickable picker button for type="time"/"date"
+   fields — the browser's own native indicator must be neutralized (not just hidden) or it sits
+   in the same corner, invisible or not, and can end up eating the click meant for ours. */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}

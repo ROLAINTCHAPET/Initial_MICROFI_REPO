@@ -25,6 +25,8 @@ public class SubmitRegistrationApplicationRequest {
     @NotBlank
     private String lastName;
 
+    private LocalDate dateOfBirth;
+
     @NotBlank
     @Pattern(regexp = "^\\+[1-9]\\d{6,14}$", message = "Phone must be in international format, e.g. +237600000000")
     private String phone;
@@ -39,8 +41,11 @@ public class SubmitRegistrationApplicationRequest {
     /** Agent-only, optional — mirrors RegisterRequest#employeeCode's default-to-login behavior. */
     private String employeeCode;
 
+    @NotBlank
     private String nationalIdNumber;
 
+    /** Unique Identification Number (UIN) — labelled "Tax ID" in some CEMAC countries' own documents. */
+    @NotBlank
     private String taxIdNumber;
 
     private String placeOfResidence;

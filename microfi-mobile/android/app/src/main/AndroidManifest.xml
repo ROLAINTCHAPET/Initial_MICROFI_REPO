@@ -12,6 +12,18 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- Client-side "scan to get your receipt" (mobile_scanner). -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- UC-10 field tracking (core/location_tracking_service.dart) runs as a real Android
+         foreground service (geolocator's ForegroundNotificationConfig), not a plain in-app Timer —
+         a bare Timer was verified on a real MIUI device to get killed by MIUI's ProcessSceneCleaner
+         within ~13s of the app losing foreground focus, silently ending tracking for the rest of
+         the agent's day. A foreground service earns higher process priority; FOREGROUND_SERVICE
+         and the location-typed variant are required to start one on API 28+/34+, POST_NOTIFICATIONS
+         to actually show its ongoing notification on API 33+. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="microfi_mobile"
         android:name="${applicationName}"

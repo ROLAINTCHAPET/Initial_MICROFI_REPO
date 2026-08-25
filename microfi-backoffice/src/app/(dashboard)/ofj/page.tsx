@@ -5,24 +5,29 @@ import { PageHeader } from "@/components/PageHeaderContext";
 import { Table, Thead, Th, Tbody, Tr, Td, EmptyState } from "@/components/Table";
 import { Badge } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import type { ReactNode } from "react";
-import type { AgentResponse, BranchResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
+import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
+import { isPastBranchCloseTime } from "@/lib/branchHours";
 import { BranchSelector } from "./BranchSelector";
 import { RecordVarianceModal } from "./RecordVarianceModal";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
 type Tab = "summary" | "history" | "variance";
-
-const TABS: { key: Tab; label: string; icon: IconName }[] = [
-  { key: "summary", label: "Today's Summary", icon: "reports" },
-  { key: "history", label: "History", icon: "history" },
-  { key: "variance", label: "Variance Debts", icon: "warning" },
-];
 
 export default async function OfjOversightPage({
   searchParams,
 }: {
   searchParams: Promise<{ branchId?: string; tab?: string; openOnly?: string }>;
 }) {
+  const dict = getDictionary(await getLocale());
+  const TABS: { key: Tab; label: string; icon: IconName }[] = [
+    { key: "summary", label: dict.ofj.tabs.summary, icon: "reports" },
+    { key: "history", label: dict.ofj.tabs.history, icon: "history" },
+    { key: "variance", label: dict.ofj.tabs.variance, icon: "warning" },
+  ];
   const [session, branches] = await Promise.all([getSession(), api.get<BranchResponse[]>("/admin/branches")]);
   const params = await searchParams;
   const tab: Tab = params.tab === "history" || params.tab === "variance" ? params.tab : "summary";
@@ -31,7 +36,7 @@ export default async function OfjOversightPage({
   const branchId = session?.role === "ADMIN" ? params.branchId ?? branches[0]?.id : session?.branchId ?? branches[0]?.id;
 
   if (!branchId) {
-    return <EmptyState>No branches exist yet — create one first.</EmptyState>;
+    return <EmptyState>{dict.ofj.noBranches}</EmptyState>;
   }
 
   const branch = branches.find((b) => b.id === branchId);
@@ -39,39 +44,66 @@ export default async function OfjOversightPage({
   const agentById = new Map(agents.map((a) => [a.id, a]));
   // UC-17 actor: Branch Manager / Administrator, own branch only (POST /ofj/{branch}/variance).
   const canRecordVariance = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
+  // POST /ofj/{branchId}/reconcile itself rejects this before the branch's closing time
+  // (OfjService#reconcile) — reflected here so the button reads as unavailable instead of
+  // sending someone to /cashier only to hit a rejected request.
+  const canReconcileNow = isPastBranchCloseTime(branch);
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
-      <PageHeader title="End of Day Oversight" subtitle="Digital cash-desk reconciliation, read-only from the Back-Office." />
+      <AutoRefresh />
+      <PageHeader title={dict.ofj.pageTitle} subtitle={dict.ofj.pageSubtitle} />
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         {session?.role === "ADMIN" ? (
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
               <Icon name="location-on" className="size-5 text-primary" />
-              Viewing branch
+              {dict.ofj.viewingBranch}
             </span>
             <BranchSelector branches={branches} selectedBranchId={branchId} />
           </div>
         ) : (
           <div className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
             <Icon name="location-on" className="size-5 text-primary" />
-            {branch ? `${branch.name} (${branch.code})` : "Branch"}
+            {branch ? `${branch.name} (${branch.code})` : dict.ofj.branchFallback}
           </div>
+        )}
+        {/* This page is read-only oversight (see subtitle) — the actual physical-count
+            reconciliation workspace lives at /cashier. Without this link, every role including
+            ADMIN lands here (the page UC-16 names) with no path at all into reconciling. */}
+        {canReconcileNow ? (
+          <Link
+            href={`/cashier?branchId=${branchId}`}
+            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+          >
+            <Icon name="check-circle" className="size-5" />
+            {dict.ofj.reconcileCash}
+          </Link>
+        ) : (
+          <span
+            title={t(dict.ofj.reconcileTooltip, {
+              closeTimeSuffix: branch?.closeTime ? ` (${branch.closeTime.slice(0, 5)} ${branch.timezone ?? ""})` : "",
+            })}
+            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed select-none"
+          >
+            <Icon name="check-circle" className="size-5" />
+            {dict.ofj.reconcileCash}
+          </span>
         )}
       </div>
 
       <div className="flex gap-1 border-b-2 border-outline-variant">
-        {TABS.map((t) => (
+        {TABS.map((tabItem) => (
           <Link
-            key={t.key}
-            href={`/ofj?branchId=${branchId}&tab=${t.key}`}
+            key={tabItem.key}
+            href={`/ofj?branchId=${branchId}&tab=${tabItem.key}`}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-0.5 transition-colors ${
-              tab === t.key ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
+              tab === tabItem.key ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
             }`}
           >
-            <Icon name={t.icon} className="size-4" />
-            {t.label}
+            <Icon name={tabItem.icon} className="size-4" />
+            {tabItem.label}
           </Link>
         ))}
       </div>
@@ -126,31 +158,54 @@ async function SummaryView({
   agentById: Map<string, AgentResponse>;
   canRecordVariance: boolean;
 }) {
-  const summary = await api.get<OfjSummaryResponse>(`/ofj/${branchId}/summary`);
-  const totalDigital = summary.agentLines.reduce((sum, l) => sum + l.digitalTotalXaf, 0);
+  // Reconciled lines only exist once a cashier has physically counted an agent's cash — before
+  // that, an agent who's actively collecting today was invisible on this page even though the
+  // page is literally named for keeping an eye on today's collection activity. /pending is the
+  // same "not yet reconciled" total /cashier's queue already uses, surfaced here too so this page
+  // (the one named for it) actually shows the live picture, not just history after the fact.
+  // Nothing about reconciliation itself changes — POST /ofj/{branchId}/reconcile still enforces
+  // the closing-time gate exactly as before; this only affects what's visible, never when the
+  // physical count can happen.
+  const [summary, pending] = await Promise.all([
+    api.get<OfjSummaryResponse>(`/ofj/${branchId}/summary`),
+    api.get<OfjPendingLineResponse[]>(`/ofj/${branchId}/pending`),
+  ]);
+  const totalDigital = summary.agentLines.reduce((sum, l) => sum + l.digitalTotalXaf, 0) + pending.reduce((sum, p) => sum + p.digitalTotalXaf, 0);
   const totalPhysical = summary.agentLines.reduce((sum, l) => sum + l.physicalTotalXaf, 0);
   const netVariance = summary.agentLines.reduce((sum, l) => sum + l.deltaXaf, 0);
+  const agentsReporting = summary.agentLines.length + pending.length;
 
+  const dict = getDictionary(await getLocale());
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon="agents" label="Agents Reporting" value={summary.agentLines.length.toLocaleString()} />
-        <StatCard icon="account-balance-wallet" label="Total Digital" value={`${totalDigital.toLocaleString()} XAF`} />
-        <StatCard icon="lock" label="Total Physical" value={`${totalPhysical.toLocaleString()} XAF`} />
-        <StatCard icon="warning" label="Net Variance" value={`${netVariance.toLocaleString()} XAF`} alert={netVariance < 0} />
+        <StatCard icon="agents" label={dict.ofj.summary.agentsReporting} value={agentsReporting.toLocaleString()} />
+        <StatCard icon="account-balance-wallet" label={dict.ofj.summary.totalDigital} value={`${totalDigital.toLocaleString()} XAF`} />
+        <StatCard icon="lock" label={dict.ofj.summary.totalPhysical} value={`${totalPhysical.toLocaleString()} XAF`} />
+        <StatCard icon="warning" label={dict.ofj.summary.netVariance} value={`${netVariance.toLocaleString()} XAF`} alert={netVariance < 0} />
       </div>
 
-      <SectionCard icon="reports" title={`Business date: ${summary.businessDate}`} right={<Badge status={summary.status} />}>
+      <SectionCard icon="reports" title={t(dict.ofj.businessDate, { date: summary.businessDate })} right={<Badge status={summary.status} />}>
         <Table>
           <Thead>
-            <Th>Agent</Th>
-            <Th>Digital Total</Th>
-            <Th>Physical Total</Th>
-            <Th>Delta</Th>
-            <Th>Resolved</Th>
-            {canRecordVariance && <Th>Actions</Th>}
+            <Th>{dict.dashboard.colAgent}</Th>
+            <Th>{dict.dashboard.colDigitalTotal}</Th>
+            <Th>{dict.dashboard.colPhysicalTotal}</Th>
+            <Th>{dict.dashboard.colDelta}</Th>
+            <Th>{dict.dashboard.colStatus}</Th>
+            {canRecordVariance && <Th>{dict.common.actions}</Th>}
           </Thead>
           <Tbody>
+            {pending.map((p) => (
+              <Tr key={`pending-${p.agentId}`}>
+                <Td className="font-medium text-on-surface">{agentLabel(agentById, p.agentId)}</Td>
+                <Td>{p.digitalTotalXaf.toLocaleString()} XAF</Td>
+                <Td className="text-on-surface-variant">—</Td>
+                <Td className="text-on-surface-variant">—</Td>
+                <Td><Badge status="PENDING" /></Td>
+                {canRecordVariance && <Td>{null}</Td>}
+              </Tr>
+            ))}
             {summary.agentLines.map((line) => {
               const isShortage = !line.resolved && line.deltaXaf < 0;
               return (
@@ -179,7 +234,7 @@ async function SummaryView({
             })}
           </Tbody>
         </Table>
-        {summary.agentLines.length === 0 && <EmptyState>No agent activity recorded for this session yet.</EmptyState>}
+        {agentsReporting === 0 && <EmptyState>{dict.ofj.summary.noActivity}</EmptyState>}
       </SectionCard>
     </div>
   );
@@ -194,6 +249,7 @@ async function HistoryView({
   agentById: Map<string, AgentResponse>;
   canRecordVariance: boolean;
 }) {
+  const dict = getDictionary(await getLocale());
   const history = await api.get<OfjSummaryResponse[]>(`/ofj/${branchId}/history`);
   return (
     <div className="flex flex-col gap-4">
@@ -201,12 +257,12 @@ async function HistoryView({
         <SectionCard key={pastSession.sessionId} icon="reports" title={pastSession.businessDate} right={<Badge status={pastSession.status} />}>
           <Table>
             <Thead>
-              <Th>Agent</Th>
-              <Th>Digital Total</Th>
-              <Th>Physical Total</Th>
-              <Th>Delta</Th>
-              <Th>Resolved</Th>
-              {canRecordVariance && <Th>Actions</Th>}
+              <Th>{dict.dashboard.colAgent}</Th>
+              <Th>{dict.dashboard.colDigitalTotal}</Th>
+              <Th>{dict.dashboard.colPhysicalTotal}</Th>
+              <Th>{dict.dashboard.colDelta}</Th>
+              <Th>{dict.ofj.history.colResolved}</Th>
+              {canRecordVariance && <Th>{dict.common.actions}</Th>}
             </Thead>
             <Tbody>
               {pastSession.agentLines.map((line) => {
@@ -239,7 +295,7 @@ async function HistoryView({
           </Table>
         </SectionCard>
       ))}
-      {history.length === 0 && <EmptyState>No past End of Day sessions for this branch yet.</EmptyState>}
+      {history.length === 0 && <EmptyState>{dict.ofj.history.noSessions}</EmptyState>}
     </div>
   );
 }
@@ -253,6 +309,7 @@ async function VarianceView({
   agentById: Map<string, AgentResponse>;
   openOnly: boolean;
 }) {
+  const dict = getDictionary(await getLocale());
   const debts = await api.get<VarianceDebtResponse[]>(`/ofj/${branchId}/variance-debts?openOnly=${openOnly}`);
   const openCount = debts.filter((d) => d.status === "OPEN").length;
   const totalAmount = debts.reduce((sum, d) => sum + d.amountXaf, 0);
@@ -260,25 +317,25 @@ async function VarianceView({
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 sm:max-w-md gap-4">
-        <StatCard icon="warning" label="Open Debts" value={openCount.toLocaleString()} alert={openCount > 0} />
-        <StatCard icon="account-balance-wallet" label="Total Amount" value={`${totalAmount.toLocaleString()} XAF`} />
+        <StatCard icon="warning" label={dict.ofj.variance.openDebts} value={openCount.toLocaleString()} alert={openCount > 0} />
+        <StatCard icon="account-balance-wallet" label={dict.ofj.variance.totalAmount} value={`${totalAmount.toLocaleString()} XAF`} />
       </div>
 
       <SectionCard
         icon="warning"
-        title="Variance Debts"
+        title={dict.ofj.variance.title}
         right={
           <Link href={`/ofj?branchId=${branchId}&tab=variance&openOnly=${!openOnly}`} className="text-sm text-primary hover:underline underline-offset-2 font-medium">
-            {openOnly ? "Show all debts" : "Show open debts only"}
+            {openOnly ? dict.ofj.variance.showAllDebts : dict.ofj.variance.showOpenOnly}
           </Link>
         }
       >
         <Table>
           <Thead>
-            <Th>Agent</Th>
-            <Th>Amount</Th>
-            <Th>Status</Th>
-            <Th>Recorded</Th>
+            <Th>{dict.dashboard.colAgent}</Th>
+            <Th>{dict.ofj.variance.colAmount}</Th>
+            <Th>{dict.dashboard.colStatus}</Th>
+            <Th>{dict.ofj.variance.colRecorded}</Th>
           </Thead>
           <Tbody>
             {debts.map((debt) => (
@@ -293,7 +350,7 @@ async function VarianceView({
             ))}
           </Tbody>
         </Table>
-        {debts.length === 0 && <EmptyState>No variance debts recorded.</EmptyState>}
+        {debts.length === 0 && <EmptyState>{dict.ofj.variance.noDebts}</EmptyState>}
       </SectionCard>
     </div>
   );

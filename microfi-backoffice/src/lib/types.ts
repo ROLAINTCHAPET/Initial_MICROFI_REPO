@@ -19,6 +19,7 @@ export interface BranchResponse {
   phone: string | null;
   openTime: string | null; // LocalTime, e.g. "08:00:00"
   closeTime: string | null;
+  openTimeLocked: boolean; // true once today's openTime has passed (branch's own timezone) — only closeTime can still be changed today
   timezone: string | null;
   maxCashiers: number;
   requireImei: boolean;
@@ -166,6 +167,7 @@ export interface RegistrationApplicationResponse {
   branchId: string;
   firstName: string;
   lastName: string;
+  dateOfBirth: string | null; // LocalDate, "1990-05-01"
   phone: string;
   login: string;
   email: string | null;

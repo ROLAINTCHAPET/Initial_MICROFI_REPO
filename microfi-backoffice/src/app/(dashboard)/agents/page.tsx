@@ -1,16 +1,20 @@
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
-import type { AdminUserResponse, AgentResponse, BranchResponse, EscrowResponse } from "@/lib/types";
-import { RegisterUserModal } from "./RegisterUserModal";
+import { Icon } from "@/components/Icon";
+import { ceilingUtilizationPct } from "@/lib/format";
+import type { AgentResponse, BranchResponse, EscrowResponse } from "@/lib/types";
 import { AgentsExplorer, type AgentRow } from "./AgentsExplorer";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
 
 export default async function AgentsPage() {
-  const [session, allAgents, branches, users] = await Promise.all([
+  const dict = getDictionary(await getLocale());
+  const [session, allAgents, branches] = await Promise.all([
     getSession(),
     api.get<AgentResponse[]>("/admin/agents"),
     api.get<BranchResponse[]>("/admin/branches"),
-    api.get<AdminUserResponse[]>("/admin/users"),
   ]);
 
   // GET /admin/agents intentionally returns every agent network-wide (any Back-Office role can
@@ -24,7 +28,7 @@ export default async function AgentsPage() {
 
   const rows: AgentRow[] = agents.map((agent, i) => {
     const escrow = escrows[i];
-    const pct = escrow && escrow.effectiveCeilingXaf > 0 ? Math.round((escrow.cumulativeTodayXaf / escrow.effectiveCeilingXaf) * 100) : null;
+    const pct = escrow && escrow.effectiveCeilingXaf > 0 ? ceilingUtilizationPct(escrow.cumulativeTodayXaf, escrow.effectiveCeilingXaf) : null;
     return {
       id: agent.id,
       fullName: agent.fullName,
@@ -43,14 +47,20 @@ export default async function AgentsPage() {
   return (
     <div className="max-w-7xl mx-auto w-full flex flex-col gap-6">
       <PageHeader
-        title="Agents Overview"
-        subtitle={session?.role === "ADMIN" ? "Manage field agents and monitor escrow levels." : "Manage your branch's field agents and monitor escrow levels."}
+        title={dict.agents.overviewTitle}
+        subtitle={session?.role === "ADMIN" ? dict.agents.overviewSubtitleAdmin : dict.agents.overviewSubtitleBranch}
       />
       <AgentsExplorer
         rows={rows}
         actions={
-          canCreate && session ? (
-            <RegisterUserModal branches={branches} users={users} callerRole={session.role} callerBranchId={session.branchId} />
+          canCreate ? (
+            <Link
+              href="/registrations/new"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+            >
+              <Icon name="plus" className="size-5" />
+              {dict.registrations.newApplication}
+            </Link>
           ) : undefined
         }
       />

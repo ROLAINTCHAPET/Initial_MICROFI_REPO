@@ -3,10 +3,15 @@ package com.microfi.authentication.controller;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.Branch;
-import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.AgentSelfService;
+import com.microfi.notifications.service.MfiSettingsService;
+import com.microfi.notifications.service.NotificationService;
 import com.microfi.shared.dto.AgentResponse;
+import com.microfi.shared.dto.BranchNoticeResponse;
 import com.microfi.shared.dto.BranchResponse;
+import com.microfi.shared.dto.MfiNameResponse;
 import com.microfi.shared.dto.ChangeAgentPinRequest;
 import com.microfi.shared.dto.RouteResponse;
 import com.microfi.shared.dto.SosResponse;
@@ -18,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,8 +54,10 @@ public class AgentSelfController {
 
     private final TrackingService trackingService;
     private final BranchRepository branchRepository;
-    private final AgentRepository agentRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AgentSelfService agentSelfService;
+    private final AgentDirectoryService agentDirectoryService;
+    private final NotificationService notificationService;
+    private final MfiSettingsService mfiSettingsService;
 
     @GetMapping
     @Operation(summary = "Get My Profile", description = "Resolves the caller's own agent record from their JWT — id, branch, phone, IMEI, status, whether the transaction PIN still needs to be set — everything the token itself doesn't carry. Agent principals only.")
@@ -107,6 +113,7 @@ public class AgentSelfController {
                             .phone(branch.getPhone())
                             .openTime(branch.getOpenTime())
                             .closeTime(branch.getCloseTime())
+                            .openTimeLocked(agentDirectoryService.isBranchPastOpenTime(branch))
                             .timezone(branch.getTimezone())
                             .maxCashiers(branch.effectiveMaxCashiers())
                             .requireImei(branch.effectiveRequireImei())
@@ -114,56 +121,44 @@ public class AgentSelfController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/mfi-name")
+    @Operation(summary = "MFI Institutional Name", description = "The organization name to print on a receipt (BR-Notif-01's mandatory legal mentions) — cached client-side so an offline collection can still compose a compliant receipt without reaching the server. Agent principals only.")
+    public Mono<MfiNameResponse> mfiName(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromCallable(() -> MfiNameResponse.builder().name(mfiSettingsService.getName()).build())
+                        .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/branch-notices")
+    @Operation(summary = "My Branch's Recent Notices", description = "The caller's own branch's most recent operational notices (e.g. a same-day closing-time change), newest first (UC-15). Polled by the mobile app — there's no push infrastructure in this app, same reasoning as SOS acknowledgement. Agent principals only.")
+    public Flux<BranchNoticeResponse> myBranchNotices(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMapMany(agent -> Mono.fromCallable(() -> notificationService.listRecentNoticesForBranch(agent.getBranchId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
+    }
+
     @PatchMapping("/pin")
     @Operation(summary = "Change My Transaction PIN", description = "Replaces the transaction PIN checked on every collection (never the login password). Used both for the mandatory first-time replacement of the admin-assigned starting PIN and any later voluntary change. Agent principals only.")
     public Mono<AgentResponse> changePin(@Valid @RequestBody ChangeAgentPinRequest request, Mono<Authentication> authenticationMono) {
         return authenticationMono
                 .map(this::requireAgent)
-                .flatMap(agent -> Mono.fromCallable(() -> {
-                    if (!passwordEncoder.matches(request.getCurrentPin(), agent.getPinHash())) {
-                        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current PIN is incorrect");
-                    }
-                    if (isWeakPin(request.getNewPin())) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                "PIN must not be all the same digit or a simple sequence (e.g. 1234)");
-                    }
-                    agent.setPinHash(passwordEncoder.encode(request.getNewPin()));
-                    agent.setPinMustChange(false);
-                    agent.setFailedTransactionPinAttempts(0);
-                    agent.setTransactionPinLockedUntil(null);
-                    Agent saved = agentRepository.save(agent);
-                    return AgentResponse.builder()
-                            .id(saved.getId())
-                            .employeeCode(saved.getEmployeeCode())
-                            .username(saved.getUsername())
-                            .email(saved.getEmail())
-                            .fullName(saved.getFullName())
-                            .phone(saved.getPhone())
-                            .imei(saved.getImei())
-                            .branchId(saved.getBranchId())
-                            .status(saved.getStatus())
-                            .pinMustChange(Boolean.TRUE.equals(saved.getPinMustChange()))
-                            .build();
-                }).subscribeOn(Schedulers.boundedElastic()));
-    }
-
-    /** Rejects the two weakest numeric-PIN shapes: every digit the same, or a simple ascending/descending run. Only meaningful for purely numeric PINs — non-numeric values pass through untouched. */
-    private boolean isWeakPin(String pin) {
-        if (!pin.chars().allMatch(Character::isDigit)) {
-            return false;
-        }
-        boolean allSame = pin.chars().distinct().count() == 1;
-        boolean ascending = true;
-        boolean descending = true;
-        for (int i = 1; i < pin.length(); i++) {
-            if (pin.charAt(i) != pin.charAt(i - 1) + 1) {
-                ascending = false;
-            }
-            if (pin.charAt(i) != pin.charAt(i - 1) - 1) {
-                descending = false;
-            }
-        }
-        return allSame || ascending || descending;
+                .flatMap(agent -> Mono.fromCallable(() -> agentSelfService.changePin(agent, request))
+                        .subscribeOn(Schedulers.boundedElastic()))
+                .map(saved -> AgentResponse.builder()
+                        .id(saved.getId())
+                        .employeeCode(saved.getEmployeeCode())
+                        .username(saved.getUsername())
+                        .email(saved.getEmail())
+                        .fullName(saved.getFullName())
+                        .phone(saved.getPhone())
+                        .imei(saved.getImei())
+                        .branchId(saved.getBranchId())
+                        .status(saved.getStatus())
+                        .pinMustChange(Boolean.TRUE.equals(saved.getPinMustChange()))
+                        .build());
     }
 
     private Agent requireAgent(Authentication authentication) {

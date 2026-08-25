@@ -4,15 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./Icon";
 import type { AdminRole } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
-const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
-  { href: "/", label: "Dashboard", icon: "dashboard" },
-  { href: "/agents", label: "Agents", icon: "agents" },
-  { href: "/team", label: "Team", icon: "shield-check" },
-  { href: "/tracking", label: "Geolocation", icon: "location-on" },
-  { href: "/ofj", label: "End of Day Oversight", icon: "reports" },
-  { href: "/sos", label: "SOS Console", icon: "bell" },
-];
+function navItems(dict: Dictionary): { href: string; label: string; icon: IconName }[] {
+  return [
+    { href: "/", label: dict.sidebar.dashboard, icon: "dashboard" },
+    { href: "/agents", label: dict.sidebar.agents, icon: "agents" },
+    { href: "/team", label: dict.sidebar.team, icon: "shield-check" },
+    { href: "/tracking", label: dict.sidebar.geolocation, icon: "location-on" },
+    { href: "/ofj", label: dict.sidebar.endOfDayOversight, icon: "reports" },
+    { href: "/sos", label: dict.sidebar.sosConsole, icon: "bell" },
+  ];
+}
 
 // DESIGN.md: Primary Container navy sidebar, mint (secondary-fixed) active state with a left
 // accent border. Nav items are the same across back-office roles — branch scoping happens
@@ -23,14 +27,15 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
 // doesn't see either.
 export function Sidebar({ role }: { role: AdminRole }) {
   const pathname = usePathname();
-  const navItems =
+  const dict = useDictionary();
+  const items =
     role === "ADMIN" || role === "BRANCH_MANAGER"
       ? [
-          ...NAV_ITEMS,
-          { href: "/registrations", label: "Registrations", icon: "edit-note" as IconName },
-          { href: "/settings", label: "Settings", icon: "settings" as IconName },
+          ...navItems(dict),
+          { href: "/registrations", label: dict.sidebar.registrations, icon: "edit-note" as IconName },
+          { href: "/settings", label: dict.sidebar.settings, icon: "settings" as IconName },
         ]
-      : NAV_ITEMS;
+      : navItems(dict);
 
   return (
     <aside className="hidden md:flex md:flex-col h-screen w-64 fixed left-0 top-0 bg-primary-container z-30 py-6">
@@ -39,8 +44,8 @@ export function Sidebar({ role }: { role: AdminRole }) {
           <Icon name="building" className="size-5 text-on-primary" />
         </div>
         <div>
-          <p className="text-base font-bold text-white leading-tight">Microfi Admin</p>
-          <p className="text-xs text-on-primary-container leading-tight">Regional Operations</p>
+          <p className="text-base font-bold text-white leading-tight">{dict.sidebar.brandName}</p>
+          <p className="text-xs text-on-primary-container leading-tight">{dict.sidebar.brandSubtitle}</p>
         </div>
       </div>
 
@@ -50,12 +55,12 @@ export function Sidebar({ role }: { role: AdminRole }) {
           className="w-full h-12 bg-secondary text-on-secondary font-semibold text-sm rounded-[var(--radius-sm)] flex items-center justify-center gap-2 hover:bg-secondary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
         >
           <Icon name="plus" className="size-5" />
-          Collect Cash
+          {dict.sidebar.collectCash}
         </Link>
       </div>
 
       <ul className="flex flex-col gap-1 px-2">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
           return (
             <li key={item.href}>

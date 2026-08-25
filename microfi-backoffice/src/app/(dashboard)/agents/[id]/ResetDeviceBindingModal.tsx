@@ -3,9 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
 
 export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; bound: boolean }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +32,7 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to reset device binding");
+        setError(body?.message ?? dict.agents.resetDeviceBinding.failedToReset);
         return;
       }
       setSucceeded(true);
@@ -40,7 +43,7 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
         router.refresh();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -57,7 +60,7 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
         className="h-12 px-6 bg-surface-container-lowest border-2 border-error text-error font-semibold text-sm rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer hover:bg-error-container transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
       >
         <Icon name="phone" className="size-5" />
-        Reset Device Binding
+        {dict.agents.resetDeviceBinding.button}
       </button>
 
       {isOpen && (
@@ -70,15 +73,15 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
                     <Icon name="phone" className="size-5" />
                   </div>
                   <div>
-                    <h2 className="text-h2 text-primary">Reset Device Binding</h2>
-                    <p className="text-xs text-on-surface-variant">Agent: {agentId}</p>
+                    <h2 className="text-h2 text-primary">{dict.agents.resetDeviceBinding.title}</h2>
+                    <p className="text-xs text-on-surface-variant">{t(dict.agents.agentLabel, { id: agentId })}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={close}
                   className="text-on-surface-variant hover:text-error cursor-pointer transition-[background-color,color,transform] duration-150 ease-out hover:scale-110 active:scale-90 p-2 rounded-full hover:bg-error-container"
-                  aria-label="Close"
+                  aria-label={dict.common.close}
                 >
                   <Icon name="close" className="size-5" />
                 </button>
@@ -88,17 +91,17 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
                 <div className="bg-error-container/40 border border-error p-4 rounded-[var(--radius-sm)] flex gap-3 items-start">
                   <Icon name="warning" filled className="size-5 text-error shrink-0" />
                   <div className="text-sm text-on-error-container">
-                    This clears the agent&apos;s bound device. They will not be able to log in until their next successful login — from whichever phone they use — binds it automatically. No code or secret needs to be handed to them.
+                    {dict.agents.resetDeviceBinding.warning}
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-primary mb-2">
-                    Reason (lost/replaced device, etc.) <span className="text-error">*</span>
+                    {dict.agents.resetDeviceBinding.reasonLabel} <span className="text-error">*</span>
                   </label>
                   <textarea
                     className="w-full p-4 bg-surface-container-lowest border border-outline-variant rounded-[var(--radius-sm)] text-primary text-sm focus:outline-none focus:border-2 focus:border-primary resize-none min-h-[100px]"
-                    placeholder="Provide a mandatory reason for this device reset..."
+                    placeholder={dict.agents.resetDeviceBinding.reasonPlaceholder}
                     required
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -114,7 +117,7 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
                   onClick={close}
                   className="h-12 px-8 bg-surface-container-lowest border-2 border-primary text-primary font-semibold text-sm rounded-[var(--radius-md)] cursor-pointer hover:bg-surface-container-low transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] order-2 sm:order-1"
                 >
-                  Cancel
+                  {dict.common.cancel}
                 </button>
                 <button
                   type="submit"
@@ -126,12 +129,12 @@ export function ResetDeviceBindingModal({ agentId, bound }: { agentId: string; b
                   {succeeded ? (
                     <>
                       <Icon name="check-circle" className="size-5" />
-                      Device Binding Reset
+                      {dict.agents.resetDeviceBinding.resetDone}
                     </>
                   ) : loading ? (
-                    "Resetting…"
+                    dict.agents.resetDeviceBinding.resetting
                   ) : (
-                    "Reset Device Binding"
+                    dict.agents.resetDeviceBinding.button
                   )}
                 </button>
               </div>

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const dict = useDictionary();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,13 +28,13 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Login failed");
+        setError(body?.message ?? dict.login.loginFailed);
         return;
       }
       router.push("/");
       router.refresh();
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.login.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -44,17 +46,17 @@ export default function LoginPage() {
         <div className="w-16 h-16 rounded-[var(--radius-md)] bg-primary flex items-center justify-center mb-5">
           <Icon name="building" className="size-8 text-on-primary" />
         </div>
-        <h1 className="text-3xl font-bold text-on-surface text-center">Microfi Admin</h1>
-        <p className="text-sm text-text-slate mt-1 mb-8">Regional Operations Back-Office</p>
+        <h1 className="text-3xl font-bold text-on-surface text-center">{dict.login.title}</h1>
+        <p className="text-sm text-text-slate mt-1 mb-8">{dict.login.subtitle}</p>
 
         <form
           onSubmit={handleSubmit}
           className="w-full bg-surface-container-lowest rounded-[var(--radius-md)] border border-outline-variant shadow-[var(--shadow-elevation-1)] p-8 flex flex-col gap-4"
         >
           <Input
-            label="Email or Username"
+            label={dict.login.emailOrUsername}
             name="login"
-            placeholder="Enter your credentials"
+            placeholder={dict.login.credentialsPlaceholder}
             autoComplete="username"
             icon={<Icon name="person" className="size-5" />}
             value={login}
@@ -62,7 +64,7 @@ export default function LoginPage() {
             required
           />
           <Input
-            label="Password"
+            label={dict.login.password}
             name="password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
@@ -72,7 +74,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
                 className="text-outline hover:text-on-surface cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? dict.login.hidePassword : dict.login.showPassword}
               >
                 <Icon name={showPassword ? "eye-off" : "eye"} className="size-5" />
               </button>
@@ -87,12 +89,12 @@ export default function LoginPage() {
             </p>
           )}
           <Button type="submit" loading={loading} className="w-full mt-2">
-            Sign In
+            {dict.login.signIn}
           </Button>
         </form>
         <div className="w-full bg-surface-container-low rounded-b-[var(--radius-md)] border border-t-0 border-outline-variant px-8 py-3 -mt-1 flex items-center justify-center gap-2">
           <Icon name="shield-check" className="size-4 text-outline" />
-          <p className="text-xs text-text-slate">Secure administrative access only.</p>
+          <p className="text-xs text-text-slate">{dict.login.secureAccess}</p>
         </div>
       </div>
     </div>

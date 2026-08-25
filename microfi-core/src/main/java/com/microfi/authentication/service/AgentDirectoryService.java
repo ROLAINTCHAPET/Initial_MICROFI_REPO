@@ -85,18 +85,66 @@ public class AgentDirectoryService {
     public boolean isBranchPastCloseTime(UUID branchId) {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found: " + branchId));
-        if (branch.getCloseTime() == null || branch.getTimezone() == null) {
+        ZoneId zone = zoneIdOrNull(branch.getTimezone());
+        if (branch.getCloseTime() == null || zone == null) {
             return true;
         }
-        LocalTime now = LocalTime.now(ZoneId.of(branch.getTimezone()));
+        LocalTime now = LocalTime.now(zone);
         return !now.isBefore(branch.getCloseTime());
     }
 
-    /** For referencing the collecting agent in the FR-09 confirmation SMS text. */
-    public String findEmployeeCode(UUID agentId) {
-        return agentRepository.findById(agentId)
-                .map(Agent::getEmployeeCode)
+    /**
+     * UC-15 schedule-lock: once today's opening time has passed (in the branch's own timezone),
+     * it can no longer be rewritten for today — only closeTime stays adjustable, so a branch
+     * manager can still shorten or extend the day without being able to retroactively change when
+     * the branch is recorded as having opened. A branch with no schedule configured yet (no
+     * openTime/timezone) is never locked, since there's nothing on record to protect.
+     */
+    public boolean isBranchPastOpenTime(Branch branch) {
+        ZoneId zone = zoneIdOrNull(branch.getTimezone());
+        if (branch.getOpenTime() == null || zone == null) {
+            return false;
+        }
+        LocalTime now = LocalTime.now(zone);
+        return !now.isBefore(branch.getOpenTime());
+    }
+
+    /**
+     * {@code Branch.timezone} is a free-text field with no format validation at write time, so
+     * garbage values (e.g. seeded test data) can and do exist — a raw {@code ZoneId.of(...)} call
+     * would throw and, worse, would do so mid-stream for a Flux of many branches (as it did for
+     * {@code GET /admin/branches} the first time this was missed), silently truncating the
+     * response instead of failing one branch cleanly. Treated the same as "no timezone set" by
+     * every caller here.
+     */
+    private ZoneId zoneIdOrNull(String timezone) {
+        if (timezone == null) {
+            return null;
+        }
+        try {
+            return ZoneId.of(timezone);
+        } catch (java.time.DateTimeException e) {
+            return null;
+        }
+    }
+
+    /** Phone numbers for every agent at a branch, for a branch-wide SMS notice (e.g. a same-day schedule change) — agents with no phone on file are already filtered out. */
+    public List<String> findAgentPhonesByBranch(UUID branchId) {
+        return agentRepository.findByBranchId(branchId).stream()
+                .map(Agent::getPhone)
+                .filter(phone -> phone != null && !phone.isBlank())
+                .toList();
+    }
+
+    /** UC-09 Bluetooth thermal receipt template's "Agent" line (employee code, name, and issuing branch). */
+    public AgentReceiptInfo findReceiptInfo(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        String branchName = branchRepository.findById(agent.getBranchId()).map(Branch::getName).orElse("—");
+        return new AgentReceiptInfo(agent.getEmployeeCode(), agent.getFullName(), branchName);
+    }
+
+    public record AgentReceiptInfo(String employeeCode, String fullName, String branchName) {
     }
 
     /**

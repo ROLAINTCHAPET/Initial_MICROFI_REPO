@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'sponsor_activation_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// UC-19 step 2 — the agent's side of the two-party activation gate. Lands directly on the list
 /// of clients who've already self-activated (set their own login) but have no live booklet token
@@ -59,21 +60,22 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
       setState(() => _results = results);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _confirmSponsor(PendingClientActivation c) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Sponsor Activation?'),
-        content: Text("Confirm you have received ${c.fullName}'s activation fee in cash."),
+        title: Text(l10n.saSponsorActivationQuestion),
+        content: Text(l10n.saConfirmReceivedFee(c.fullName)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Confirm')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.commonConfirm)),
         ],
       ),
     );
@@ -87,16 +89,14 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
       final active = result.status == 'ACTIVE';
       await showSuccessDialog(
         context,
-        active
-            ? '${c.fullName} is now fully activated — both sponsorship and payment are confirmed.'
-            : 'Sponsorship recorded for ${c.fullName}. Still waiting on their own payment confirmation.',
-        title: active ? 'Client Activated' : 'Sponsorship Recorded',
+        active ? l10n.saClientFullyActivated(c.fullName) : l10n.saSponsorshipRecorded(c.fullName),
+        title: active ? l10n.saClientActivatedTitle : l10n.saSponsorshipRecordedTitle,
       );
       if (!mounted) return;
       await _search();
     } catch (e) {
       if (!mounted) return;
-      await showErrorDialog(context, e, title: 'Sponsorship Failed');
+      await showErrorDialog(context, e, title: l10n.saSponsorshipFailedTitle);
     } finally {
       if (mounted) setState(() => _sponsoringId = null);
     }
@@ -104,9 +104,10 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Sponsor Activation')),
+      appBar: AppBar(title: Text(l10n.saTitle)),
       body: SafeArea(
         child: Column(
           children: [
@@ -120,7 +121,7 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                   _search();
                 },
                 decoration: InputDecoration(
-                  hintText: 'Name, phone, or member number',
+                  hintText: l10n.csSearchHint,
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchController.text.isEmpty ? null : IconButton(icon: const Icon(Icons.clear), onPressed: _searchController.clear),
                 ),
@@ -137,8 +138,8 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   _searchController.text.trim().isEmpty
-                      ? 'No clients are currently awaiting activation.'
-                      : 'No clients found for that search.',
+                      ? l10n.saNoClientsAwaiting
+                      : l10n.csNoClientsFound,
                   style: const TextStyle(color: MicrofiColors.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
@@ -161,10 +162,10 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Text('${c.mfiMemberNo} • ${c.phone}'),
+                      subtitle: Text(l10n.csClientSubtitle(c.mfiMemberNo, c.phone)),
                       trailing: c.sponsored
-                          ? const Chip(
-                              label: Text('Awaiting payment', style: TextStyle(fontSize: 11)),
+                          ? Chip(
+                              label: Text(l10n.saAwaitingPayment, style: const TextStyle(fontSize: 11)),
                               backgroundColor: MicrofiColors.surfaceContainerHigh,
                               visualDensity: VisualDensity.compact,
                             )
@@ -173,7 +174,7 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                               : FilledButton(
                                   onPressed: () => _confirmSponsor(c),
                                   style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 12)),
-                                  child: const Text('Sponsor', style: TextStyle(fontSize: 12)),
+                                  child: Text(l10n.saSponsorButton, style: const TextStyle(fontSize: 12)),
                                 ),
                       onTap: c.sponsored || busy ? null : () => _confirmSponsor(c),
                     ),

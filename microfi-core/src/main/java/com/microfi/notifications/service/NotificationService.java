@@ -1,16 +1,23 @@
 package com.microfi.notifications.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.AgentDirectoryService.AgentReceiptInfo;
+import com.microfi.notifications.domain.BranchNotice;
 import com.microfi.notifications.domain.NotificationChannel;
 import com.microfi.notifications.domain.NotificationLog;
 import com.microfi.notifications.domain.NotificationStatus;
 import com.microfi.notifications.gateway.SmsGatewayFactory;
 import com.microfi.notifications.gateway.SmsSendResult;
+import com.microfi.notifications.repository.BranchNoticeRepository;
 import com.microfi.notifications.repository.NotificationLogRepository;
 import com.microfi.savings.service.ClientDirectoryService;
+import com.microfi.savings.service.ClientDirectoryService.ClientReceiptInfo;
+import com.microfi.shared.dto.BranchNoticeResponse;
 import com.microfi.shared.dto.NotificationLogResponse;
 import com.microfi.shared.dto.NotifyCollectionRequest;
+import com.microfi.shared.dto.ReceiptDataResponse;
 import com.microfi.transactions.service.CollectionDirectoryService;
+import com.microfi.transactions.service.CollectionDirectoryService.DenominationLineView;
 import com.microfi.transactions.service.CollectionSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +27,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
@@ -47,6 +55,7 @@ public class NotificationService {
             DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(Locale.FRENCH).withZone(ZoneOffset.UTC);
 
     private final NotificationLogRepository notificationLogRepository;
+    private final BranchNoticeRepository branchNoticeRepository;
     private final CollectionDirectoryService collectionDirectoryService;
     private final ClientDirectoryService clientDirectoryService;
     private final AgentDirectoryService agentDirectoryService;
@@ -54,27 +63,70 @@ public class NotificationService {
     private final MfiSettingsService mfiSettingsService;
 
     public Mono<NotificationLogResponse> notifyCollection(UUID collectionId, UUID callerAgentId, NotifyCollectionRequest request) {
-        return Mono.fromCallable(() -> prepare(collectionId, callerAgentId))
+        boolean french = "fr".equals(request.getLocale());
+        return Mono.fromCallable(() -> prepare(collectionId, callerAgentId, french))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prepared -> smsGatewayFactory.getActiveGateway().send(prepared.phone(), prepared.message())
                         .flatMap(result -> Mono.fromCallable(() -> persist(prepared, result, request.isPrintedReceipt()))
                                 .subscribeOn(Schedulers.boundedElastic())));
     }
 
-    private PreparedNotification prepare(UUID collectionId, UUID callerAgentId) {
+    /**
+     * UC-15 follow-on: agents don't watch the Back-Office, so a same-day closing-time change would
+     * otherwise go unnoticed until an agent happened to check — SMS every agent at the branch
+     * (best-effort, same "never blocks the caller" contract as {@link #notifyCollection}: a
+     * gateway failure here must never fail the schedule update itself) and leave a BranchNotice
+     * row the mobile app polls, so the change is visible even to an agent who missed the SMS or
+     * had the app closed at the time.
+     */
+    public void notifyBranchScheduleChange(UUID branchId, String branchName, LocalTime newCloseTime) {
+        String message = branchName + ": today's closing time changed to " + newCloseTime + ".";
+
+        branchNoticeRepository.save(BranchNotice.builder()
+                .id(UUID.randomUUID())
+                .branchId(branchId)
+                .message(message)
+                .createdAt(Instant.now())
+                .build());
+
+        for (String phone : agentDirectoryService.findAgentPhonesByBranch(branchId)) {
+            smsGatewayFactory.getActiveGateway().send(phone, message)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(result -> { }, error -> { });
+        }
+    }
+
+    /** UC-15: the caller's own branch's most recent operational notices, newest first — polled by the mobile app (no push infrastructure exists here, same reasoning as SOS acknowledgement). */
+    public List<BranchNoticeResponse> listRecentNoticesForBranch(UUID branchId) {
+        return branchNoticeRepository.findTop10ByBranchIdOrderByCreatedAtDesc(branchId).stream()
+                .map(notice -> BranchNoticeResponse.builder()
+                        .id(notice.getId())
+                        .message(notice.getMessage())
+                        .createdAt(notice.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    private PreparedNotification prepare(UUID collectionId, UUID callerAgentId, boolean french) {
         CollectionSummary collection = collectionDirectoryService.findById(collectionId);
         if (!collection.agentId().equals(callerAgentId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot notify for a collection recorded by another agent");
         }
         String phone = clientDirectoryService.findPhone(collection.clientId());
-        String employeeCode = agentDirectoryService.findEmployeeCode(callerAgentId);
+        AgentReceiptInfo agent = agentDirectoryService.findReceiptInfo(callerAgentId);
+        ClientReceiptInfo client = clientDirectoryService.findReceiptInfo(collection.clientId());
+        List<DenominationLineView> denominationLines = collectionDirectoryService.findDenominationLines(collectionId);
         String mfiName = mfiSettingsService.getName();
         String formattedDate = MESSAGE_DATE_FORMAT.format(collection.collectedAt());
         String message = mfiName + ": depot de " + collection.amountXaf() + " XAF recu le "
-                + formattedDate + " (agent " + employeeCode + "). Merci.";
-        String receiptText = mfiName + "\nRecu de versement\nMontant: " + collection.amountXaf() + " XAF\n"
-                + "Date: " + formattedDate + "\nAgent: " + employeeCode + "\nMerci de votre confiance.";
-        return new PreparedNotification(collection, phone, message, receiptText);
+                + formattedDate + " (agent " + agent.employeeCode() + "). Merci.";
+        String receiptText = ReceiptTemplateComposer.compose(mfiName, agent.branchName(), collection.collectedAt(),
+                agent.employeeCode(), agent.fullName(), client.mfiMemberNo(), client.fullName(), collection.amountXaf(),
+                denominationLines, collection.deviceTxId(), french);
+        ReceiptDataResponse receiptData = ReceiptDataComposer.compose(agent.branchName(), collection.collectedAt(),
+                agent.employeeCode(), agent.fullName(), client.mfiMemberNo(), client.fullName(), collection.amountXaf(),
+                denominationLines, collection.deviceTxId(), french);
+        return new PreparedNotification(collection, phone, message, receiptText, receiptData);
     }
 
     private NotificationLogResponse persist(PreparedNotification prepared, SmsSendResult result, boolean printedReceipt) {
@@ -90,10 +142,10 @@ public class NotificationService {
                 .sentAt(Instant.now())
                 .build();
         notificationLogRepository.save(log);
-        return toResponse(log, prepared.receiptText());
+        return toResponse(log, prepared.receiptText(), prepared.receiptData());
     }
 
-    private NotificationLogResponse toResponse(NotificationLog log, String receiptText) {
+    private NotificationLogResponse toResponse(NotificationLog log, String receiptText, ReceiptDataResponse receiptData) {
         return NotificationLogResponse.builder()
                 .id(log.getId())
                 .collectionId(log.getCollectionId())
@@ -102,6 +154,7 @@ public class NotificationService {
                 .printedReceipt(log.isPrintedReceipt())
                 .sentAt(log.getSentAt())
                 .receiptText(receiptText)
+                .receiptData(receiptData)
                 .build();
     }
 
@@ -121,10 +174,10 @@ public class NotificationService {
             }
         }
         return notificationLogRepository.findByCollectionIdOrderBySentAtDesc(collectionId).stream()
-                .map(log -> toResponse(log, null))
+                .map(log -> toResponse(log, null, null))
                 .toList();
     }
 
-    private record PreparedNotification(CollectionSummary collection, String phone, String message, String receiptText) {
+    private record PreparedNotification(CollectionSummary collection, String phone, String message, String receiptText, ReceiptDataResponse receiptData) {
     }
 }

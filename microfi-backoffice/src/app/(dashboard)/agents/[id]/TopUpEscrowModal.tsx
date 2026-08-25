@@ -3,12 +3,26 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
+
+// Red asterisk — the visual marker for every mandatory field on this form (Top-Up Amount, Proof
+// of Deposit). Payment Reference is the only optional one and is left unmarked.
+function Req() {
+  return (
+    <span className="text-danger-red ml-0.5" aria-hidden>
+      *
+    </span>
+  );
+}
 
 export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: string; isPendingCeiling: boolean }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("50000");
   const [reference, setReference] = useState("");
+  const [proof, setProof] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
@@ -20,17 +34,26 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!proof) {
+      setError(dict.agents.topUpEscrow.uploadProofRequired);
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
+      const formData = new FormData();
+      formData.append(
+        "metadata",
+        new Blob([JSON.stringify({ amountXaf: Number(amount), reference: reference || "MANUAL-CASHIER" })], { type: "application/json" })
+      );
+      formData.append("proof", proof);
       const res = await fetch(`/api/agents/${agentId}/escrow/top-up`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountXaf: Number(amount), reference: reference || "MANUAL-CASHIER" }),
+        body: formData,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to fund escrow account");
+        setError(body?.message ?? dict.agents.topUpEscrow.failedToFund);
         return;
       }
       setSucceeded(true);
@@ -38,10 +61,11 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
         setIsOpen(false);
         setSucceeded(false);
         setReference("");
+        setProof(null);
         router.refresh();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -54,7 +78,7 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
         className="h-12 px-6 bg-primary text-on-primary font-semibold text-sm rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
       >
         <Icon name="lock" className="size-5" />
-        Fund Escrow
+        {dict.agents.topUpEscrow.fundEscrow}
       </button>
 
       {isOpen && (
@@ -67,15 +91,15 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
                     <Icon name="lock" className="size-5" />
                   </div>
                   <div>
-                    <h2 className="text-h2 text-primary">Fund Escrow Account</h2>
-                    <p className="text-xs text-on-surface-variant">Agent: {agentId}</p>
+                    <h2 className="text-h2 text-primary">{dict.agents.topUpEscrow.fundEscrowAccount}</h2>
+                    <p className="text-xs text-on-surface-variant">{t(dict.agents.agentLabel, { id: agentId })}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={close}
                   className="text-on-surface-variant hover:text-error cursor-pointer transition-[background-color,color,transform] duration-150 ease-out hover:scale-110 active:scale-90 p-2 rounded-full hover:bg-error-container"
-                  aria-label="Close"
+                  aria-label={dict.common.close}
                 >
                   <Icon name="close" className="size-5" />
                 </button>
@@ -85,13 +109,16 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
                 <div className="bg-primary-fixed/20 border border-primary-fixed p-4 rounded-[var(--radius-sm)] flex gap-3 items-start">
                   <Icon name="check-circle" className="size-5 text-primary-fixed-dim shrink-0" />
                   <div className="text-sm text-on-primary-fixed-variant">
-                    This credits the agent&apos;s wallet and permanently raises their escrow ceiling by the same amount — this is different from a temporary waiver.
-                    {isPendingCeiling && " This agent is PENDING_CEILING: funding their escrow for the first time activates them automatically."}
+                    {dict.agents.topUpEscrow.infoCredit}
+                    {isPendingCeiling && dict.agents.topUpEscrow.infoPendingCeiling}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary mb-2">Top-Up Amount (XAF)</label>
+                  <label className="block text-sm font-semibold text-primary mb-2">
+                    {dict.agents.topUpEscrow.topUpAmount}
+                    <Req />
+                  </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant font-semibold text-xs">XAF</span>
                     <input
@@ -106,13 +133,29 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary mb-2">Payment Reference (optional)</label>
+                  <label className="block text-sm font-semibold text-primary mb-2">{dict.agents.topUpEscrow.paymentReference}</label>
                   <input
                     className="w-full h-12 px-4 bg-surface-container-lowest border border-outline-variant rounded-[var(--radius-sm)] text-primary text-sm focus:outline-none focus:border-2 focus:border-primary"
-                    placeholder="e.g. cashier receipt number"
+                    placeholder={dict.agents.topUpEscrow.paymentReferencePlaceholder}
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-primary mb-2">
+                    {dict.agents.topUpEscrow.proofOfDeposit}
+                    <Req />
+                  </label>
+                  <input
+                    type="file"
+                    aria-label={dict.agents.topUpEscrow.proofAriaLabel}
+                    accept="application/pdf,image/jpeg"
+                    required
+                    onChange={(e) => setProof(e.target.files?.[0] ?? null)}
+                    className="w-full text-sm text-on-surface-variant file:mr-3 file:h-10 file:px-3 file:rounded-[var(--radius-sm)] file:border file:border-outline-variant file:bg-surface-container-lowest file:text-sm file:font-semibold file:cursor-pointer file:text-primary"
+                  />
+                  <p className="text-xs text-on-surface-variant mt-1">{dict.agents.topUpEscrow.proofHelp}</p>
                 </div>
 
                 {error && <p role="alert" className="text-sm text-danger-red">{error}</p>}
@@ -124,7 +167,7 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
                   onClick={close}
                   className="h-12 px-8 bg-surface-container-lowest border-2 border-primary text-primary font-semibold text-sm rounded-[var(--radius-md)] cursor-pointer hover:bg-surface-container-low transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] order-2 sm:order-1"
                 >
-                  Cancel
+                  {dict.common.cancel}
                 </button>
                 <button
                   type="submit"
@@ -136,12 +179,12 @@ export function TopUpEscrowModal({ agentId, isPendingCeiling }: { agentId: strin
                   {succeeded ? (
                     <>
                       <Icon name="check-circle" className="size-5" />
-                      Funded
+                      {dict.agents.topUpEscrow.funded}
                     </>
                   ) : loading ? (
-                    "Funding…"
+                    dict.agents.topUpEscrow.funding
                   ) : (
-                    "Fund Escrow"
+                    dict.agents.topUpEscrow.fundEscrow
                   )}
                 </button>
               </div>

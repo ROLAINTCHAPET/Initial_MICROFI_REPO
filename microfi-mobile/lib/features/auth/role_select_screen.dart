@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/design_tokens.dart';
+import '../../core/language_picker.dart';
+import '../../l10n/app_localizations.dart';
 import '../client/client_login_screen.dart';
 import 'login_screen.dart';
 
@@ -10,58 +12,64 @@ class RoleSelectScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: MicrofiColors.primary,
-                      borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                    ),
-                    child: const Icon(Icons.account_balance, color: Colors.white, size: 26),
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: MicrofiColors.primary,
+                          borderRadius: BorderRadius.circular(MicrofiRadius.md),
+                        ),
+                        child: const Icon(Icons.account_balance, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        l10n.appName,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        l10n.roleSelectPrompt,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 24),
+                      _RoleCard(
+                        icon: Icons.badge_outlined,
+                        title: l10n.roleFieldAgentTitle,
+                        subtitle: l10n.roleFieldAgentSubtitle,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                      ),
+                      const SizedBox(height: 12),
+                      _RoleCard(
+                        icon: Icons.menu_book_outlined,
+                        title: l10n.roleClientTitle,
+                        subtitle: l10n.roleClientSubtitle,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClientLoginScreen())),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Microfi',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
-                  ),
-                  const SizedBox(height: 3),
-                  const Text(
-                    'Who\'s signing in?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 24),
-                  _RoleCard(
-                    icon: Icons.badge_outlined,
-                    title: 'Field Agent',
-                    subtitle: 'Collect cash, manage clients and escrow',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                  ),
-                  const SizedBox(height: 12),
-                  _RoleCard(
-                    icon: Icons.menu_book_outlined,
-                    title: 'Client',
-                    subtitle: 'View my digital savings booklet',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClientLoginScreen())),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            const Positioned(top: 8, right: 8, child: LanguagePickerButton()),
+          ],
         ),
       ),
     );

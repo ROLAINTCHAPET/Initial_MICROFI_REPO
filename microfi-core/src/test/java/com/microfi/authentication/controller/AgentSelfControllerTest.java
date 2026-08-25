@@ -9,11 +9,14 @@ import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.AdminUserDetails;
-import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.AgentSelfService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.notifications.service.MfiSettingsService;
+import com.microfi.notifications.service.NotificationService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.shared.dto.RouteResponse;
 import com.microfi.transactions.service.TrackingService;
@@ -21,13 +24,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -35,7 +39,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -67,10 +70,16 @@ class AgentSelfControllerTest {
     private BranchRepository branchRepository;
 
     @MockitoBean
-    private AgentRepository agentRepository;
+    private AgentSelfService agentSelfService;
 
     @MockitoBean
-    private PasswordEncoder passwordEncoder;
+    private AgentDirectoryService agentDirectoryService;
+
+    @MockitoBean
+    private NotificationService notificationService;
+
+    @MockitoBean
+    private MfiSettingsService mfiSettingsService;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID branchId = UUID.randomUUID();
@@ -221,9 +230,9 @@ class AgentSelfControllerTest {
 
     @Test
     void changePinSuccess() {
-        when(passwordEncoder.matches(eq("0000"), anyString())).thenReturn(true);
-        when(passwordEncoder.encode(anyString())).thenReturn("new-hashed-pin");
-        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+        Agent saved = buildAgent();
+        saved.setPinMustChange(false);
+        when(agentSelfService.changePin(any(Agent.class), any())).thenReturn(saved);
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .patch()
@@ -238,7 +247,8 @@ class AgentSelfControllerTest {
 
     @Test
     void changePinRejectsWrongCurrentPin() {
-        when(passwordEncoder.matches(eq("0000"), anyString())).thenReturn(false);
+        when(agentSelfService.changePin(any(Agent.class), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current PIN is incorrect"));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .patch()
@@ -251,7 +261,8 @@ class AgentSelfControllerTest {
 
     @Test
     void changePinRejectsWeakNewPin() {
-        when(passwordEncoder.matches(eq("0000"), anyString())).thenReturn(true);
+        when(agentSelfService.changePin(any(Agent.class), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "PIN must not be all the same digit or a simple sequence (e.g. 1234)"));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .patch()

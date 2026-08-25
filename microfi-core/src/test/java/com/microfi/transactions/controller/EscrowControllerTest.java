@@ -10,19 +10,24 @@ import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.transactions.service.EscrowDepositProofStorageService;
 import com.microfi.transactions.service.EscrowService;
 import com.microfi.shared.dto.EscrowResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -42,6 +47,9 @@ class EscrowControllerTest {
 
     @MockitoBean
     private EscrowService escrowService;
+
+    @MockitoBean
+    private EscrowDepositProofStorageService escrowDepositProofStorageService;
 
     @MockitoBean
     private AgentDirectoryService agentDirectoryService;
@@ -69,6 +77,19 @@ class EscrowControllerTest {
                 .role(role).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
         AdminUserDetails details = new AdminUserDetails(adminUser);
         return new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
+    }
+
+    /** Multipart body matching EscrowController#topUp: a 'metadata' JSON part plus a 'proof' file part. */
+    private org.springframework.util.MultiValueMap<String, org.springframework.http.HttpEntity<?>> topUpBody(String metadataJson) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("metadata", metadataJson).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        builder.part("proof", new ByteArrayResource("fake-proof".getBytes()) {
+            @Override
+            public String getFilename() {
+                return "proof.jpg";
+            }
+        }).header(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE);
+        return builder.build();
     }
 
     @Test
@@ -106,13 +127,14 @@ class EscrowControllerTest {
                 .agentId(agentId).balanceXaf(20_000).baseCeilingXaf(20_000).effectiveCeilingXaf(20_000)
                 .updatedAt(Instant.now()).build();
         when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(UUID.randomUUID());
-        when(escrowService.topUp(eq(agentId), anyLong(), anyString())).thenReturn(response);
+        when(escrowDepositProofStorageService.store(any(), any())).thenReturn(Mono.just("proof/path.jpg"));
+        when(escrowService.topUp(eq(agentId), anyLong(), anyString(), any(), anyString())).thenReturn(response);
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(topUpBody("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}"))
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -127,13 +149,14 @@ class EscrowControllerTest {
                 .agentId(agentId).balanceXaf(20_000).baseCeilingXaf(20_000).effectiveCeilingXaf(20_000)
                 .updatedAt(Instant.now()).build();
         when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(branchId);
-        when(escrowService.topUp(eq(agentId), anyLong(), anyString())).thenReturn(response);
+        when(escrowDepositProofStorageService.store(any(), any())).thenReturn(Mono.just("proof/path.jpg"));
+        when(escrowService.topUp(eq(agentId), anyLong(), anyString(), any(), anyString())).thenReturn(response);
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
                 .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(topUpBody("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}"))
                 .exchange()
                 .expectStatus().isOk();
     }
@@ -144,12 +167,13 @@ class EscrowControllerTest {
         UUID agentBranchId = UUID.randomUUID();
         UUID callerBranchId = UUID.randomUUID();
         when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(agentBranchId);
+        when(escrowDepositProofStorageService.store(any(), any())).thenReturn(Mono.just("proof/path.jpg"));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, callerBranchId)))
                 .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(topUpBody("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}"))
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -157,12 +181,13 @@ class EscrowControllerTest {
     @Test
     void testTopUpByCashierForbidden() {
         UUID agentId = UUID.randomUUID();
+        when(escrowDepositProofStorageService.store(any(), any())).thenReturn(Mono.just("proof/path.jpg"));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
                 .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(topUpBody("{\"amountXaf\":20000,\"reference\":\"MANUAL-CASHIER\"}"))
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -170,12 +195,13 @@ class EscrowControllerTest {
     @Test
     void testTopUpRejectsNonPositiveAmount() {
         UUID agentId = UUID.randomUUID();
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(UUID.randomUUID());
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .post()
                 .uri("/api/v1/agents/" + agentId + "/escrow/top-up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"amountXaf\":0}")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(topUpBody("{\"amountXaf\":0}"))
                 .exchange()
                 .expectStatus().isBadRequest();
     }

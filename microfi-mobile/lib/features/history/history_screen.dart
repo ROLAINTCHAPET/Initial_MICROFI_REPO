@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../collection/collection_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Full collection history — same list as Home's "Recent Collections" but unbounded (up to the
 /// server's top-50 cap; see CollectionController#myCollections).
@@ -38,7 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() => _collections = results);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,6 +54,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return ListView(
@@ -63,7 +65,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           const SizedBox(height: 10),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.error)),
           const SizedBox(height: 14),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
@@ -73,7 +75,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          const Text('Collection History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.hsCollectionHistoryTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
             width: double.infinity,
@@ -86,7 +88,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total Collected This Month', style: TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
+                Text(l10n.histTotalCollectedThisMonth, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
                 const SizedBox(height: 4),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -102,13 +104,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: MicrofiSpacing.gapLg),
           if (_collections.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  Icon(Icons.receipt_long, color: MicrofiColors.outlineVariant, size: 40),
-                  SizedBox(height: 10),
-                  Text('No collections recorded yet.', style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+                  const Icon(Icons.receipt_long, color: MicrofiColors.outlineVariant, size: 40),
+                  const SizedBox(height: 10),
+                  Text(l10n.hsNoCollectionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
                 ],
               ),
             )
@@ -131,14 +133,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.clientName ?? 'Unknown client', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-                          Text('$date • $time • Cash', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                          Text(c.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                          Text(l10n.histDateTimeCashLine(date, time), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
                           if (c.locationName != null)
                             Text(c.locationName!, style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
-                    Text('+${_fmt(c.amountXaf)} XAF', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+                    Text(l10n.hsAmountCollectedPlus(_fmt(c.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
                   ],
                 ),
               );

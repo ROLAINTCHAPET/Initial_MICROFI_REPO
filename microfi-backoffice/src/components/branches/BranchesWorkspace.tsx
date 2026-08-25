@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Toast } from "@/components/Toast";
 import type { ScheduleDefaultsResponse } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 import { GlobalThresholds } from "./GlobalThresholds";
 import { BranchDirectory, type BranchRow } from "./BranchDirectory";
 
@@ -17,6 +18,7 @@ export function BranchesWorkspace({
   branches: BranchRow[];
   actions?: ReactNode;
 }) {
+  const dict = useDictionary();
   const [locked, setLocked] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -32,7 +34,7 @@ export function BranchesWorkspace({
         }}
       />
       <BranchDirectory branches={branches} actions={actions} locked={locked} />
-      {toastVisible && <Toast message="New schedule saved" onDismiss={() => setToastVisible(false)} />}
+      {toastVisible && <Toast message={dict.branches.workspace.scheduleSaved} onDismiss={() => setToastVisible(false)} />}
     </>
   );
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../../core/session_storage.dart';
 import 'client_activation_screen.dart';
 import 'client_repository.dart';
 import 'client_session_entry.dart';
+import '../../l10n/app_localizations.dart';
 
 class ClientLoginScreen extends StatefulWidget {
   const ClientLoginScreen({super.key});
@@ -42,7 +44,7 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ClientSessionEntry(token: token)));
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -50,9 +52,10 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Client Login')),
+      appBar: AppBar(title: Text(l10n.clClientLoginTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -74,16 +77,16 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
                     child: const Icon(Icons.menu_book_outlined, color: Colors.white, size: 26),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'My Booklet',
+                  Text(
+                    l10n.clMyBooklet,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
                   ),
                   const SizedBox(height: 3),
-                  const Text(
-                    'Your digital savings booklet',
+                  Text(
+                    l10n.clDigitalSavingsBooklet,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
+                    style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -101,22 +104,23 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
                         children: [
                           TextFormField(
                             controller: _loginController,
-                            decoration: const InputDecoration(
-                              labelText: 'Login',
-                              prefixIcon: Icon(Icons.person_outline),
+                            decoration: InputDecoration(
+                              labelText: l10n.clLoginLabel,
+                              prefixIcon: const Icon(Icons.person_outline),
                             ),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? l10n.commonRequiredField : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _pinController,
-                            decoration: const InputDecoration(
-                              labelText: 'PIN',
-                              prefixIcon: Icon(Icons.lock_outline),
+                            decoration: InputDecoration(
+                              labelText: l10n.clPinLabel,
+                              prefixIcon: const Icon(Icons.lock_outline),
                             ),
                             obscureText: true,
                             keyboardType: TextInputType.number,
-                            validator: (v) => (v == null || v.length < 4) ? 'Min. 4 digits' : null,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            validator: (v) => (v == null || v.length < 4) ? l10n.clPinMinDigitsError : null,
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: 12),
@@ -140,7 +144,7 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
                             onPressed: _loading ? null : _submit,
                             child: _loading
                                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text('Sign In'),
+                                : Text(l10n.clSignInButton),
                           ),
                         ],
                       ),
@@ -150,7 +154,7 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
                   Center(
                     child: TextButton(
                       onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClientActivationScreen())),
-                      child: const Text('First time? Activate my booklet', style: TextStyle(fontSize: 13)),
+                      child: Text(l10n.clFirstTimeActivate, style: const TextStyle(fontSize: 13)),
                     ),
                   ),
                 ],

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'core/app_background.dart';
 import 'core/app_theme.dart';
 import 'core/jwt.dart';
+import 'core/locale_preference.dart';
 import 'core/session_entry.dart';
 import 'core/session_storage.dart';
 import 'features/auth/role_select_screen.dart';
 import 'features/client/client_session_entry.dart';
+import 'l10n/app_localizations.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LocalePreference.instance.load();
   runApp(const MicrofiAgentApp());
 }
 
@@ -16,19 +20,27 @@ class MicrofiAgentApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Microfi',
-      debugShowCheckedModeBanner: false,
-      theme: microfiTheme,
-      // No dark mode has been designed for this app — force light regardless of the device's
-      // system theme setting, rather than leaving it to follow ThemeMode.system's default.
-      themeMode: ThemeMode.light,
-      // `builder` wraps whatever the Navigator renders, at every route, permanently — unlike
-      // wrapping `home:` directly, which only covered the very first screen. Every subsequent
-      // Navigator.push/pushReplacement (i.e. nearly the whole app) opens as a new, sibling route
-      // that isn't nested inside `home`'s widget subtree, so it silently lost the background.
-      builder: (context, child) => AppBackground(child: child!),
-      home: const _SessionGate(),
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocalePreference.instance.notifier,
+      builder: (context, locale, _) {
+        return MaterialApp(
+          title: 'Microfi',
+          debugShowCheckedModeBanner: false,
+          theme: microfiTheme,
+          // No dark mode has been designed for this app — force light regardless of the device's
+          // system theme setting, rather than leaving it to follow ThemeMode.system's default.
+          themeMode: ThemeMode.light,
+          locale: locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          // `builder` wraps whatever the Navigator renders, at every route, permanently — unlike
+          // wrapping `home:` directly, which only covered the very first screen. Every subsequent
+          // Navigator.push/pushReplacement (i.e. nearly the whole app) opens as a new, sibling route
+          // that isn't nested inside `home`'s widget subtree, so it silently lost the background.
+          builder: (context, child) => AppBackground(child: child!),
+          home: const _SessionGate(),
+        );
+      },
     );
   }
 }

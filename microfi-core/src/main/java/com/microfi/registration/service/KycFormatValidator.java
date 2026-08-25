@@ -15,10 +15,12 @@ import java.util.regex.Pattern;
  * 9-digit CNI still coexists with the new 10-character digital CNI; Chad's legacy 7-digit-plus-
  * check-letter NIF coexists with a new 13-character alphanumeric one. Congo's NIU format is
  * officially undisclosed (centrally stored with biometric data, no public structure) — left on
- * the generic fallback rather than a fabricated pattern. A phone number outside these 6 CEMAC
- * dial codes — or either field left blank, since both are optional — always passes: deliberately
- * generous rather than a hard lock, so an unmatched, undisclosed, or future format never silently
- * blocks a legitimate submission.
+ * the generic fallback rather than a fabricated pattern. Both National ID and Unique
+ * Identification Number (UIN) are mandatory (see {@code SubmitRegistrationApplicationRequest}'s
+ * {@code @NotBlank}) — this validator only checks format, not presence, so a blank value or a
+ * phone number outside these 6 CEMAC dial codes still passes here: deliberately generous rather
+ * than a hard lock, so an unmatched, undisclosed, or future format never silently blocks a
+ * legitimate submission.
  */
 @Component
 public class KycFormatValidator {

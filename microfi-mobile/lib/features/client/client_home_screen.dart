@@ -3,12 +3,14 @@ import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'client_history_screen.dart';
 import 'client_models.dart';
+import 'client_receipt_scan_screen.dart';
 import 'client_repository.dart';
+import '../../l10n/app_localizations.dart';
 
-/// Graphical Design/client/client_digital_booklet_home — "My Booklet": identity + status,
-/// current balance, and recent contributions. All data is real (UC-20/21/22); "Request
-/// Withdrawal" has no backend behind it yet (see client_wallet_screen.dart), so it isn't offered
-/// here as a working action.
+/// Graphical Design/client/client_digital_booklet_home — "My Booklet": identity + status and
+/// recent contributions. Balance is deliberately not shown here — it isn't backed by a real CBS
+/// yet, see client_wallet_screen.dart's own balance display for the same caveat. "Request
+/// Withdrawal" has no backend behind it yet either, so it isn't offered here as a working action.
 class ClientHomeScreen extends StatefulWidget {
   final String token;
 
@@ -22,11 +24,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   late final ClientSelfRepository _repository = ClientSelfRepository(widget.token);
 
   ClientSelfProfile? _profile;
-  ClientBalance? _balance;
   List<ClientHistoryEntry> _recent = [];
   List<ClientRecentCollection> _recentCollections = [];
   String? _error;
   bool _loading = true;
+  bool _confirmingPayment = false;
 
   @override
   void initState() {
@@ -42,30 +44,58 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     try {
       final results = await Future.wait([
         _repository.fetchProfile(),
-        _repository.fetchBalance(),
         _repository.fetchHistory(),
         _repository.fetchRecentCollections(),
       ]);
       if (!mounted) return;
       setState(() {
         _profile = results[0] as ClientSelfProfile;
-        _balance = results[1] as ClientBalance;
-        _recent = (results[2] as List<ClientHistoryEntry>).take(5).toList();
-        _recentCollections = (results[3] as List<ClientRecentCollection>).take(3).toList();
+        _recent = (results[1] as List<ClientHistoryEntry>).take(5).toList();
+        _recentCollections = (results[2] as List<ClientRecentCollection>).take(3).toList();
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _confirmPayment() async {
+    final l10n = AppLocalizations.of(context)!;
+    final pin = await promptForPin(
+      context,
+      message: l10n.chEnterPinConfirmPayment,
+    );
+    if (pin == null || pin.isEmpty) return;
+    if (!mounted) return;
+
+    setState(() => _confirmingPayment = true);
+    try {
+      final result = await _repository.confirmActivationPayment(pin);
+      if (!mounted) return;
+      final active = result.status == 'ACTIVE';
+      await showSuccessDialog(
+        context,
+        active ? l10n.chBookletActiveMessage : l10n.chPaymentConfirmedWaitingMessage,
+        title: active ? l10n.chBookletActivatedTitle : l10n.chPaymentConfirmedTitle,
+      );
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      await showErrorDialog(context, e, title: l10n.chCouldNotConfirmPaymentTitle);
+    } finally {
+      if (mounted) setState(() => _confirmingPayment = false);
+    }
+  }
+
   void _openHistory() {
+    final l10n = AppLocalizations.of(context)!;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Contribution History')),
+        appBar: AppBar(title: Text(l10n.chContributionHistoryTitle)),
         body: SafeArea(child: ClientHistoryScreen(token: widget.token)),
       ),
     ));
@@ -73,6 +103,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading && _profile == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -85,13 +116,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           const SizedBox(height: 10),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.error)),
           const SizedBox(height: 14),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
 
     final profile = _profile!;
-    final balance = _balance;
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -114,35 +144,48 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               _TokenStatusPill(status: profile.tokenStatus),
             ],
           ),
-          const SizedBox(height: MicrofiSpacing.gapLg),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
-            decoration: BoxDecoration(
-              color: MicrofiColors.primary,
-              borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('CURRENT BALANCE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70, letterSpacing: 0.5)),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(balance != null ? _fmt(balance.balanceXaf) : '—', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 6),
-                    const Text('XAF', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-                if (balance != null) ...[
-                  const SizedBox(height: 6),
-                  Text('As of ${_fmtDate(balance.asOf)}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          if (profile.tokenStatus != 'ACTIVE') ...[
+            const SizedBox(height: MicrofiSpacing.gapLg),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(MicrofiSpacing.card),
+              decoration: BoxDecoration(
+                color: MicrofiColors.tertiaryFixed.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(MicrofiRadius.md),
+                border: Border.all(color: MicrofiColors.tertiaryFixedDim, width: MicrofiBorders.width),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.hourglass_top, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
+                      const SizedBox(width: 6),
+                      Text(
+                        profile.tokenStatus == 'EXPIRED' ? l10n.chRenewalNeeded : l10n.chActivationPending,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.chConfirmOncePaidMessage,
+                    style: const TextStyle(fontSize: 11, color: MicrofiColors.onTertiaryFixedVariant),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _confirmingPayment ? null : _confirmPayment,
+                      child: _confirmingPayment
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(l10n.chConfirmActivationPaymentButton, style: const TextStyle(fontSize: 13)),
+                    ),
+                  ),
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
           if (_recentCollections.isNotEmpty) ...[
             const SizedBox(height: MicrofiSpacing.gapLg),
             Container(
@@ -160,13 +203,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     children: [
                       const Icon(Icons.schedule, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
                       const SizedBox(width: 6),
-                      const Text('Just Collected', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant)),
+                      Text(l10n.chJustCollected, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant)),
                     ],
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Recorded by MICROFI — reflected in your official balance at end of day.',
-                    style: TextStyle(fontSize: 11, color: MicrofiColors.onTertiaryFixedVariant),
+                  Text(
+                    l10n.chRecordedReflectedMessage,
+                    style: const TextStyle(fontSize: 11, color: MicrofiColors.onTertiaryFixedVariant),
                   ),
                   const SizedBox(height: 8),
                   ..._recentCollections.map((c) => Padding(
@@ -181,7 +224,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Text('+${_fmt(c.amountXaf)} XAF', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant)),
+                            Text(l10n.hsAmountCollectedPlus(_fmt(c.amountXaf)), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant)),
                           ],
                         ),
                       )),
@@ -192,17 +235,30 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           const SizedBox(height: MicrofiSpacing.gapLg),
           SizedBox(
             width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClientReceiptScanScreen())),
+              icon: const Icon(Icons.qr_code_scanner, size: 18),
+              label: Text(l10n.chScanReceiptFromAgent, style: const TextStyle(fontSize: 13)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(42),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+              ),
+            ),
+          ),
+          const SizedBox(height: MicrofiSpacing.gap),
+          SizedBox(
+            width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () => showDialog<void>(
                 context: context,
                 builder: (_) => AlertDialog(
-                  title: const Text('How to Top Up'),
-                  content: const Text('Hand cash to a field agent visiting you, or visit your branch directly. Every deposit appears here once recorded.'),
-                  actions: [FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+                  title: Text(l10n.chHowToTopUpTitle),
+                  content: Text(l10n.chHowToTopUpMessage),
+                  actions: [FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonOk))],
                 ),
               ),
               icon: const Icon(Icons.info_outline, size: 16),
-              label: const Text('Top-up Info', style: TextStyle(fontSize: 13)),
+              label: Text(l10n.chTopUpInfo, style: const TextStyle(fontSize: 13)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: MicrofiColors.primary,
                 side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
@@ -215,15 +271,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Contributions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-              TextButton(onPressed: _openHistory, child: const Text('View All', style: TextStyle(fontSize: 13))),
+              Text(l10n.chRecentContributions, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+              TextButton(onPressed: _openHistory, child: Text(l10n.chViewAll, style: const TextStyle(fontSize: 13))),
             ],
           ),
           const Divider(color: MicrofiColors.outlineVariant, height: 1),
           if (_recent.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('No contributions recorded yet.', style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(l10n.chNoContributionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
             )
           else
             ..._recent.map((e) => _ContributionRow(entry: e)),
@@ -255,6 +311,7 @@ class _ContributionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final local = entry.date.toLocal();
     final date = '${local.day}/${local.month} ${TimeOfDay.fromDateTime(local).format(context)}';
     return Padding(
@@ -277,7 +334,7 @@ class _ContributionRow extends StatelessWidget {
               ],
             ),
           ),
-          Text('+${_fmt(entry.amountXaf)} XAF', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+          Text(l10n.hsAmountCollectedPlus(_fmt(entry.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
         ],
       ),
     );
@@ -301,9 +358,10 @@ class _TokenStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final active = status == 'ACTIVE';
     final color = active ? MicrofiColors.secondary : (status == 'EXPIRED' ? MicrofiColors.error : MicrofiColors.outline);
-    final label = active ? 'ACTIVE' : (status == 'EXPIRED' ? 'EXPIRED' : 'NOT ACTIVATED');
+    final label = active ? l10n.chStatusActive : (status == 'EXPIRED' ? l10n.chStatusExpired : l10n.chStatusNotActivated);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

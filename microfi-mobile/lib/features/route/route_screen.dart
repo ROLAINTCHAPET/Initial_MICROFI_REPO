@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'route_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// UC-11 — Historical Route Visualization. A map view (Google/Mapbox tiles) is a real feature this
 /// design mock implies but this app doesn't integrate a maps SDK yet — this is a list-based
@@ -40,7 +41,7 @@ class _RouteScreenState extends State<RouteScreen> {
       setState(() => _route = route);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -48,14 +49,15 @@ class _RouteScreenState extends State<RouteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('My Route — Today')),
-      body: SafeArea(child: _buildBody()),
+      appBar: AppBar(title: Text(l10n.rtMyRouteTodayTitle)),
+      body: SafeArea(child: _buildBody(l10n)),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return ListView(
@@ -66,7 +68,7 @@ class _RouteScreenState extends State<RouteScreen> {
           const SizedBox(height: 12),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: MicrofiColors.error)),
           const SizedBox(height: 16),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
@@ -82,11 +84,11 @@ class _RouteScreenState extends State<RouteScreen> {
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(24),
-          children: const [
-            SizedBox(height: 80),
-            Icon(Icons.map_outlined, color: MicrofiColors.outlineVariant, size: 48),
-            SizedBox(height: 12),
-            Center(child: Text('No GPS pings or collections recorded today.', style: TextStyle(color: MicrofiColors.onSurfaceVariant))),
+          children: [
+            const SizedBox(height: 80),
+            const Icon(Icons.map_outlined, color: MicrofiColors.outlineVariant, size: 48),
+            const SizedBox(height: 12),
+            Center(child: Text(l10n.rtNoGpsOrCollections, style: const TextStyle(color: MicrofiColors.onSurfaceVariant))),
           ],
         ),
       );
@@ -97,7 +99,7 @@ class _RouteScreenState extends State<RouteScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         itemCount: events.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 2),
+        separatorBuilder: (_, _) => const SizedBox(height: 2),
         itemBuilder: (context, index) {
           final e = events[index];
           final time = TimeOfDay.fromDateTime(e.time.toLocal()).format(context);
@@ -122,10 +124,10 @@ class _RouteScreenState extends State<RouteScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        e.isCollection ? 'Collection — ${_fmt(e.amountXaf!)} XAF' : 'GPS ping',
+                        e.isCollection ? l10n.rtCollectionLine(_fmt(e.amountXaf!)) : l10n.rtGpsPing,
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: e.isCollection ? MicrofiColors.secondary : MicrofiColors.onSurface),
                       ),
-                      Text('$time • ${e.lat.toStringAsFixed(4)}, ${e.lon.toStringAsFixed(4)}', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                      Text(l10n.rtTimeLatLonLine(time, e.lat.toStringAsFixed(4), e.lon.toStringAsFixed(4)), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
                     ],
                   ),
                 ),

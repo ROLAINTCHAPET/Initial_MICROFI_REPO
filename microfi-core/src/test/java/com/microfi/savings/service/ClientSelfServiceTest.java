@@ -109,7 +109,7 @@ class ClientSelfServiceTest {
         UUID collectionId = UUID.randomUUID();
         Instant collectedAt = Instant.now();
         when(collectionDirectoryService.findRecentByClient(clientId)).thenReturn(
-                List.of(new CollectionSummary(collectionId, UUID.randomUUID(), clientId, 5000L, "Akwa, Douala", collectedAt)));
+                List.of(new CollectionSummary(collectionId, UUID.randomUUID(), clientId, 5000L, "Akwa, Douala", collectedAt, 4.05, 9.7, "device-tx-1")));
 
         List<ClientRecentCollectionResponse> response = service.getRecentCollections(clientId);
 

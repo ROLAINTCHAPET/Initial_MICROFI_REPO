@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'design_tokens.dart';
+import '../l10n/app_localizations.dart';
 
 /// Microfi Status Cards Library (Graphical Design/agent/microfi_status_interaction_library) —
 /// only the states this app actually drives are implemented here; the mock's token-validation
@@ -71,6 +72,7 @@ class EscrowCeilingReachedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(MicrofiSpacing.card),
       decoration: BoxDecoration(
@@ -95,9 +97,9 @@ class EscrowCeilingReachedCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Text('Escrow Ceiling Reached', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: MicrofiColors.error)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(l10n.escrowCeilingReachedTitle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: MicrofiColors.error)),
                     ),
                     const SizedBox(height: 3),
                     Text(message, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
@@ -113,7 +115,7 @@ class EscrowCeilingReachedCard extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onContactBranch,
                 icon: const Icon(Icons.call, size: 16),
-                label: const Text('Contact Branch', style: TextStyle(fontSize: 13)),
+                label: Text(l10n.commonContactBranch, style: const TextStyle(fontSize: 13)),
                 style: FilledButton.styleFrom(
                   backgroundColor: MicrofiColors.secondary,
                   foregroundColor: Colors.white,
@@ -139,6 +141,7 @@ class OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(MicrofiSpacing.card),
       decoration: BoxDecoration(
@@ -159,9 +162,9 @@ class OfflineBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Offline Mode', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
+                Text(l10n.offlineModeTitle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
                 Text(
-                  pendingCount == 1 ? '1 collection pending sync' : '$pendingCount collections pending sync',
+                  l10n.offlineCollectionsPendingSync(pendingCount),
                   style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
                 ),
               ],
@@ -179,7 +182,7 @@ class OfflineBanner extends StatelessWidget {
               ),
               child: syncing
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sync Now', style: TextStyle(fontSize: 12)),
+                  : Text(l10n.syncNowButton, style: const TextStyle(fontSize: 12)),
             ),
         ],
       ),

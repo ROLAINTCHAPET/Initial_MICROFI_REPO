@@ -5,8 +5,10 @@ import { Modal } from "@/components/Modal";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export function ResetPasswordModal({ userId, login }: { userId: string; login: string }) {
+  const dict = useDictionary();
   const [open, setOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function ResetPasswordModal({ userId, login }: { userId: string; login: s
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to reset password");
+        setError(body?.message ?? dict.team.resetPassword.failedToReset);
         return;
       }
       setSucceeded(true);
@@ -40,7 +42,7 @@ export function ResetPasswordModal({ userId, login }: { userId: string; login: s
         setSucceeded(false);
       }, 800);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -50,16 +52,16 @@ export function ResetPasswordModal({ userId, login }: { userId: string; login: s
     <>
       <Button variant="ghost" onClick={() => setOpen(true)}>
         <Icon name="lock" className="size-5" />
-        Reset Password
+        {dict.team.resetPassword.button}
       </Button>
-      <Modal open={open} onClose={close} title="Reset Password">
+      <Modal open={open} onClose={close} title={dict.team.resetPassword.title}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="text-sm text-on-surface-variant">
-            Set a new password for <span className="font-semibold text-on-surface">{login}</span>. They will need to sign in with it
-            next time — no confirmation from their current password is required.
+            {dict.team.resetPassword.descriptionPrefix} <span className="font-semibold text-on-surface">{login}</span>
+            {dict.team.resetPassword.descriptionSuffix}
           </p>
           <Input
-            label="New Password (min. 8 characters)"
+            label={dict.team.resetPassword.newPasswordLabel}
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -70,16 +72,16 @@ export function ResetPasswordModal({ userId, login }: { userId: string; login: s
           {error && <p role="alert" className="text-sm text-danger-red">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
             <Button type="button" variant="ghost" onClick={close} disabled={succeeded}>
-              Cancel
+              {dict.common.cancel}
             </Button>
             <Button type="submit" variant={succeeded ? "success" : "primary"} loading={loading} disabled={succeeded}>
               {succeeded ? (
                 <>
                   <Icon name="check-circle" className="size-5" />
-                  Reset
+                  {dict.team.resetPassword.resetDone}
                 </>
               ) : (
-                "Set New Password"
+                dict.team.resetPassword.setNewPassword
               )}
             </Button>
           </div>

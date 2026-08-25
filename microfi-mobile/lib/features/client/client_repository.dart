@@ -35,6 +35,10 @@ class ClientSelfRepository {
     return ClientSelfProfile.fromJson(json);
   }
 
+  /// Not called from any screen right now — balance display was pulled from the UI since it isn't
+  /// backed by a real CBS yet (see client_home_screen.dart/client_wallet_screen.dart). Kept here,
+  /// not deleted, since the endpoint itself is real and this is expected to come back once a real
+  /// CBS integration lands.
   Future<ClientBalance> fetchBalance() async {
     final json = await _client.get('/clients/me/balance') as Map<String, dynamic>;
     return ClientBalance.fromJson(json);
@@ -50,5 +54,13 @@ class ClientSelfRepository {
   Future<List<ClientRecentCollection>> fetchRecentCollections() async {
     final json = await _client.get('/clients/me/recent-collections') as List<dynamic>;
     return json.map((e) => ClientRecentCollection.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// UC-19 step 3: the client's own half of the two-party activation gate — re-enters their PIN
+  /// to confirm the agent's cash-receipt record is correct (BR-04). Safe to call even if the
+  /// agent hasn't sponsored yet; the response's status just comes back AWAITING_SPONSORSHIP.
+  Future<ClientActivationConfirmation> confirmActivationPayment(String pin) async {
+    final json = await _client.post('/clients/me/activation/pay', {'pin': pin});
+    return ClientActivationConfirmation.fromJson(json);
   }
 }

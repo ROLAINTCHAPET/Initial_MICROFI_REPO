@@ -6,6 +6,8 @@ import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.domain.BranchScheduleDefaults;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.repository.BranchScheduleDefaultsRepository;
+import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.notifications.service.NotificationService;
 import com.microfi.shared.dto.BranchDefaultCeilingPctRequest;
 import com.microfi.shared.dto.BranchMaxCashiersRequest;
 import com.microfi.shared.dto.BranchPhoneRequest;
@@ -55,6 +57,8 @@ public class BranchController {
 
     private final BranchRepository branchRepository;
     private final BranchScheduleDefaultsRepository scheduleDefaultsRepository;
+    private final AgentDirectoryService agentDirectoryService;
+    private final NotificationService notificationService;
 
     @GetMapping("/schedule-defaults")
     @Operation(summary = "Get Global Schedule Defaults", description = "Organization-wide default working hours (FR-15). Falls back to 08:00-17:00 until an ADMIN sets one explicitly. Any Back-Office role.")
@@ -191,7 +195,7 @@ public class BranchController {
     }
 
     @PutMapping("/{id}/schedule")
-    @Operation(summary = "Configure Branch Schedule", description = "Sets the session opening/closing time windows enforced on agent sessions (FR-15). ADMIN or that branch's own BRANCH_MANAGER.")
+    @Operation(summary = "Configure Branch Schedule", description = "Sets the session opening/closing time windows enforced on agent sessions (FR-15). Once today's opening time has passed (branch's own timezone), openTime is locked for the rest of the day — only closeTime can still be changed; check openTimeLocked on GET before submitting. Changing closeTime notifies every agent at the branch (SMS + in-app notice). ADMIN or that branch's own BRANCH_MANAGER.")
     public Mono<BranchResponse> putSchedule(@PathVariable UUID id, @Valid @RequestBody ScheduleRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> {
@@ -201,9 +205,22 @@ public class BranchController {
                             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "openTime must be before closeTime");
                         }
                         Branch branch = findBranchOrThrow(id);
+
+                        boolean openTimeChanged = !java.util.Objects.equals(branch.getOpenTime(), request.getOpenTime());
+                        if (openTimeChanged && agentDirectoryService.isBranchPastOpenTime(branch)) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                    "Today's opening time (" + branch.getOpenTime() + ") has already passed and can no longer be changed — only closing time can still be updated today.");
+                        }
+                        boolean closeTimeChanged = !java.util.Objects.equals(branch.getCloseTime(), request.getCloseTime());
+
                         branch.setOpenTime(request.getOpenTime());
                         branch.setCloseTime(request.getCloseTime());
-                        return toResponse(branchRepository.save(branch));
+                        Branch saved = branchRepository.save(branch);
+
+                        if (closeTimeChanged) {
+                            notificationService.notifyBranchScheduleChange(saved.getId(), saved.getName(), saved.getCloseTime());
+                        }
+                        return toResponse(saved);
                     }).subscribeOn(Schedulers.boundedElastic());
                 });
     }
@@ -221,6 +238,7 @@ public class BranchController {
                 .phone(branch.getPhone())
                 .openTime(branch.getOpenTime())
                 .closeTime(branch.getCloseTime())
+                .openTimeLocked(agentDirectoryService.isBranchPastOpenTime(branch))
                 .timezone(branch.getTimezone())
                 .maxCashiers(branch.effectiveMaxCashiers())
                 .requireImei(branch.effectiveRequireImei())

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { ApiRequestError, api } from "@/lib/api";
+import { ApiRequestError, apiFetch } from "@/lib/api";
 import type { EscrowResponse } from "@/lib/types";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const body = await request.json();
+  const formData = await request.formData();
   try {
-    const escrow = await api.post<EscrowResponse>(`/agents/${id}/escrow/top-up`, body);
+    const escrow = await apiFetch<EscrowResponse>(`/agents/${id}/escrow/top-up`, {
+      method: "POST",
+      body: formData,
+    });
     return NextResponse.json(escrow);
   } catch (err) {
     if (err instanceof ApiRequestError) {

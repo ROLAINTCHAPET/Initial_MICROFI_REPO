@@ -47,6 +47,8 @@ public class RegistrationApplication {
     @Column(nullable = false)
     private String lastName;
 
+    private LocalDate dateOfBirth;
+
     @Column(nullable = false)
     private String phone;
 

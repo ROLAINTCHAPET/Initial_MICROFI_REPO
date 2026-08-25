@@ -15,6 +15,8 @@ public class BranchResponse {
     private String phone;
     private LocalTime openTime;
     private LocalTime closeTime;
+    /** Whether today's openTime has already passed (branch's own timezone) — see BranchController#putSchedule. When true, only closeTime can still be changed today. */
+    private boolean openTimeLocked;
     private String timezone;
     private int maxCashiers;
     private boolean requireImei;

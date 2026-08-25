@@ -3,6 +3,7 @@ import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../home/agent_profile.dart';
 import '../home/home_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// The funded escrow wallet (top-up balance/ceiling, administered by a cashier — see
 /// EscrowService.topUp) — distinct from Home's "Today's Collections" card, which tracks the
@@ -42,7 +43,7 @@ class _WalletScreenState extends State<WalletScreen> {
       setState(() => _escrow = escrow);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -50,6 +51,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null || _escrow == null) {
       return ListView(
@@ -58,9 +60,9 @@ class _WalletScreenState extends State<WalletScreen> {
           const SizedBox(height: 60),
           const Icon(Icons.error_outline, color: MicrofiColors.error, size: 40),
           const SizedBox(height: 12),
-          Text(_error ?? 'Wallet unavailable.', textAlign: TextAlign.center, style: const TextStyle(color: MicrofiColors.error)),
+          Text(_error ?? l10n.wsWalletUnavailable, textAlign: TextAlign.center, style: const TextStyle(color: MicrofiColors.error)),
           const SizedBox(height: 16),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
@@ -73,7 +75,7 @@ class _WalletScreenState extends State<WalletScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          const Text('Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.wsWalletTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
             padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
@@ -93,7 +95,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 16),
                     ),
                     const SizedBox(width: 10),
-                    const Text('Escrow Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(l10n.wsEscrowWalletBalance, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -117,17 +119,17 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text('Base ceiling: ${_fmt(escrow.baseCeilingXaf)} XAF', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                Text(l10n.wsBaseCeiling(_fmt(escrow.baseCeilingXaf)), style: const TextStyle(color: Colors.white70, fontSize: 11)),
               ],
             ),
           ),
           const SizedBox(height: MicrofiSpacing.gapLg),
           _InfoCard(
-            title: 'Effective Ceiling',
+            title: l10n.wsEffectiveCeilingTitle,
             rows: [
-              _InfoRow(label: 'Effective ceiling (today)', value: '${_fmt(escrow.effectiveCeilingXaf)} XAF'),
-              _InfoRow(label: "Today's collections", value: '${_fmt(escrow.cumulativeTodayXaf)} XAF'),
-              _InfoRow(label: 'Remaining today', value: '${_fmt(escrow.remainingCeilingXaf)} XAF'),
+              _InfoRow(label: l10n.wsEffectiveCeilingToday, value: l10n.amountXaf(_fmt(escrow.effectiveCeilingXaf))),
+              _InfoRow(label: l10n.wsTodaysCollectionsLabel, value: l10n.amountXaf(_fmt(escrow.cumulativeTodayXaf))),
+              _InfoRow(label: l10n.wsRemainingToday, value: l10n.amountXaf(_fmt(escrow.remainingCeilingXaf))),
             ],
           ),
           if (escrow.activeOverrideReason != null) ...[
@@ -148,7 +150,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Active waiver', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
+                        Text(l10n.wsActiveWaiver, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
                         const SizedBox(height: 2),
                         Text(escrow.activeOverrideReason!, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
                       ],
@@ -159,11 +161,11 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ],
           const SizedBox(height: MicrofiSpacing.gapLg),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Text(
-              'Wallet top-ups are administered by a branch cashier — this screen is read-only.',
-              style: TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
+              l10n.wsTopUpAdminNote,
+              style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
             ),
           ),
         ],

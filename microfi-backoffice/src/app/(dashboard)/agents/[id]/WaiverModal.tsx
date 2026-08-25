@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { TimePicker } from "@/components/TimePicker";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
 
 function defaultDate() {
   const d = new Date();
@@ -12,6 +15,7 @@ function defaultDate() {
 
 export function WaiverModal({ agentId, currentCeiling }: { agentId: string; currentCeiling: number }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [isOpen, setIsOpen] = useState(false);
   const [tempCeiling, setTempCeiling] = useState(String(Math.round(currentCeiling * 1.4) || 1_000_000));
   const [validDate, setValidDate] = useState(defaultDate());
@@ -39,7 +43,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to apply waiver");
+        setError(body?.message ?? dict.agents.waiver.failedToApply);
         return;
       }
       setSucceeded(true);
@@ -50,7 +54,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
         router.refresh();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -63,7 +67,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
         className="h-12 px-6 bg-primary text-on-primary font-semibold text-sm rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
       >
         <Icon name="pencil" className="size-5" />
-        Temporary Waiver
+        {dict.agents.waiver.temporaryWaiver}
       </button>
 
       {isOpen && (
@@ -76,15 +80,15 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                     <Icon name="pencil" className="size-5" />
                   </div>
                   <div>
-                    <h2 className="text-h2 text-primary">Temporary Ceiling Waiver</h2>
-                    <p className="text-xs text-on-surface-variant">Agent: {agentId}</p>
+                    <h2 className="text-h2 text-primary">{dict.agents.waiver.temporaryCeilingWaiver}</h2>
+                    <p className="text-xs text-on-surface-variant">{t(dict.agents.agentLabel, { id: agentId })}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={close}
                   className="text-on-surface-variant hover:text-error cursor-pointer transition-[background-color,color,transform] duration-150 ease-out hover:scale-110 active:scale-90 p-2 rounded-full hover:bg-error-container"
-                  aria-label="Close"
+                  aria-label={dict.common.close}
                 >
                   <Icon name="close" className="size-5" />
                 </button>
@@ -94,12 +98,12 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                 <div className="bg-primary-fixed/20 border border-primary-fixed p-4 rounded-[var(--radius-sm)] flex gap-3 items-start">
                   <Icon name="check-circle" className="size-5 text-primary-fixed-dim shrink-0" />
                   <div className="text-sm text-on-primary-fixed-variant">
-                    Current effective ceiling is <strong>{currentCeiling.toLocaleString()} XAF</strong>. A waiver temporarily overrides this limit to prevent collection blocking — it does not credit the agent&apos;s wallet and cannot activate a PENDING_CEILING agent. To actually fund the account, use &quot;Fund Escrow&quot; instead.
+                    {t(dict.agents.waiver.infoCurrent, { value: currentCeiling.toLocaleString() })}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary mb-2">Temporary Ceiling Amount (XAF)</label>
+                  <label className="block text-sm font-semibold text-primary mb-2">{dict.agents.waiver.tempCeilingAmount}</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant font-semibold text-xs">XAF</span>
                     <input
@@ -114,7 +118,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary mb-2">Valid Until</label>
+                  <label className="block text-sm font-semibold text-primary mb-2">{dict.agents.waiver.validUntilLabel}</label>
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       className="w-full h-12 px-3 bg-surface-container-lowest border border-outline-variant rounded-[var(--radius-sm)] text-primary text-sm focus:outline-none focus:border-2 focus:border-primary"
@@ -123,23 +127,17 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                       value={validDate}
                       onChange={(e) => setValidDate(e.target.value)}
                     />
-                    <input
-                      className="w-full h-12 px-3 bg-surface-container-lowest border border-outline-variant rounded-[var(--radius-sm)] text-primary text-sm focus:outline-none focus:border-2 focus:border-primary"
-                      type="time"
-                      required
-                      value={validTime}
-                      onChange={(e) => setValidTime(e.target.value)}
-                    />
+                    <TimePicker value={validTime} onChange={setValidTime} />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-primary mb-2">
-                    Reason for Waiver <span className="text-error">*</span>
+                    {dict.agents.waiver.reasonLabel} <span className="text-error">*</span>
                   </label>
                   <textarea
                     className="w-full p-4 bg-surface-container-lowest border border-outline-variant rounded-[var(--radius-sm)] text-primary text-sm focus:outline-none focus:border-2 focus:border-primary resize-none min-h-[100px]"
-                    placeholder="Provide a mandatory business justification for this temporary increase..."
+                    placeholder={dict.agents.waiver.reasonPlaceholder}
                     required
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -155,7 +153,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                   onClick={close}
                   className="h-12 px-8 bg-surface-container-lowest border-2 border-primary text-primary font-semibold text-sm rounded-[var(--radius-md)] cursor-pointer hover:bg-surface-container-low transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] order-2 sm:order-1"
                 >
-                  Cancel
+                  {dict.common.cancel}
                 </button>
                 <button
                   type="submit"
@@ -167,12 +165,12 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                   {succeeded ? (
                     <>
                       <Icon name="check-circle" className="size-5" />
-                      Waiver Applied
+                      {dict.agents.waiver.waiverApplied}
                     </>
                   ) : loading ? (
-                    "Applying…"
+                    dict.agents.waiver.applying
                   ) : (
-                    "Approve Waiver"
+                    dict.agents.waiver.approveWaiver
                   )}
                 </button>
               </div>

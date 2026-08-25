@@ -3,15 +3,19 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/Input";
+import { TimePicker } from "@/components/TimePicker";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 // Shared by BranchSettingsModal (ADMIN, editing any branch from the Branch Directory) and the
-// BRANCH_MANAGER's own /settings page — same three fields, same save behavior either way.
+// BRANCH_MANAGER's own /settings page — one edit surface for everything a branch controls about
+// itself, including working hours.
 export function BranchSettingsForm({
   branchId,
   openTime,
   closeTime,
+  openTimeLocked,
   phone,
   maxCashiers,
   requireImei,
@@ -22,6 +26,7 @@ export function BranchSettingsForm({
   branchId: string;
   openTime: string | null;
   closeTime: string | null;
+  openTimeLocked: boolean;
   phone: string | null;
   maxCashiers: number;
   requireImei: boolean;
@@ -30,6 +35,7 @@ export function BranchSettingsForm({
   onSaved?: () => void;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [openTimeValue, setOpenTimeValue] = useState(openTime?.slice(0, 5) ?? "08:00");
   const [closeTimeValue, setCloseTimeValue] = useState(closeTime?.slice(0, 5) ?? "17:00");
   const [phoneValue, setPhoneValue] = useState(phone ?? "");
@@ -45,7 +51,7 @@ export function BranchSettingsForm({
     setError(null);
     setLoading(true);
     try {
-      const requests = [
+      const requests: Promise<Response>[] = [
         fetch(`/api/branches/${branchId}/schedule`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -92,7 +98,7 @@ export function BranchSettingsForm({
       const failed = results.find((res) => !res.ok);
       if (failed) {
         const body = await failed.json().catch(() => null);
-        setError(body?.message ?? "Failed to save branch settings");
+        setError(body?.message ?? dict.branches.settingsForm.failedToSave);
         return;
       }
       setSucceeded(true);
@@ -102,7 +108,7 @@ export function BranchSettingsForm({
         onSaved?.();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -111,28 +117,18 @@ export function BranchSettingsForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="Open Time"
-          name="openTime"
-          type="time"
-          icon={<Icon name="clock" className="size-5" />}
-          value={openTimeValue}
-          onChange={(e) => setOpenTimeValue(e.target.value)}
-          required
-        />
-        <Input
-          label="Close Time"
-          name="closeTime"
-          type="time"
-          icon={<Icon name="clock" className="size-5" />}
-          value={closeTimeValue}
-          onChange={(e) => setCloseTimeValue(e.target.value)}
-          required
-        />
+        <div>
+          <TimePicker label={dict.branches.settingsForm.openTimeLabel} name="openTime" value={openTimeValue} onChange={setOpenTimeValue} disabled={openTimeLocked} />
+          {openTimeLocked && (
+            <p className="text-xs text-on-surface-variant mt-1">{dict.branches.settingsForm.openTimeLockedNote}</p>
+          )}
+        </div>
+        <TimePicker label={dict.branches.settingsForm.closeTimeLabel} name="closeTime" value={closeTimeValue} onChange={setCloseTimeValue} />
       </div>
+      <p className="text-xs text-on-surface-variant -mt-2">{dict.branches.settingsForm.closeTimeHint}</p>
       <div>
         <Input
-          label="Contact Number"
+          label={dict.dashboard.contactNumber}
           name="phone"
           type="tel"
           icon={<Icon name="phone" className="size-5" />}
@@ -140,11 +136,11 @@ export function BranchSettingsForm({
           value={phoneValue}
           onChange={(e) => setPhoneValue(e.target.value)}
         />
-        <p className="text-xs text-on-surface-variant mt-1">Reached by field agents via &ldquo;Contact Branch&rdquo; in the mobile app.</p>
+        <p className="text-xs text-on-surface-variant mt-1">{dict.branches.settingsForm.contactHint}</p>
       </div>
       <div>
         <Input
-          label="Cashier Cap"
+          label={dict.branches.settingsForm.cashierCapLabel}
           name="maxCashiers"
           type="number"
           min={1}
@@ -153,11 +149,11 @@ export function BranchSettingsForm({
           onChange={(e) => setMaxCashiersValue(e.target.value)}
           required
         />
-        <p className="text-xs text-on-surface-variant mt-1">Maximum active branch cashiers at once. Registering beyond this requires replacing an existing cashier.</p>
+        <p className="text-xs text-on-surface-variant mt-1">{dict.branches.settingsForm.cashierCapHint}</p>
       </div>
       <div>
         <Input
-          label="Default Ceiling %"
+          label={dict.branches.settingsForm.defaultCeilingLabel}
           name="defaultCeilingPct"
           type="number"
           min={1}
@@ -167,7 +163,7 @@ export function BranchSettingsForm({
           required
         />
         <p className="text-xs text-on-surface-variant mt-1">
-          Escrow ceiling granted per XAF of security deposit when an agent&apos;s escrow is funded — 100% grants a ceiling equal to the deposit, 150% grants 1.5x. Applies to every future top-up for agents at this branch; a manual waiver or an individual top-up can still be used to adjust any one agent regardless of this default.
+          {dict.branches.settingsForm.defaultCeilingHint}
         </p>
       </div>
       <div className="flex items-start gap-3 p-3 rounded-[var(--radius-sm)] border-2 border-outline-variant">
@@ -179,9 +175,9 @@ export function BranchSettingsForm({
           className="mt-0.5 size-4 cursor-pointer accent-primary"
         />
         <label htmlFor="require-imei" className="cursor-pointer">
-          <p className="text-sm font-semibold text-on-surface">Require device IMEI for new agents</p>
+          <p className="text-sm font-semibold text-on-surface">{dict.branches.settingsForm.requireImeiLabel}</p>
           <p className="text-xs text-on-surface-variant mt-1">
-            Disable if agents at this branch use their own phone to collect — new agents can be enrolled without a bound device. Already-enrolled agents are unaffected.
+            {dict.branches.settingsForm.requireImeiHint}
           </p>
         </label>
       </div>
@@ -189,17 +185,17 @@ export function BranchSettingsForm({
       <div className="flex justify-end gap-2 mt-2">
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel} disabled={succeeded}>
-            Cancel
+            {dict.common.cancel}
           </Button>
         )}
         <Button type="submit" variant={succeeded ? "success" : "primary"} loading={loading} disabled={succeeded}>
           {succeeded ? (
             <>
               <Icon name="check-circle" className="size-5" />
-              Saved
+              {dict.branches.settingsForm.saved}
             </>
           ) : (
-            "Save Settings"
+            dict.branches.settingsForm.saveSettings
           )}
         </Button>
       </div>

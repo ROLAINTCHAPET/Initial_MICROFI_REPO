@@ -6,6 +6,7 @@ import '../auth/role_select_screen.dart';
 import 'client_models.dart';
 import 'client_repository.dart';
 import 'client_shell.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Resolves the client's own profile once after login/session-restore, then hands off to
 /// ClientShell — mirrors SessionEntry's role for the agent side.
@@ -35,7 +36,7 @@ class _ClientSessionEntryState extends State<ClientSessionEntry> {
       setState(() => _profile = profile);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     }
   }
 
@@ -47,6 +48,7 @@ class _ClientSessionEntryState extends State<ClientSessionEntry> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_error != null) {
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -60,7 +62,7 @@ class _ClientSessionEntryState extends State<ClientSessionEntry> {
                 const SizedBox(height: 10),
                 Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.error)),
                 const SizedBox(height: 14),
-                FilledButton(onPressed: _signOut, child: const Text('Sign In Again')),
+                FilledButton(onPressed: _signOut, child: Text(l10n.seSignInAgain)),
               ],
             ),
           ),

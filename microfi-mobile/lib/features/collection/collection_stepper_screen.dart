@@ -1,13 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/api_client.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
+import '../../core/local_ceiling_cache.dart';
+import '../../core/local_pin_verifier.dart';
+import '../../core/locale_preference.dart';
 import '../../core/location.dart';
+import '../../core/offline_receipt_composer.dart';
 import '../../core/printer_service.dart';
+import '../../core/qr_receipt_signer.dart';
+import '../../core/receipt_context_cache.dart';
+import '../../core/receipt_file_service.dart';
+import 'receipt_qr_screen.dart';
 import '../../core/status_components.dart';
 import '../home/agent_profile.dart';
 import '../home/contact_branch.dart';
@@ -17,6 +26,8 @@ import 'client_repository.dart';
 import 'collection_repository.dart';
 import 'notification_repository.dart';
 import 'offline_queue_repository.dart';
+import 'receipt_models.dart';
+import '../../l10n/app_localizations.dart';
 
 const List<int> _denominations = [10000, 5000, 2000, 1000, 500, 200, 100, 50, 25];
 
@@ -24,9 +35,15 @@ const List<int> _denominations = [10000, 5000, 2000, 1000, 500, 200, 100, 50, 25
 /// count denominations (with a live daily-ceiling preview), confirm and submit.
 class CollectionStepperScreen extends StatefulWidget {
   final String token;
-  final String agentId;
+  final AgentProfile profile;
 
-  const CollectionStepperScreen({super.key, required this.token, required this.agentId});
+  const CollectionStepperScreen({super.key, required this.token, required this.profile});
+
+  /// Kept as a convenience getter (not a stored field) so the ~7 existing internal uses of
+  /// widget.agentId didn't need touching when this changed from a bare id to the full profile —
+  /// needed now for employeeCode/fullName on an offline-composed receipt (see
+  /// OfflineReceiptComposer), which a bare id can't provide without a network round-trip.
+  String get agentId => profile.id;
 
   @override
   State<CollectionStepperScreen> createState() => _CollectionStepperScreenState();
@@ -38,6 +55,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   late final HomeRepository _homeRepository = HomeRepository(widget.token);
   late final NotificationRepository _notificationRepository = NotificationRepository(widget.token);
   final PrinterService _printerService = PrinterService();
+  final ReceiptFileService _receiptFileService = ReceiptFileService();
 
   int _step = 0;
 
@@ -55,6 +73,8 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   String? _locationError;
   bool _locating = false;
   EscrowStatus? _escrow;
+  CeilingSnapshot? _cachedCeiling;
+  int _queuedTodayXaf = 0;
 
   // Step 3 — confirm/submit
   final _pinController = TextEditingController();
@@ -63,9 +83,17 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   CollectionResult? _result;
   bool _queuedOffline = false;
   String? _receiptText;
+  ReceiptData? _receiptData;
+  /// Set only for an offline-composed receipt (see _composeOfflineReceipt) — there's no
+  /// server-confirmed CollectionResult.id to key a filename off yet.
+  String? _offlineDeviceTxId;
+  QrReceiptPayload? _qrPayload;
   bool _printing = false;
   bool _printed = false;
   String? _printError;
+  bool _downloading = false;
+  bool _downloaded = false;
+  String? _downloadError;
 
   @override
   void initState() {
@@ -103,7 +131,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       setState(() => _searchError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _searchError = 'Unable to reach the server.');
+      setState(() => _searchError = AppLocalizations.of(context)!.errorUnableToReachServerShort);
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -127,6 +155,9 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       final position = await captureCurrentLocation();
       if (!mounted) return;
       setState(() => _position = position);
+    } on LocationUnavailable catch (e) {
+      if (!mounted) return;
+      setState(() => _locationError = e.message(AppLocalizations.of(context)!));
     } catch (e) {
       if (!mounted) return;
       setState(() => _locationError = e.toString());
@@ -142,19 +173,64 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       final escrow = await _homeRepository.fetchEscrow(widget.agentId);
       if (!mounted) return;
       setState(() => _escrow = escrow);
+      LocalCeilingCache(widget.agentId).save(effectiveCeilingXaf: escrow.effectiveCeilingXaf, cumulativeTodayXaf: escrow.cumulativeTodayXaf);
     } catch (_) {
-      // Live ceiling preview is a courtesy, not a gate — the server still enforces BR-03 on submit.
+      // No connectivity (or a transient failure) — fall back to the last snapshot the server
+      // actually confirmed, so the offline path still has something to check against instead of
+      // flying blind until sync.
+      final cached = await LocalCeilingCache(widget.agentId).read();
+      if (!mounted) return;
+      setState(() => _cachedCeiling = cached);
     }
+    await _refreshQueuedTodayTotal();
+  }
+
+  /// Neither a live escrow fetch nor the cached snapshot reflects collections still sitting in the
+  /// offline queue (the server hasn't seen them yet either way) — so both paths need this added on
+  /// top to get a realistic projected total.
+  Future<void> _refreshQueuedTodayTotal() async {
+    final pending = await OfflineQueueRepository(widget.agentId).list();
+    final now = DateTime.now().toUtc();
+    final total = pending
+        .where((c) {
+          final collectedAt = DateTime.tryParse(c.collectedAtIso)?.toUtc();
+          return collectedAt != null && collectedAt.year == now.year && collectedAt.month == now.month && collectedAt.day == now.day;
+        })
+        .fold(0, (sum, c) => sum + c.amountXaf);
+    if (!mounted) return;
+    setState(() => _queuedTodayXaf = total);
+  }
+
+  /// Ceiling, projected total, and whether it would exceed — shared by the live preview card and
+  /// the offline submit gate so the two can never silently disagree. hasInfo false means neither a
+  /// live fetch nor a cached snapshot has ever succeeded (a fresh install's very first collection,
+  /// offline, before Home has loaded once) — there's nothing to check against yet, so this doesn't
+  /// block; the server still catches it at sync, same as before this feature existed.
+  ({int ceiling, int projected, bool wouldExceed, bool hasInfo}) _ceilingCheck() {
+    final ceiling = _escrow?.effectiveCeilingXaf ?? _cachedCeiling?.effectiveCeilingXaf ?? 0;
+    final baseline = _escrow?.cumulativeTodayXaf ?? (_cachedCeiling?.cumulativeIsFromToday == true ? _cachedCeiling!.cumulativeTodayXaf : 0);
+    final hasInfo = _escrow != null || _cachedCeiling != null;
+    final projected = baseline + _queuedTodayXaf + _total;
+    return (ceiling: ceiling, projected: projected, wouldExceed: hasInfo && ceiling > 0 && projected > ceiling, hasInfo: hasInfo);
   }
 
   int get _total => _denominations.fold(0, (sum, d) => sum + d * (_counts[d] ?? 0));
 
   Future<void> _submit() async {
     if (_total <= 0 || _position == null || _client == null) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _submitting = true;
       _submitError = null;
     });
+
+    if (_pinController.text.isEmpty) {
+      setState(() {
+        _submitError = l10n.csPinRequiredError;
+        _submitting = false;
+      });
+      return;
+    }
 
     final deviceTxId = const Uuid().v4();
     final lines = _denominations
@@ -164,9 +240,43 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
 
     final online = await ConnectivityService.instance.isOnline();
     if (!online) {
-      // No PIN collected here — it's never persisted to the local offline queue, only prompted
-      // once at sync time (Home's "Sync Now"), so a stolen/rooted phone with a local queue file
-      // never has the PIN sitting on disk.
+      // Checked locally before anything is queued or handed to the client — a wrong PIN caught
+      // here costs a retry; a wrong PIN only caught at sync means the client already has a
+      // receipt for a collection the server is about to reject. See LocalPinVerifier.
+      final pinVerifier = LocalPinVerifier(widget.agentId);
+      final lockout = await pinVerifier.lockoutRemaining();
+      if (lockout != null) {
+        setState(() {
+          _submitError = l10n.csTooManyPinAttempts(lockout.inMinutes + 1);
+          _submitting = false;
+        });
+        return;
+      }
+      if (!await pinVerifier.verify(_pinController.text)) {
+        setState(() {
+          _submitError = l10n.csIncorrectPin;
+          _submitting = false;
+        });
+        return;
+      }
+
+      // Same reasoning as the PIN check above, applied to BR-03: blocked here, before the client
+      // is handed a receipt, using the last ceiling/cumulative the server actually confirmed (see
+      // LocalCeilingCache) — not after the fact at sync, when the cash is already collected.
+      final check = _ceilingCheck();
+      if (check.hasInfo && check.wouldExceed) {
+        setState(() {
+          _submitError = l10n.csCeilingExceedOfflineMessage(_fmt(check.projected), _fmt(check.ceiling));
+          _submitting = false;
+        });
+        return;
+      }
+
+      // The PIN entered just now travels with the queued item (encrypted, see
+      // OfflineQueueRepository) so sync can upload it the moment connectivity returns with no
+      // second prompt — this is the same one-time PIN confirmation an online collection already
+      // requires, not a weaker check.
+      final collectedAt = DateTime.now().toUtc();
       await OfflineQueueRepository(widget.agentId).add(PendingCollection(
         deviceTxId: deviceTxId,
         clientId: _client!.id,
@@ -175,20 +285,16 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         lat: _position!.latitude,
         lon: _position!.longitude,
         accuracyM: _position!.accuracy,
-        collectedAtIso: DateTime.now().toUtc().toIso8601String(),
+        collectedAtIso: collectedAt.toIso8601String(),
         denominationLines: lines,
+        pin: _pinController.text,
       ));
+      await _refreshQueuedTodayTotal();
+      await _composeOfflineReceipt(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
+      await _composeQrPayload(uniqueRef: deviceTxId, collectedAt: collectedAt, lines: lines);
       if (!mounted) return;
       setState(() {
         _queuedOffline = true;
-        _submitting = false;
-      });
-      return;
-    }
-
-    if (_pinController.text.isEmpty) {
-      setState(() {
-        _submitError = 'Enter your PIN to confirm this collection.';
         _submitting = false;
       });
       return;
@@ -207,11 +313,13 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       );
       if (!mounted) return;
       setState(() => _result = result);
+      LocalPinVerifier(widget.agentId).seed(_pinController.text);
       _notifyAfterSuccess(result.id);
+      _composeQrPayload(uniqueRef: result.id, collectedAt: DateTime.now().toUtc(), lines: lines);
     } on ApiException catch (e) {
       setState(() => _submitError = e.message);
     } catch (_) {
-      setState(() => _submitError = 'Unable to reach the server.');
+      setState(() => _submitError = l10n.errorUnableToReachServerShort);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -224,7 +332,10 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     try {
       final result = await _notificationRepository.notifyCollection(collectionId, printedReceipt: false);
       if (!mounted) return;
-      setState(() => _receiptText = result.receiptText);
+      setState(() {
+        _receiptText = result.receiptText;
+        _receiptData = result.receiptData;
+      });
     } catch (_) {
       // Silent — SMS delivery status isn't something the agent needs to act on here; the
       // Back-Office notification audit log is the place to investigate a failed send.
@@ -234,6 +345,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   Future<void> _printReceipt() async {
     final receiptText = _receiptText;
     if (receiptText == null) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _printing = true;
       _printError = null;
@@ -251,7 +363,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       }
       final success = await _printerService.printReceipt(receiptText, printer: printer);
       if (!success) {
-        throw PrinterUnavailable('Printer did not confirm the print.');
+        throw PrinterUnavailable(PrinterUnavailableReason.didNotConfirm);
       }
       if (_result != null) {
         await _notificationRepository.notifyCollection(_result!.id, printedReceipt: true);
@@ -260,30 +372,63 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       setState(() => _printed = true);
     } on PrinterUnavailable catch (e) {
       if (!mounted) return;
-      setState(() => _printError = e.message);
+      setState(() => _printError = e.message(l10n));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _printError = 'Could not print the receipt.');
+      setState(() => _printError = l10n.csCouldNotPrintReceipt);
     } finally {
       if (mounted) setState(() => _printing = false);
     }
   }
 
+  /// Renders the styled receipt as a PDF and opens it immediately — no printer needed, and no
+  /// share sheet — so the agent has proof on the device alongside (or instead of) the physical slip.
+  /// fileNameHint falls back to deviceTxId for an offline-composed receipt, which has no
+  /// server-confirmed collection id yet (see _composeOfflineReceipt) — same purpose, just whichever
+  /// unique reference actually exists at this point.
+  Future<void> _downloadReceipt() async {
+    final receiptData = _receiptData;
+    if (receiptData == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    final fileNameHint = _result?.id.substring(0, 8) ?? _offlineDeviceTxId ?? 'receipt';
+    setState(() {
+      _downloading = true;
+      _downloadError = null;
+    });
+    try {
+      await _receiptFileService.downloadReceipt(receiptData, fileNameHint: fileNameHint, l10n: l10n);
+      if (!mounted) return;
+      setState(() => _downloaded = true);
+    } on ReceiptFileDownloadFailed catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _downloaded = true;
+        _downloadError = l10n.csReceiptSavedCouldNotOpen(e.message);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _downloadError = l10n.csCouldNotDownloadReceipt);
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
   Future<PairedPrinter?> _pickPrinter() async {
+    final l10n = AppLocalizations.of(context)!;
     if (!await _printerService.isReady()) {
-      setState(() => _printError = 'Turn on Bluetooth and grant permission, then try again.');
+      setState(() => _printError = l10n.csBluetoothPermissionNeeded);
       return null;
     }
     final printers = await _printerService.pairedPrinters();
     if (!mounted) return null;
     if (printers.isEmpty) {
-      setState(() => _printError = 'No paired thermal printer found — pair one in your phone\'s Bluetooth settings first.');
+      setState(() => _printError = l10n.csNoPairedPrinterFound);
       return null;
     }
     return showDialog<PairedPrinter>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Select Thermal Printer'),
+        title: Text(l10n.csSelectThermalPrinter),
         children: printers
             .map((p) => SimpleDialogOption(
                   onPressed: () => Navigator.of(context).pop(p),
@@ -304,6 +449,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -313,7 +459,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _back),
-          title: const Text('Collect Cash'),
+          title: Text(l10n.csCollectCashTitle),
         ),
         body: SafeArea(
           child: Column(
@@ -342,6 +488,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   }
 
   Widget _buildClientStep() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         Padding(
@@ -354,7 +501,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
               _search();
             },
             decoration: InputDecoration(
-              hintText: 'Name, phone, or member number',
+              hintText: l10n.csSearchHint,
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isEmpty ? null : IconButton(icon: const Icon(Icons.clear), onPressed: _searchController.clear),
             ),
@@ -367,7 +514,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              _searchController.text.trim().isEmpty ? 'No clients registered yet.' : 'No clients found for that search.',
+              _searchController.text.trim().isEmpty ? l10n.csNoClientsRegistered : l10n.csNoClientsFound,
               style: const TextStyle(color: MicrofiColors.onSurfaceVariant),
             ),
           ),
@@ -388,7 +535,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text('${c.mfiMemberNo} • ${c.phone}'),
+                  subtitle: Text(l10n.csClientSubtitle(c.mfiMemberNo, c.phone)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _selectClient(c),
                 ),
@@ -401,11 +548,13 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   }
 
   Widget _buildDenominationsStep() {
+    final l10n = AppLocalizations.of(context)!;
     final client = _client!;
     final canContinue = _total > 0 && _position != null;
-    final projected = (_escrow?.cumulativeTodayXaf ?? 0) + _total;
-    final ceiling = _escrow?.effectiveCeilingXaf ?? 0;
-    final wouldExceed = _escrow != null && ceiling > 0 && projected > ceiling;
+    final check = _ceilingCheck();
+    final projected = check.projected;
+    final ceiling = check.ceiling;
+    final wouldExceed = check.wouldExceed;
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -423,14 +572,14 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
               Expanded(
                 child: Text(
                   _locating
-                      ? 'Capturing GPS location…'
+                      ? l10n.csCapturingGps
                       : _position != null
-                          ? 'Location captured (±${_position!.accuracy.round()}m)'
-                          : (_locationError ?? 'Location unavailable'),
+                          ? l10n.csLocationCaptured(_position!.accuracy.round())
+                          : (_locationError ?? l10n.csLocationUnavailable),
                   style: TextStyle(color: _locationError != null ? MicrofiColors.error : MicrofiColors.onSurfaceVariant),
                 ),
               ),
-              if (!_locating && _position == null) TextButton(onPressed: _captureLocation, child: const Text('Retry')),
+              if (!_locating && _position == null) TextButton(onPressed: _captureLocation, child: Text(l10n.commonRetry)),
             ],
           ),
         ),
@@ -448,9 +597,9 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
                 decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MicrofiColors.outlineVariant))),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('Denomination Breakdown', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                    Icon(Icons.payments, color: MicrofiColors.outline),
+                  children: [
+                    Text(l10n.csDenominationBreakdown, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    const Icon(Icons.payments, color: MicrofiColors.outline),
                   ],
                 ),
               ),
@@ -471,20 +620,20 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
                 ),
                 child: Column(
                   children: [
-                    const Text('CALCULATED TOTAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.5)),
+                    Text(l10n.csCalculatedTotal, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.5)),
                     const SizedBox(height: 6),
-                    Text('${_fmt(_total)} XAF', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                    Text(l10n.amountXaf(_fmt(_total)), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
                   ],
                 ),
               ),
             ],
           ),
         ),
-        if (_escrow != null) ...[
+        if (check.hasInfo) ...[
           const SizedBox(height: 12),
           if (wouldExceed)
             EscrowCeilingReachedCard(
-              message: 'This collection would push you to ${_fmt(projected)} / ${_fmt(ceiling)} XAF — ${_fmt(projected - ceiling)} XAF over your daily ceiling.',
+              message: l10n.csEscrowExceedMessage(_fmt(projected), _fmt(ceiling), _fmt(projected - ceiling)),
               onContactBranch: _contactBranch,
             )
           else
@@ -497,7 +646,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
           child: FilledButton.icon(
             onPressed: canContinue ? () => setState(() => _step = 2) : null,
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('Verify & Continue'),
+            label: Text(l10n.csVerifyAndContinue),
             style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.full))),
           ),
         ),
@@ -506,6 +655,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   }
 
   Widget _buildConfirmStep() {
+    final l10n = AppLocalizations.of(context)!;
     final client = _client!;
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -516,15 +666,15 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Confirm Collection', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              Text(l10n.csConfirmCollectionTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
               const SizedBox(height: 12),
               ..._denominations.where((d) => (_counts[d] ?? 0) > 0).map((d) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('$d XAF × ${_counts[d]}', style: const TextStyle(color: MicrofiColors.onSurfaceVariant)),
-                        Text('${_fmt(d * (_counts[d] ?? 0))} XAF', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(l10n.csDenominationLine(d, _counts[d] ?? 0), style: const TextStyle(color: MicrofiColors.onSurfaceVariant)),
+                        Text(l10n.amountXaf(_fmt(d * (_counts[d] ?? 0))), style: const TextStyle(fontWeight: FontWeight.w600)),
                       ],
                     ),
                   )),
@@ -532,13 +682,13 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                  Text('${_fmt(_total)} XAF', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                  Text(l10n.commonTotal, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  Text(l10n.amountXaf(_fmt(_total)), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
-                'Location: ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)} (±${_position!.accuracy.round()}m)',
+                l10n.csLocationLine(_position!.latitude.toStringAsFixed(5), _position!.longitude.toStringAsFixed(5), _position!.accuracy.round()),
                 style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
               ),
             ],
@@ -548,13 +698,14 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         _Card(
           child: TextField(
             controller: _pinController,
-            decoration: const InputDecoration(
-              labelText: 'Enter Your PIN to Confirm',
-              prefixIcon: Icon(Icons.lock_outline),
+            decoration: InputDecoration(
+              labelText: l10n.csEnterPinToConfirm,
+              prefixIcon: const Icon(Icons.lock_outline),
               border: InputBorder.none,
             ),
             obscureText: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
         ),
         if (_submitError != null) ...[
@@ -573,7 +724,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
             onPressed: _submitting ? null : _submit,
             child: _submitting
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Record Collection'),
+                : Text(l10n.csRecordCollection),
           ),
         ),
       ],
@@ -581,50 +732,169 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   }
 
   Widget _buildSuccess() {
+    final l10n = AppLocalizations.of(context)!;
     final result = _result!;
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
         const SizedBox(height: 20),
         SuccessCard(
-          title: result.duplicate ? 'Already Recorded' : 'Collection Validated',
+          title: result.duplicate ? l10n.csAlreadyRecorded : l10n.csCollectionValidated,
           subtitle: result.locationName != null
-              ? 'Transaction ID: ${result.id.substring(0, 8).toUpperCase()} • ${result.locationName}'
-              : 'Transaction ID: ${result.id.substring(0, 8).toUpperCase()}',
-          amountLabel: 'Amount Collected',
-          amountValue: '${_fmt(result.amountXaf)} XAF',
+              ? l10n.csTransactionIdWithLocation(result.id.substring(0, 8).toUpperCase(), result.locationName!)
+              : l10n.csTransactionId(result.id.substring(0, 8).toUpperCase()),
+          amountLabel: l10n.csAmountCollected,
+          amountValue: l10n.amountXaf(_fmt(result.amountXaf)),
         ),
-        if (_receiptText != null) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: _printing || _printed ? null : _printReceipt,
-              icon: Icon(_printed ? Icons.check_circle : Icons.print, size: 18),
-              label: Text(_printed ? 'Receipt Printed' : (_printing ? 'Printing…' : 'Print Receipt')),
-            ),
-          ),
-          if (_printError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(_printError!, style: const TextStyle(color: MicrofiColors.error, fontSize: 12)),
-            ),
-        ],
+        ..._receiptActionWidgets(),
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           height: 44,
           child: FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Done'),
+            child: Text(l10n.commonDone),
           ),
         ),
       ],
     );
   }
 
+  /// Shared by the online success screen and the offline-queued screen — a wrong PIN or a missing
+  /// printer looks and behaves identically either way; only how _receiptText/_receiptData got
+  /// populated differs (server-composed vs. OfflineReceiptComposer).
+  List<Widget> _receiptActionWidgets() {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      if (_receiptText != null) ...[
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: _printing || _printed ? null : _printReceipt,
+            icon: Icon(_printed ? Icons.check_circle : Icons.print, size: 18),
+            label: Text(_printed ? l10n.csReceiptPrinted : (_printing ? l10n.csPrinting : l10n.csPrintReceipt)),
+          ),
+        ),
+        if (_printError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(_printError!, style: const TextStyle(color: MicrofiColors.error, fontSize: 12)),
+          ),
+      ],
+      if (_receiptData != null) ...[
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: _downloading ? null : _downloadReceipt,
+            icon: Icon(_downloaded ? Icons.check_circle : Icons.download, size: 18),
+            label: Text(_downloaded ? l10n.csReceiptDownloaded : (_downloading ? l10n.csDownloading : l10n.csDownloadReceipt)),
+          ),
+        ),
+        if (_downloadError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(_downloadError!, style: const TextStyle(color: MicrofiColors.error, fontSize: 12)),
+          ),
+      ],
+      if (_qrPayload != null) ...[
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReceiptQrScreen(payload: _qrPayload!))),
+            icon: const Icon(Icons.qr_code_2, size: 18),
+            label: Text(l10n.csShowQrForClient),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  /// Builds the same receipt (printable text + structured PDF data) the server would have, using
+  /// only what's already known locally — no network call, since there's no connectivity to make
+  /// one. See OfflineReceiptComposer for why this stays faithful to the backend's own composers.
+  /// Best-effort: a receipt that fails to compose still leaves the collection safely queued —
+  /// this never blocks or fails the collection itself.
+  Future<void> _composeOfflineReceipt({
+    required String deviceTxId,
+    required DateTime collectedAt,
+    required List<DenominationLine> lines,
+  }) async {
+    try {
+      final context = await ReceiptContextCache().read();
+      final mfiName = context?.mfiName ?? 'MICROFI';
+      final branchName = context?.branchName ?? '—';
+      final french = LocalePreference.instance.notifier.value.languageCode == 'fr';
+      final text = OfflineReceiptComposer.composeText(
+        mfiName: mfiName,
+        branchName: branchName,
+        collectedAtUtc: collectedAt,
+        employeeCode: widget.profile.employeeCode,
+        agentFullName: widget.profile.fullName,
+        clientMemberNo: _client!.mfiMemberNo,
+        clientFullName: _client!.fullName,
+        amountXaf: _total,
+        denominationLines: lines,
+        deviceTxId: deviceTxId,
+        french: french,
+      );
+      final data = OfflineReceiptComposer.composeData(
+        branchName: branchName,
+        collectedAtUtc: collectedAt,
+        employeeCode: widget.profile.employeeCode,
+        agentFullName: widget.profile.fullName,
+        clientMemberNo: _client!.mfiMemberNo,
+        clientFullName: _client!.fullName,
+        amountXaf: _total,
+        denominationLines: lines,
+        deviceTxId: deviceTxId,
+        french: french,
+      );
+      if (!mounted) return;
+      setState(() {
+        _receiptText = text;
+        _receiptData = data;
+        _offlineDeviceTxId = deviceTxId;
+      });
+    } catch (_) {
+      // No receipt UI shows up, but the collection is already safely queued regardless.
+    }
+  }
+
+  /// Builds the signed payload behind "Show QR for Client" — used for both the online and
+  /// offline success paths, since the client scanning their own copy is valuable either way, not
+  /// just when there's no connectivity. Best-effort: a QR that fails to build never affects the
+  /// collection itself, already recorded or safely queued by this point regardless.
+  Future<void> _composeQrPayload({required String uniqueRef, required DateTime collectedAt, required List<DenominationLine> lines}) async {
+    try {
+      final context = await ReceiptContextCache().read();
+      final payload = QrReceiptPayload(
+        uniqueRef: uniqueRef,
+        mfiName: context?.mfiName ?? 'MICROFI',
+        branchName: context?.branchName ?? '—',
+        agentEmployeeCode: widget.profile.employeeCode,
+        agentFullName: widget.profile.fullName,
+        clientMemberNo: _client!.mfiMemberNo,
+        clientFullName: _client!.fullName,
+        amountXaf: _total,
+        collectedAtIso: collectedAt.toIso8601String(),
+        denominationLines: lines,
+        french: LocalePreference.instance.notifier.value.languageCode == 'fr',
+      );
+      if (!mounted) return;
+      setState(() => _qrPayload = payload);
+    } catch (_) {
+      // No QR button shows up, but printing/downloading and the collection itself are unaffected.
+    }
+  }
+
   Widget _buildQueuedOffline() {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -650,10 +920,10 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Saved Offline', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18, color: MicrofiColors.onTertiaryFixedVariant)),
+                    Text(l10n.csSavedOffline, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18, color: MicrofiColors.onTertiaryFixedVariant)),
                     const SizedBox(height: 4),
                     Text(
-                      '${_fmt(_total)} XAF for ${_client?.fullName ?? 'client'} is queued. It will sync automatically once you\'re back online.',
+                      l10n.csQueuedOfflineMessage(_fmt(_total), _client?.fullName ?? l10n.csGenericClient),
                       style: const TextStyle(color: MicrofiColors.onSurfaceVariant),
                     ),
                   ],
@@ -662,13 +932,14 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
             ],
           ),
         ),
+        ..._receiptActionWidgets(),
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           height: 44,
           child: FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Done'),
+            child: Text(l10n.commonDone),
           ),
         ),
       ],
@@ -693,15 +964,16 @@ class _StepperHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
       child: Row(
         children: [
-          _StepDot(label: 'Step 1', state: step > 0 ? _DotState.done : (step == 0 ? _DotState.current : _DotState.pending), number: 1),
+          _StepDot(label: l10n.csStepLabel(1), state: step > 0 ? _DotState.done : (step == 0 ? _DotState.current : _DotState.pending), number: 1),
           Expanded(child: Container(height: 2, color: step > 0 ? MicrofiColors.secondary : MicrofiColors.surfaceContainerHighest)),
-          _StepDot(label: 'Step 2', state: step > 1 ? _DotState.done : (step == 1 ? _DotState.current : _DotState.pending), number: 2),
+          _StepDot(label: l10n.csStepLabel(2), state: step > 1 ? _DotState.done : (step == 1 ? _DotState.current : _DotState.pending), number: 2),
           Expanded(child: Container(height: 2, color: step > 1 ? MicrofiColors.secondary : MicrofiColors.surfaceContainerHighest)),
-          _StepDot(label: 'Step 3', state: step == 2 ? _DotState.current : _DotState.pending, number: 3),
+          _StepDot(label: l10n.csStepLabel(3), state: step == 2 ? _DotState.current : _DotState.pending, number: 3),
         ],
       ),
     );
@@ -759,6 +1031,7 @@ class _ClientContextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _Card(
       child: Row(
         children: [
@@ -773,7 +1046,7 @@ class _ClientContextCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('TARGET CLIENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.5)),
+                Text(l10n.csTargetClientLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.5)),
                 Text(client.fullName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: MicrofiColors.primary)),
                 Text(client.mfiMemberNo, style: const TextStyle(color: MicrofiColors.outline, fontSize: 12)),
               ],
@@ -793,6 +1066,7 @@ class _CeilingPreviewBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final utilization = ceiling > 0 ? (projected / ceiling).clamp(0, 1).toDouble() : 0.0;
     final nearLimit = utilization >= 0.9;
     return _Card(
@@ -803,7 +1077,7 @@ class _CeilingPreviewBar extends StatelessWidget {
             children: [
               Icon(Icons.speed, color: nearLimit ? MicrofiColors.error : MicrofiColors.secondary, size: 18),
               const SizedBox(width: 8),
-              const Text('Daily Ceiling Impact', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              Text(l10n.csDailyCeilingImpact, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             ],
           ),
           const SizedBox(height: 10),
@@ -824,7 +1098,7 @@ class _CeilingPreviewBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$projected / $ceiling XAF', style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
+              Text(l10n.csCeilingProgressLine(projected, ceiling), style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
               Text('${(utilization * 100).round()}%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: nearLimit ? MicrofiColors.error : MicrofiColors.secondary)),
             ],
           ),

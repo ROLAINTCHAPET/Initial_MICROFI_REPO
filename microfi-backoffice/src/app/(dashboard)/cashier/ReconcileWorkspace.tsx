@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
 
 const DENOMINATIONS = [10000, 5000, 2000, 1000, 500, 200, 100, 50, 25];
 
@@ -20,8 +22,21 @@ export interface ValidatedLine {
   deltaXaf: number;
 }
 
-export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: string; queue: QueueLine[]; validated: ValidatedLine[] }) {
+export function ReconcileWorkspace({
+  branchId,
+  queue,
+  validated,
+  canReconcileNow,
+  closeTime,
+}: {
+  branchId: string;
+  queue: QueueLine[];
+  validated: ValidatedLine[];
+  canReconcileNow: boolean;
+  closeTime: string | null;
+}) {
   const router = useRouter();
+  const dict = useDictionary();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(queue[0]?.agentId ?? null);
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +70,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to reconcile");
+        setError(body?.message ?? dict.cashier.reconcile.failedToReconcile);
         return;
       }
       setSucceeded(true);
@@ -66,7 +81,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
         router.refresh();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -78,9 +93,9 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
         <div className="flex items-center justify-between px-5 py-4 border-b-2 border-outline-variant bg-surface-container-low">
           <h2 className="flex items-center gap-2 font-bold text-on-surface">
             <Icon name="history" className="size-5 text-primary" />
-            Active Queue
+            {dict.cashier.reconcile.activeQueue}
           </h2>
-          <span className="bg-primary-container text-on-primary rounded-full px-2 py-0.5 font-semibold text-xs">{queue.length} Waiting</span>
+          <span className="bg-primary-container text-on-primary rounded-full px-2 py-0.5 font-semibold text-xs">{t(dict.cashier.reconcile.waitingCount, { count: queue.length })}</span>
         </div>
         <div className="p-4 flex flex-col gap-3">
           {queue.map((item) => {
@@ -101,7 +116,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
               </button>
             );
           })}
-          {queue.length === 0 && <p className="text-sm text-on-surface-variant p-2">No agents pending reconciliation.</p>}
+          {queue.length === 0 && <p className="text-sm text-on-surface-variant p-2">{dict.cashier.reconcile.noAgentsPending}</p>}
         </div>
       </div>
 
@@ -113,7 +128,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
                 <h2 className="font-bold text-lg text-primary">{selected.agentLabel}</h2>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-xs text-on-surface-variant uppercase tracking-wider mb-1">Expected Deposit</p>
+                <p className="font-semibold text-xs text-on-surface-variant uppercase tracking-wider mb-1">{dict.cashier.reconcile.expectedDeposit}</p>
                 <p className="text-display text-primary">{expected.toLocaleString()} XAF</p>
               </div>
             </div>
@@ -121,7 +136,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
             <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] p-6 flex flex-col">
               <h3 className="text-h2 text-primary mb-4 flex items-center gap-2">
                 <Icon name="account-balance-wallet" className="size-6" />
-                Physical Cash Count
+                {dict.cashier.reconcile.physicalCashCount}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                 {DENOMINATIONS.map((denom) => {
@@ -149,13 +164,13 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
 
               <div className="mt-6 pt-6 border-t-2 border-outline-variant flex items-end justify-between flex-wrap gap-4">
                 <div>
-                  <p className="font-semibold text-xs text-on-surface-variant uppercase tracking-wider mb-1">Physical Count Total</p>
+                  <p className="font-semibold text-xs text-on-surface-variant uppercase tracking-wider mb-1">{dict.cashier.reconcile.physicalCountTotal}</p>
                   <div className="flex items-center gap-4">
                     <p className="text-display text-primary">{physicalTotal.toLocaleString()} XAF</p>
                     {isMatch ? (
                       <span className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
                         <Icon name="check-circle" className="size-4" />
-                        Match
+                        {dict.cashier.reconcile.match}
                       </span>
                     ) : (
                       <span className="bg-error-container text-on-error-container px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
@@ -168,19 +183,25 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
                 </div>
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || succeeded}
+                  disabled={loading || succeeded || !canReconcileNow}
+                  title={canReconcileNow ? undefined : t(dict.cashier.reconcile.opensAfterClosingTime, { time: closeTime ? ` (${closeTime.slice(0, 5)})` : "" })}
                   className={`h-12 px-8 rounded-[var(--radius-md)] font-semibold text-sm flex items-center gap-2 cursor-pointer transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100 disabled:opacity-80 ${
                     succeeded ? "bg-success-emerald text-white" : "bg-primary text-on-primary hover:bg-primary/90"
                   }`}
                 >
                   <Icon name="check-circle" className="size-5" />
-                  {succeeded ? "Posted" : loading ? "Posting…" : "Verify & Post"}
+                  {succeeded ? dict.cashier.reconcile.posted : loading ? dict.cashier.reconcile.posting : dict.cashier.reconcile.verifyAndPost}
                 </button>
               </div>
+              {!canReconcileNow && (
+                <p className="text-xs text-on-surface-variant mt-2">
+                  {t(dict.cashier.reconcile.reconciliationOpensAfterClosing, { time: closeTime ? ` (${closeTime.slice(0, 5)})` : "" })}
+                </p>
+              )}
               {error && <p role="alert" className="text-sm text-danger-red mt-3">{error}</p>}
               {!isMatch && (
                 <p className="text-xs text-on-surface-variant mt-2">
-                  A shortage will remain unresolved until a manager records it as a variance debt from End of Day Oversight.
+                  {dict.cashier.reconcile.shortageUnresolvedNotice}
                 </p>
               )}
             </div>
@@ -188,7 +209,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
         ) : (
           <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] p-10 flex flex-col items-center gap-2 text-center text-sm text-on-surface-variant">
             <Icon name="info" className="size-6 text-outline-variant" />
-            Select an agent from the queue to begin reconciliation.
+            {dict.cashier.reconcile.selectAgentPrompt}
           </div>
         )}
       </div>
@@ -197,7 +218,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
         <div className="px-5 py-4 border-b-2 border-outline-variant bg-surface-container-low">
           <h2 className="flex items-center gap-2 font-bold text-on-surface">
             <Icon name="check-circle" className="size-5 text-primary" />
-            Today&apos;s Validated
+            {dict.cashier.reconcile.todaysValidated}
           </h2>
         </div>
         <div className="p-4 flex flex-col gap-2">
@@ -210,7 +231,7 @@ export function ReconcileWorkspace({ branchId, queue, validated }: { branchId: s
               </div>
             </div>
           ))}
-          {validated.length === 0 && <p className="text-sm text-on-surface-variant p-2">No validated lines yet today.</p>}
+          {validated.length === 0 && <p className="text-sm text-on-surface-variant p-2">{dict.cashier.reconcile.noValidatedLinesYet}</p>}
         </div>
       </div>
     </div>

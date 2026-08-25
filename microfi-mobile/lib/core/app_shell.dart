@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'connectivity_service.dart';
 import 'design_tokens.dart';
+import 'local_ceiling_cache.dart';
+import 'local_pin_verifier.dart';
 import 'session_storage.dart';
 import '../features/auth/login_screen.dart';
 import '../features/history/history_screen.dart';
@@ -10,6 +12,7 @@ import '../features/home/agent_profile.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/wallet/wallet_screen.dart';
+import '../l10n/app_localizations.dart';
 
 /// The persistent header ("MICROFI COLLECT", live connectivity status, account menu) and
 /// BottomNavBar (Home/History/Wallet) that wrap every agent-facing screen once logged in. Tabs are
@@ -32,7 +35,6 @@ class _AppShellState extends State<AppShell> {
   bool _online = true;
   StreamSubscription<bool>? _connectivitySub;
 
-  static const _tabs = ['Home', 'History', 'Wallet'];
   static const _icons = [Icons.home, Icons.history, Icons.account_balance_wallet];
 
   @override
@@ -53,6 +55,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _signOut() async {
+    // The offline collection queue is deliberately left untouched here — those rows are cash
+    // already collected and not yet synced, and must survive a sign-out exactly like they survive
+    // an app restart. Only the per-agent local caches (PIN verification, ceiling snapshot) are
+    // cleared, since they have no reason to keep existing once this agent isn't the one signed in
+    // on this device.
+    await LocalPinVerifier(widget.profile.id).clear();
+    await LocalCeilingCache(widget.profile.id).clear();
     await SessionStorage().clear();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
@@ -64,6 +73,8 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tabs = [l10n.asHomeTab, l10n.asHistoryTab, l10n.wsWalletTitle];
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -72,13 +83,13 @@ class _AppShellState extends State<AppShell> {
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 20,
-        title: const Text(
-          'MICROFI COLLECT',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0.3),
+        title: Text(
+          l10n.asAppTitle,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0.3),
         ),
         actions: [
           Tooltip(
-            message: _online ? 'Online' : 'Offline',
+            message: _online ? l10n.hsStatusActive : l10n.asOfflineTooltip,
             child: Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Icon(
@@ -94,10 +105,10 @@ class _AppShellState extends State<AppShell> {
               if (value == 'signout') _signOut();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'profile', child: Row(children: [Icon(Icons.person_outline, size: 20), SizedBox(width: 10), Text('My Profile')])),
-              const PopupMenuItem(
+              PopupMenuItem(value: 'profile', child: Row(children: [const Icon(Icons.person_outline, size: 20), const SizedBox(width: 10), Text(l10n.prMyProfileTitle)])),
+              PopupMenuItem(
                 value: 'signout',
-                child: Row(children: [Icon(Icons.logout, size: 20, color: MicrofiColors.error), SizedBox(width: 10), Text('Sign Out', style: TextStyle(color: MicrofiColors.error))]),
+                child: Row(children: [const Icon(Icons.logout, size: 20, color: MicrofiColors.error), const SizedBox(width: 10), Text(l10n.commonSignOut, style: const TextStyle(color: MicrofiColors.error))]),
               ),
             ],
           ),
@@ -122,8 +133,8 @@ class _AppShellState extends State<AppShell> {
           selectedIndex: _selectedIndex,
           onDestinationSelected: (index) => setState(() => _selectedIndex = index),
           destinations: List.generate(
-            _tabs.length,
-            (i) => NavigationDestination(icon: Icon(_icons[i]), label: _tabs[i]),
+            tabs.length,
+            (i) => NavigationDestination(icon: Icon(_icons[i]), label: tabs[i]),
           ),
         ),
       ),

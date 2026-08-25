@@ -27,7 +27,10 @@ import java.util.UUID;
  * Branch#effectiveDefaultCeilingPct). A {@link CeilingOverride} lets an administrator temporarily
  * extend the ceiling beyond that, independent of the branch policy or the deposit itself.
  * Financial facts are immutable and append-only (no updates/deletes on ledger rows) per the
- * "no soft-deletes on financial facts" design rule.
+ * "no soft-deletes on financial facts" design rule. Every top-up requires proof of the cash
+ * deposit ({@link EscrowController#topUp} resolves and stores it before calling in here) — the
+ * first one is also what activates a PENDING_CEILING agent, since there's no separate "activate"
+ * action; registration approval itself never requires this (see RegistrationApplicationService).
  */
 @Service
 @RequiredArgsConstructor
@@ -53,7 +56,8 @@ public class EscrowService {
         return toResponse(findAccountOrThrow(agentId));
     }
 
-    public EscrowResponse topUp(UUID agentId, long amountXaf, String reference) {
+    /** {@code ledgerEntryId}/{@code proofDocPath} are resolved by the controller before this call — proof storage is reactive (FilePart), this service is not. */
+    public EscrowResponse topUp(UUID agentId, long amountXaf, String reference, UUID ledgerEntryId, String proofDocPath) {
         EscrowAccount account = findAccountOrThrow(agentId);
         // balance tracks the literal security deposit 1:1; the ceiling it buys is governed by the
         // agent's branch policy (Branch#effectiveDefaultCeilingPct — 100 = 1:1, the default, so
@@ -65,11 +69,12 @@ public class EscrowService {
         escrowAccountRepository.save(account);
 
         escrowLedgerRepository.save(EscrowLedger.builder()
-                .id(UUID.randomUUID())
+                .id(ledgerEntryId)
                 .escrowId(account.getId())
                 .deltaXaf(amountXaf)
                 .reason("TOP_UP")
                 .ref(reference)
+                .proofDocPath(proofDocPath)
                 .build());
 
         // First funding is what actually makes a newly-enrolled agent usable — until now their

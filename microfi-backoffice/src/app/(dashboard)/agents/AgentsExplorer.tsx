@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { formatCompactXaf } from "@/lib/format";
 import type { AgentStatus } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export interface AgentRow {
   id: string;
@@ -29,6 +30,7 @@ function initials(name: string) {
 }
 
 export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: ReactNode }) {
+  const dict = useDictionary();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -65,7 +67,7 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             type="text"
-            placeholder="Search by name, ID, or branch…"
+            placeholder={dict.agents.searchPlaceholder}
             className="w-full h-11 pl-10 pr-4 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:border-primary transition-colors"
           />
         </div>
@@ -73,34 +75,34 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Total Active Agents" value={stats.active.toLocaleString()} />
+        <StatCard label={dict.agents.statTotalActive} value={stats.active.toLocaleString()} />
         <StatCard
-          label="Agents Near Ceiling"
+          label={dict.agents.statNearCeiling}
           value={stats.nearCeiling.toLocaleString()}
-          hint="Requires attention"
+          hint={dict.agents.statNearCeilingHint}
           valueClass={stats.nearCeiling > 0 ? "text-tertiary-fixed-dim" : undefined}
           active={filter === "nearCeiling"}
           onClick={stats.nearCeiling > 0 ? () => toggleFilter("nearCeiling") : undefined}
         />
         <StatCard
-          label="Suspended Accounts"
+          label={dict.agents.statSuspended}
           value={stats.suspended.toLocaleString()}
-          hint="Pending review"
+          hint={dict.agents.statSuspendedHint}
           valueClass={stats.suspended > 0 ? "text-error" : undefined}
           active={filter === "suspended"}
           onClick={stats.suspended > 0 ? () => toggleFilter("suspended") : undefined}
         />
-        <StatCard label="Collected Today (All Agents)" value={formatCompactXaf(stats.collectedToday)} />
+        <StatCard label={dict.agents.statCollectedToday} value={formatCompactXaf(stats.collectedToday)} />
       </div>
 
       {filter !== "all" && (
         <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-          Showing only: <Badge status={filter === "nearCeiling" ? "PENDING" : "SUSPENDED"} label={filter === "nearCeiling" ? "Near ceiling" : "Suspended"} />
+          {dict.agents.showingOnly} <Badge status={filter === "nearCeiling" ? "PENDING" : "SUSPENDED"} label={filter === "nearCeiling" ? dict.agents.nearCeilingLabel : dict.common.status.SUSPENDED} />
           <button
             onClick={() => setFilter("all")}
             className="text-primary hover:underline underline-offset-2 font-medium cursor-pointer transition-transform duration-150 ease-out hover:scale-105 active:scale-95"
           >
-            Clear
+            {dict.agents.clear}
           </button>
         </div>
       )}
@@ -110,12 +112,12 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-surface-container-low border-b-2 border-outline-variant">
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">Name</th>
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">ID</th>
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">Zone</th>
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">Status</th>
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider w-64">Collected Today vs Limit</th>
-                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">{dict.agents.colName}</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">{dict.agents.colId}</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">{dict.agents.colZone}</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider">{dict.agents.colStatus}</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider w-64">{dict.agents.colCollectedVsLimit}</th>
+                <th className="p-4 text-[13px] font-semibold text-on-surface-variant uppercase tracking-wider text-right">{dict.agents.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
@@ -170,7 +172,7 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
                     <Link
                       href={`/agents/${row.id}`}
                       className="inline-flex items-center justify-center p-2 text-primary hover:bg-primary-fixed rounded transition-[background-color,transform] duration-150 ease-out hover:scale-110 active:scale-90"
-                      title="View Profile"
+                      title={dict.agents.viewProfile}
                     >
                       <Icon name="person" className="size-5" />
                     </Link>
@@ -180,7 +182,7 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
               {filtered.length === 0 && (
                 <tr key="empty">
                   <td colSpan={6} className="p-8 text-center text-on-surface-variant">
-                    {rows.length === 0 ? "No agents enrolled yet." : "No agents match your search."}
+                    {rows.length === 0 ? dict.agents.noAgentsYet : dict.agents.noAgentsMatch}
                   </td>
                 </tr>
               )}

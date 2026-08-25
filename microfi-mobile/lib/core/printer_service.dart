@@ -2,13 +2,26 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
+
+enum PrinterUnavailableReason { noPrinterSelected, bluetoothUnavailable, connectionFailed, didNotConfirm }
 
 class PrinterUnavailable implements Exception {
-  final String message;
-  PrinterUnavailable(this.message);
+  final PrinterUnavailableReason reason;
+  final String? printerName;
+  PrinterUnavailable(this.reason, {this.printerName});
+
+  /// Localized message for [reason] — resolved at catch time, since every call site that catches
+  /// this already has a BuildContext (a printing flow driven by a widget).
+  String message(AppLocalizations l10n) => switch (reason) {
+        PrinterUnavailableReason.noPrinterSelected => l10n.printerErrorNoPrinterSelected,
+        PrinterUnavailableReason.bluetoothUnavailable => l10n.printerErrorBluetoothUnavailable,
+        PrinterUnavailableReason.connectionFailed => l10n.printerErrorConnectionFailed(printerName ?? ''),
+        PrinterUnavailableReason.didNotConfirm => l10n.printerErrorDidNotConfirm,
+      };
 
   @override
-  String toString() => message;
+  String toString() => reason.toString();
 }
 
 class PairedPrinter {
@@ -74,21 +87,24 @@ class PrinterService {
   Future<bool> printReceipt(String receiptText, {PairedPrinter? printer}) async {
     final target = printer ?? await savedPrinter();
     if (target == null) {
-      throw PrinterUnavailable('No thermal printer selected yet.');
+      throw PrinterUnavailable(PrinterUnavailableReason.noPrinterSelected);
     }
     if (!await isReady()) {
-      throw PrinterUnavailable('Turn on Bluetooth and grant permission to print.');
+      throw PrinterUnavailable(PrinterUnavailableReason.bluetoothUnavailable);
     }
     final connected = await PrintBluetoothThermal.connect(macPrinterAddress: target.macAddress);
     if (!connected) {
-      throw PrinterUnavailable('Could not connect to ${target.name}.');
+      throw PrinterUnavailable(PrinterUnavailableReason.connectionFailed, printerName: target.name);
     }
     try {
       final profile = await CapabilityProfile.load();
       final generator = Generator(PaperSize.mm58, profile);
       final bytes = <int>[];
+      // receiptText (ReceiptTemplateComposer, server-side) is pre-formatted to the 32-column
+      // width itself — headers/footers are manually centered, so printing left-aligned preserves
+      // that layout instead of the printer re-centering (and breaking) the denomination table.
       for (final line in receiptText.split('\n')) {
-        bytes.addAll(generator.text(line, styles: const PosStyles(align: PosAlign.center)));
+        bytes.addAll(generator.text(line, styles: const PosStyles(align: PosAlign.left)));
       }
       bytes.addAll(generator.feed(2));
       bytes.addAll(generator.cut());

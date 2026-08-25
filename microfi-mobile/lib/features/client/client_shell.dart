@@ -9,6 +9,7 @@ import 'client_history_screen.dart';
 import 'client_home_screen.dart';
 import 'client_models.dart';
 import 'client_wallet_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Client-facing counterpart to AppShell: same header/nav language ("MICROFI COLLECT" → "MY
 /// BOOKLET", live connectivity, account menu), Home/History/Wallet tabs. No Emergency tab, same
@@ -28,7 +29,6 @@ class _ClientShellState extends State<ClientShell> {
   bool _online = true;
   StreamSubscription<bool>? _connectivitySub;
 
-  static const _tabs = ['Home', 'History', 'Wallet'];
   static const _icons = [Icons.home, Icons.history, Icons.account_balance_wallet];
 
   @override
@@ -56,6 +56,8 @@ class _ClientShellState extends State<ClientShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tabs = [l10n.asHomeTab, l10n.asHistoryTab, l10n.wsWalletTitle];
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -64,10 +66,10 @@ class _ClientShellState extends State<ClientShell> {
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 20,
-        title: const Text('MY BOOKLET', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0.3)),
+        title: Text(l10n.cshMyBookletTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0.3)),
         actions: [
           Tooltip(
-            message: _online ? 'Online' : 'Offline',
+            message: _online ? l10n.hsStatusActive : l10n.asOfflineTooltip,
             child: Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Icon(_online ? Icons.wifi : Icons.wifi_off, color: _online ? MicrofiColors.secondaryFixed : MicrofiColors.tertiaryFixedDim),
@@ -79,9 +81,9 @@ class _ClientShellState extends State<ClientShell> {
               if (value == 'signout') _signOut();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'signout',
-                child: Row(children: [Icon(Icons.logout, size: 20, color: MicrofiColors.error), SizedBox(width: 10), Text('Sign Out', style: TextStyle(color: MicrofiColors.error))]),
+                child: Row(children: [const Icon(Icons.logout, size: 20, color: MicrofiColors.error), const SizedBox(width: 10), Text(l10n.commonSignOut, style: const TextStyle(color: MicrofiColors.error))]),
               ),
             ],
           ),
@@ -105,7 +107,7 @@ class _ClientShellState extends State<ClientShell> {
           backgroundColor: MicrofiColors.surfaceContainerLowest,
           selectedIndex: _selectedIndex,
           onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-          destinations: List.generate(_tabs.length, (i) => NavigationDestination(icon: Icon(_icons[i]), label: _tabs[i])),
+          destinations: List.generate(tabs.length, (i) => NavigationDestination(icon: Icon(_icons[i]), label: tabs[i])),
         ),
       ),
     );

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import { formatCompactXaf } from "@/lib/format";
+import { ceilingUtilizationPct, formatCompactXaf } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeaderContext";
 import { Icon, type IconName } from "@/components/Icon";
 import { Badge } from "@/components/Badge";
@@ -10,12 +10,16 @@ import { BranchesWorkspace } from "@/components/branches/BranchesWorkspace";
 import { CreateBranchModal } from "@/components/branches/CreateBranchModal";
 import type { BranchRow } from "@/components/branches/BranchDirectory";
 import type { AgentResponse, BranchResponse, EscrowResponse, OfjPendingLineResponse, OfjSummaryResponse, ScheduleDefaultsResponse, SosResponse } from "@/lib/types";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
 function yesterdayBusinessDate(): string {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 export default async function RegionalDashboardPage() {
+  const dict = getDictionary(await getLocale());
   const [session, allAgents, branches, scheduleDefaults] = await Promise.all([
     getSession(),
     api.get<AgentResponse[]>("/admin/agents"),
@@ -40,7 +44,15 @@ export default async function RegionalDashboardPage() {
   const nearCeiling = agents
     .map((agent, i) => ({ agent, escrow: escrows[i] }))
     .filter((x): x is { agent: AgentResponse; escrow: EscrowResponse } => !!x.escrow && x.escrow.effectiveCeilingXaf > 0)
-    .map((x) => ({ ...x, pct: Math.round((x.escrow.balanceXaf / x.escrow.effectiveCeilingXaf) * 100) }))
+    // "Near ceiling" is about today's collections against the daily cap (BR-03) — balanceXaf is
+    // the agent's funded security deposit, a completely separate, non-daily figure that has
+    // nothing to do with how much they've actually collected today. Using it here previously
+    // meant an agent who collected nothing today could still show up (or be missed) based on
+    // deposit size alone. pct (raw, can exceed 100 — e.g. a temporary ceiling override expired
+    // after collections already happened against it) drives sort order, so the worst overages
+    // still rank first; displayPct is what's actually shown, capped at 100 so the text can't say
+    // "230%".
+    .map((x) => ({ ...x, pct: Math.round((x.escrow.cumulativeTodayXaf / x.escrow.effectiveCeilingXaf) * 100), displayPct: ceilingUtilizationPct(x.escrow.cumulativeTodayXaf, x.escrow.effectiveCeilingXaf) }))
     .filter((x) => x.pct >= 80)
     .sort((a, b) => b.pct - a.pct)
     .slice(0, 5);
@@ -94,6 +106,7 @@ export default async function RegionalDashboardPage() {
     timezone: b.timezone,
     openTime: b.openTime,
     closeTime: b.closeTime,
+    openTimeLocked: b.openTimeLocked,
     maxCashiers: b.maxCashiers,
     requireImei: b.requireImei,
     defaultCeilingPct: b.defaultCeilingPct,
@@ -103,15 +116,15 @@ export default async function RegionalDashboardPage() {
   return (
     <div className="max-w-7xl mx-auto w-full flex flex-col gap-6">
       <PageHeader
-        title={homeBranch ? "Branch Overview" : "Regional Overview"}
-        subtitle={homeBranch ? `${homeBranch.name} (${homeBranch.code}) · Live Operational Metrics` : "CEMAC Region · Live Operational Metrics"}
+        title={homeBranch ? dict.dashboard.branchOverview : dict.dashboard.regionalOverview}
+        subtitle={homeBranch ? t(dict.dashboard.branchSubtitle, { name: homeBranch.name, code: homeBranch.code }) : dict.dashboard.regionSubtitle}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon="agents" label="Total Agents" value={agents.length.toLocaleString()} />
-        <StatCard icon="check-circle" label="Active Agents" value={activeCount.toLocaleString()} />
-        <StatCard icon="lock" label="Total Escrow" value={formatCompactXaf(totalEscrow)} />
-        <StatCard icon="bell" label="Unresolved SOS" value={unresolvedSos.length.toLocaleString()} alert={unresolvedSos.length > 0} href="/sos" />
+        <StatCard icon="agents" label={dict.dashboard.totalAgents} value={agents.length.toLocaleString()} />
+        <StatCard icon="check-circle" label={dict.dashboard.activeAgents} value={activeCount.toLocaleString()} />
+        <StatCard icon="lock" label={dict.dashboard.totalEscrow} value={formatCompactXaf(totalEscrow)} />
+        <StatCard icon="bell" label={dict.dashboard.unresolvedSos} value={unresolvedSos.length.toLocaleString()} alert={unresolvedSos.length > 0} href="/sos" />
       </div>
 
       {homeBranch && (
@@ -123,12 +136,12 @@ export default async function RegionalDashboardPage() {
                   <Icon name="schedule" className="size-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">Business Hours</p>
+                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">{dict.dashboard.businessHours}</p>
                   <p className="font-bold text-lg text-primary tabular-nums">
                     {homeBranch.openTime && homeBranch.closeTime ? (
                       `${homeBranch.openTime.slice(0, 5)} – ${homeBranch.closeTime.slice(0, 5)}`
                     ) : (
-                      <span className="text-text-grey-disabled font-normal text-sm">Not configured</span>
+                      <span className="text-text-grey-disabled font-normal text-sm">{dict.dashboard.notConfigured}</span>
                     )}
                   </p>
                 </div>
@@ -138,15 +151,25 @@ export default async function RegionalDashboardPage() {
                   <Icon name="phone" className="size-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">Contact Number</p>
+                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">{dict.dashboard.contactNumber}</p>
                   <p className="font-bold text-lg text-primary tabular-nums">
-                    {homeBranch.phone ?? <span className="text-text-grey-disabled font-normal text-sm">Not configured</span>}
+                    {homeBranch.phone ?? <span className="text-text-grey-disabled font-normal text-sm">{dict.dashboard.notConfigured}</span>}
                   </p>
                 </div>
               </div>
             </div>
             {session?.role === "BRANCH_MANAGER" && (
-              <BranchSettingsModal branchId={homeBranch.id} branchName={homeBranch.name} openTime={homeBranch.openTime} closeTime={homeBranch.closeTime} phone={homeBranch.phone} maxCashiers={homeBranch.maxCashiers} requireImei={homeBranch.requireImei} defaultCeilingPct={homeBranch.defaultCeilingPct} />
+              <BranchSettingsModal
+                branchId={homeBranch.id}
+                branchName={homeBranch.name}
+                openTime={homeBranch.openTime}
+                closeTime={homeBranch.closeTime}
+                openTimeLocked={homeBranch.openTimeLocked}
+                phone={homeBranch.phone}
+                maxCashiers={homeBranch.maxCashiers}
+                requireImei={homeBranch.requireImei}
+                defaultCeilingPct={homeBranch.defaultCeilingPct}
+              />
             )}
           </div>
 
@@ -165,9 +188,9 @@ export default async function RegionalDashboardPage() {
                   <Icon name="account-balance-wallet" className="size-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">Awaiting Reconciliation</p>
+                  <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1 font-semibold">{dict.dashboard.awaitingReconciliation}</p>
                   <p className={`font-bold text-lg tabular-nums ${pendingReconciliation > 0 ? "text-on-tertiary-fixed-variant" : "text-primary"}`}>
-                    {pendingReconciliation} agent{pendingReconciliation === 1 ? "" : "s"}
+                    {t(pendingReconciliation === 1 ? dict.dashboard.agentSingular : dict.dashboard.agentsPlural, { count: pendingReconciliation })}
                   </p>
                 </div>
               </div>
@@ -175,7 +198,7 @@ export default async function RegionalDashboardPage() {
                 href="/cashier"
                 className="h-10 px-4 rounded-[var(--radius-sm)] bg-primary text-on-primary text-sm font-semibold flex items-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95"
               >
-                Open Cashier Portal
+                {dict.dashboard.openCashierPortal}
                 <Icon name="chevron-right" className="size-4" />
               </Link>
             </div>
@@ -186,11 +209,11 @@ export default async function RegionalDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] overflow-hidden flex flex-col">
           <div className="p-4 border-b-2 border-outline-variant flex items-center justify-between">
-            <h3 className="text-h2 text-primary">Agents Near Ceiling</h3>
-            <Link href="/agents" className="text-sm text-primary hover:underline underline-offset-2 font-medium">View all</Link>
+            <h3 className="text-h2 text-primary">{dict.dashboard.agentsNearCeiling}</h3>
+            <Link href="/agents" className="text-sm text-primary hover:underline underline-offset-2 font-medium">{dict.dashboard.viewAll}</Link>
           </div>
           <div className="p-3 flex flex-col gap-2">
-            {nearCeiling.map(({ agent, escrow, pct }) => (
+            {nearCeiling.map(({ agent, escrow, pct, displayPct }) => (
               <Link
                 key={agent.id}
                 href={`/agents/${agent.id}`}
@@ -203,11 +226,11 @@ export default async function RegionalDashboardPage() {
                   <p className="text-xs text-on-surface-variant">{agent.employeeCode}</p>
                 </div>
                 <span className={`font-bold text-sm tabular-nums ${pct >= 100 ? "text-error" : "text-on-tertiary-fixed-variant"}`}>
-                  {escrow.balanceXaf.toLocaleString()} XAF &middot; {pct}%
+                  {escrow.cumulativeTodayXaf.toLocaleString()} XAF &middot; {displayPct}%
                 </span>
               </Link>
             ))}
-            {nearCeiling.length === 0 && <p className="p-6 text-center text-sm text-on-surface-variant">No agents currently near their escrow ceiling.</p>}
+            {nearCeiling.length === 0 && <p className="p-6 text-center text-sm text-on-surface-variant">{dict.dashboard.noAgentsNearCeiling}</p>}
           </div>
         </div>
 
@@ -215,9 +238,9 @@ export default async function RegionalDashboardPage() {
           <div className="p-4 border-b-2 border-outline-variant flex items-center justify-between">
             <h3 className="text-h2 text-primary flex items-center gap-2">
               <Icon name="bell" filled className="size-5 text-error" />
-              Unresolved SOS Alerts
+              {dict.dashboard.unresolvedSosAlerts}
             </h3>
-            <Link href="/sos" className="text-sm text-primary hover:underline underline-offset-2 font-medium">Open console</Link>
+            <Link href="/sos" className="text-sm text-primary hover:underline underline-offset-2 font-medium">{dict.dashboard.openConsole}</Link>
           </div>
           <div className="p-3 flex flex-col gap-2">
             {unresolvedSos.slice(0, 5).map((event) => {
@@ -231,7 +254,7 @@ export default async function RegionalDashboardPage() {
                 </div>
               );
             })}
-            {unresolvedSos.length === 0 && <p className="p-6 text-center text-sm text-on-surface-variant">No unresolved SOS alerts.</p>}
+            {unresolvedSos.length === 0 && <p className="p-6 text-center text-sm text-on-surface-variant">{dict.dashboard.noUnresolvedSos}</p>}
           </div>
         </div>
       </div>
@@ -239,24 +262,24 @@ export default async function RegionalDashboardPage() {
       <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] overflow-hidden">
         <div className="p-4 border-b-2 border-outline-variant flex items-center justify-between">
           <div>
-            <h3 className="text-h2 text-primary">{homeBranch ? "Reconciliations" : "Branches · Reconciliations"}</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">Last 48 hours</p>
+            <h3 className="text-h2 text-primary">{homeBranch ? dict.dashboard.reconciliations : dict.dashboard.branchesReconciliations}</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">{dict.dashboard.last48Hours}</p>
           </div>
           <Link href="/ofj" className="text-sm text-primary hover:underline underline-offset-2 font-medium">
-            Open End of Day Oversight
+            {dict.dashboard.openEndOfDayOversight}
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b-2 border-outline-variant text-xs text-on-surface-variant uppercase tracking-wider">
-                <th className="p-4 font-semibold">Date</th>
-                {showBranchColumn && <th className="p-4 font-semibold">Branch</th>}
-                <th className="p-4 font-semibold">Agent</th>
-                <th className="p-4 font-semibold">Digital Total</th>
-                <th className="p-4 font-semibold">Physical Total</th>
-                <th className="p-4 font-semibold">Delta</th>
-                <th className="p-4 font-semibold">Status</th>
+                <th className="p-4 font-semibold">{dict.dashboard.colDate}</th>
+                {showBranchColumn && <th className="p-4 font-semibold">{dict.dashboard.colBranch}</th>}
+                <th className="p-4 font-semibold">{dict.dashboard.colAgent}</th>
+                <th className="p-4 font-semibold">{dict.dashboard.colDigitalTotal}</th>
+                <th className="p-4 font-semibold">{dict.dashboard.colPhysicalTotal}</th>
+                <th className="p-4 font-semibold">{dict.dashboard.colDelta}</th>
+                <th className="p-4 font-semibold">{dict.dashboard.colStatus}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
@@ -291,7 +314,7 @@ export default async function RegionalDashboardPage() {
               {reconciliationRows.length === 0 && (
                 <tr>
                   <td colSpan={showBranchColumn ? 7 : 6} className="p-8 text-center text-on-surface-variant">
-                    No reconciliations recorded in the last 48 hours.
+                    {dict.dashboard.noReconciliations}
                   </td>
                 </tr>
               )}

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
+import '../../core/local_pin_verifier.dart';
 import '../home/agent_profile.dart';
 import '../home/home_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Forced first-time replacement of the admin-assigned starting transaction PIN — not skippable,
 /// shown by SessionEntry whenever AgentProfile.pinMustChange is true. The same screen also serves
@@ -44,8 +47,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context)!;
     if (_newPinController.text != _confirmPinController.text) {
-      setState(() => _error = 'New PIN and confirmation do not match.');
+      setState(() => _error = l10n.psPinMismatchError);
       return;
     }
     setState(() {
@@ -57,18 +61,19 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         currentPin: _currentPinController.text,
         newPin: _newPinController.text,
       );
+      await LocalPinVerifier(widget.profile.id).seed(_newPinController.text);
       if (!mounted) return;
       if (widget.mandatory) {
         widget.onChanged?.call(updated);
       } else {
-        await showSuccessDialog(context, 'Your PIN has been updated.');
+        await showSuccessDialog(context, l10n.psPinUpdatedMessage);
         if (!mounted) return;
         Navigator.of(context).pop(updated);
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -76,11 +81,12 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return PopScope(
       canPop: !widget.mandatory,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: widget.mandatory ? null : AppBar(title: const Text('Change PIN')),
+        appBar: widget.mandatory ? null : AppBar(title: Text(l10n.psChangePinTitle)),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -100,16 +106,16 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                         child: const Icon(Icons.pin_outlined, color: Colors.white, size: 26),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Set Your Transaction PIN',
+                      Text(
+                        l10n.psSetYourPinTitle,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MicrofiColors.primary),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Your branch assigned a starting PIN. Replace it with one only you know before you can record a collection.',
+                      Text(
+                        l10n.psSetYourPinIntro,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
+                        style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant),
                       ),
                       const SizedBox(height: 18),
                     ],
@@ -129,35 +135,38 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                             TextFormField(
                               controller: _currentPinController,
                               decoration: InputDecoration(
-                                labelText: widget.mandatory ? 'Starting PIN (given by your branch)' : 'Current PIN',
+                                labelText: widget.mandatory ? l10n.psStartingPinLabel : l10n.psCurrentPinLabel,
                                 prefixIcon: const Icon(Icons.lock_outline),
                               ),
                               obscureText: true,
                               keyboardType: TextInputType.number,
-                              validator: (v) => (v == null || v.length < 4) ? 'Min. 4 digits' : null,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              validator: (v) => (v == null || v.length < 4) ? l10n.clPinMinDigitsError : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _newPinController,
-                              decoration: const InputDecoration(
-                                labelText: 'New PIN',
-                                prefixIcon: Icon(Icons.lock_reset_outlined),
-                                helperText: 'Not all the same digit or a simple run (e.g. 1234)',
+                              decoration: InputDecoration(
+                                labelText: l10n.psNewPinLabel,
+                                prefixIcon: const Icon(Icons.lock_reset_outlined),
+                                helperText: l10n.psNewPinHelperText,
                               ),
                               obscureText: true,
                               keyboardType: TextInputType.number,
-                              validator: (v) => (v == null || v.length < 4 || v.length > 10) ? '4–10 digits' : null,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              validator: (v) => (v == null || v.length < 4 || v.length > 10) ? l10n.psPinLengthError : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _confirmPinController,
-                              decoration: const InputDecoration(
-                                labelText: 'Confirm New PIN',
-                                prefixIcon: Icon(Icons.check_circle_outline),
+                              decoration: InputDecoration(
+                                labelText: l10n.psConfirmNewPinLabel,
+                                prefixIcon: const Icon(Icons.check_circle_outline),
                               ),
                               obscureText: true,
                               keyboardType: TextInputType.number,
-                              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              validator: (v) => (v == null || v.isEmpty) ? l10n.commonRequiredField : null,
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),
@@ -178,7 +187,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                               onPressed: _loading ? null : _submit,
                               child: _loading
                                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Set PIN'),
+                                  : Text(l10n.psSetPinButton),
                             ),
                           ],
                         ),

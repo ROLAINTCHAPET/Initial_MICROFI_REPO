@@ -67,7 +67,7 @@ class EscrowServiceTest {
     void topUpAt100PctRaisesCeiling1to1WithDeposit() {
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1");
+        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         assertThat(response.getBalanceXaf()).isEqualTo(50_000);
         assertThat(response.getBaseCeilingXaf()).isEqualTo(50_000);
@@ -78,7 +78,7 @@ class EscrowServiceTest {
         when(agentDirectoryService.effectiveCeilingPctForAgent(agentId)).thenReturn(150);
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1");
+        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         assertThat(response.getBalanceXaf()).isEqualTo(50_000);
         assertThat(response.getBaseCeilingXaf()).isEqualTo(75_000);
@@ -89,7 +89,7 @@ class EscrowServiceTest {
         when(agentDirectoryService.effectiveCeilingPctForAgent(agentId)).thenReturn(50);
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1");
+        EscrowResponse response = escrowService.topUp(agentId, 50_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         assertThat(response.getBalanceXaf()).isEqualTo(50_000);
         assertThat(response.getBaseCeilingXaf()).isEqualTo(25_000);
@@ -99,7 +99,7 @@ class EscrowServiceTest {
     void topUpActivatesPendingCeilingAgentOnceCeilingBecomesPositive() {
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        escrowService.topUp(agentId, 10_000, "REF-1");
+        escrowService.topUp(agentId, 10_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         verify(agentDirectoryService).activateIfPendingCeiling(agentId);
     }
@@ -109,7 +109,7 @@ class EscrowServiceTest {
         when(agentDirectoryService.effectiveCeilingPctForAgent(agentId)).thenReturn(0);
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        escrowService.topUp(agentId, 10_000, "REF-1");
+        escrowService.topUp(agentId, 10_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         verify(agentDirectoryService, never()).activateIfPendingCeiling(any());
     }
@@ -119,7 +119,7 @@ class EscrowServiceTest {
         when(agentDirectoryService.effectiveCeilingPctForAgent(agentId)).thenReturn(150);
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 0)));
 
-        escrowService.topUp(agentId, 50_000, "REF-1");
+        escrowService.topUp(agentId, 50_000, "REF-1", UUID.randomUUID(), "proof/path.jpg");
 
         ArgumentCaptor<com.microfi.transactions.domain.EscrowLedger> captor = ArgumentCaptor.forClass(com.microfi.transactions.domain.EscrowLedger.class);
         verify(escrowLedgerRepository).save(captor.capture());
@@ -131,7 +131,7 @@ class EscrowServiceTest {
     void topUpUnknownAgentThrows404() {
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> escrowService.topUp(agentId, 10_000, "REF-1"))
+        assertThatThrownBy(() -> escrowService.topUp(agentId, 10_000, "REF-1", UUID.randomUUID(), "proof/path.jpg"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
     }

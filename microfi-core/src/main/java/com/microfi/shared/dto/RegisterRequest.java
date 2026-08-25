@@ -36,9 +36,9 @@ public class RegisterRequest {
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
 
-    /** Admin-assigned starting PIN — the agent is forced to replace it with one of their own before their first collection (Agent#pinMustChange). */
+    /** Admin-assigned starting PIN — the agent is forced to replace it with one of their own before their first collection (Agent#pinMustChange). A PIN is a natural number, never letters. */
     @NotBlank
-    @Size(min = 4, max = 10, message = "PIN must be between 4 and 10 characters")
+    @Pattern(regexp = "\\d{4,10}", message = "PIN must be 4 to 10 digits")
     private String pin;
 
     @NotNull

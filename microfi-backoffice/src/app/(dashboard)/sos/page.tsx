@@ -4,15 +4,18 @@ import { PageHeader } from "@/components/PageHeaderContext";
 import { Icon, type IconName } from "@/components/Icon";
 import type { AgentResponse, SosResponse } from "@/lib/types";
 import { AcknowledgeButton } from "./AcknowledgeButton";
+import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, dict: Dictionary) {
   const ms = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(ms / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return dict.sos.timeAgo.justNow;
+  if (mins < 60) return t(dict.sos.timeAgo.minutesAgo, { minutes: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t(dict.sos.timeAgo.hoursAgo, { hours });
+  return t(dict.sos.timeAgo.daysAgo, { days: Math.floor(hours / 24) });
 }
 
 export default async function SosConsolePage({
@@ -20,6 +23,7 @@ export default async function SosConsolePage({
 }: {
   searchParams: Promise<{ unresolvedOnly?: string }>;
 }) {
+  const dict = getDictionary(await getLocale());
   const params = await searchParams;
   const unresolvedOnly = params.unresolvedOnly !== "false";
 
@@ -34,17 +38,17 @@ export default async function SosConsolePage({
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
-      <PageHeader title="SOS Console" subtitle="Distress alerts raised by field agents." />
+      <PageHeader title={dict.sidebar.sosConsole} subtitle={dict.sos.subtitle} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon="bell" label="Total Alerts" value={allEvents.length.toLocaleString()} />
-        <StatCard icon="warning" label="Unresolved" value={unresolvedCount.toLocaleString()} alert={unresolvedCount > 0} />
-        <StatCard icon="check-circle" label="Acknowledged" value={acknowledgedCount.toLocaleString()} />
+        <StatCard icon="bell" label={dict.sos.totalAlerts} value={allEvents.length.toLocaleString()} />
+        <StatCard icon="warning" label={dict.sos.unresolved} value={unresolvedCount.toLocaleString()} alert={unresolvedCount > 0} />
+        <StatCard icon="check-circle" label={dict.common.status.ACKNOWLEDGED} value={acknowledgedCount.toLocaleString()} />
       </div>
 
       <div className="flex justify-end">
         <Link href={`/sos?unresolvedOnly=${!unresolvedOnly}`} className="text-sm text-primary hover:underline underline-offset-2 font-medium">
-          {unresolvedOnly ? "Show all alerts" : "Show unresolved only"}
+          {unresolvedOnly ? dict.sos.showAllAlerts : dict.sos.showUnresolvedOnly}
         </Link>
       </div>
 
@@ -52,11 +56,11 @@ export default async function SosConsolePage({
         <div className="flex items-center justify-between px-5 py-4 border-b-2 border-outline-variant bg-surface-bright">
           <div className="flex items-center gap-2 font-bold text-on-surface">
             <Icon name="bell" filled className="size-5 text-danger-red" />
-            Critical Alerts
+            {dict.sos.criticalAlerts}
           </div>
           {unresolvedCount > 0 && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-[var(--radius-full)] bg-danger-red text-white text-xs font-bold">
-              {unresolvedCount} New
+              {t(dict.sos.newBadge, { count: unresolvedCount })}
             </span>
           )}
         </div>
@@ -70,18 +74,18 @@ export default async function SosConsolePage({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-4">
                     <p className="font-semibold text-on-surface">{agent ? `${agent.fullName} (${agent.employeeCode})` : event.agentId}</p>
-                    <span className="text-xs text-text-slate shrink-0">{timeAgo(event.raisedAt)}</span>
+                    <span className="text-xs text-text-slate shrink-0">{timeAgo(event.raisedAt, dict)}</span>
                   </div>
                   <p className="text-sm text-text-slate mt-1 flex items-center gap-1.5">
                     <Icon name="location" className="size-4 shrink-0" />
-                    {event.lat !== null && event.lon !== null ? `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}` : "Location unavailable"}
+                    {event.lat !== null && event.lon !== null ? `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}` : dict.sos.locationUnavailable}
                   </p>
                   <p className="text-xs text-text-grey-disabled mt-1">{new Date(event.raisedAt).toLocaleString()}</p>
                   <div className="mt-3 flex items-center gap-3">
                     {resolved ? (
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
                         <Icon name="check-circle" filled className="size-4 text-secondary" />
-                        Acknowledged
+                        {dict.common.status.ACKNOWLEDGED}
                       </span>
                     ) : (
                       <AcknowledgeButton eventId={event.id} />
@@ -95,7 +99,7 @@ export default async function SosConsolePage({
         {events.length === 0 && (
           <div className="p-10 flex flex-col items-center gap-2 text-center text-sm text-text-slate">
             <Icon name="check-circle" className="size-6 text-outline-variant" />
-            No {unresolvedOnly ? "unresolved " : ""}SOS alerts.
+            {unresolvedOnly ? dict.sos.noUnresolvedAlerts : dict.sos.noAlerts}
           </div>
         )}
       </div>

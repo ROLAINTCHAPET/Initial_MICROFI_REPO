@@ -3,6 +3,7 @@ import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'client_models.dart';
 import 'client_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// UC-22 — full contribution history / mini-statement, replacing the paper booklet page.
 class ClientHistoryScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
       setState(() => _entries = results);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(e));
+      setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,6 +54,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return ListView(
@@ -63,7 +65,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
           const SizedBox(height: 10),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.error)),
           const SizedBox(height: 14),
-          Center(child: FilledButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: FilledButton(onPressed: _load, child: Text(l10n.commonRetry))),
         ],
       );
     }
@@ -73,7 +75,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          const Text('Contribution History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.chContributionHistoryTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
             width: double.infinity,
@@ -86,7 +88,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total Contributions This Month', style: TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
+                Text(l10n.chTotalContributionsThisMonth, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
                 const SizedBox(height: 4),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -102,13 +104,13 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
           ),
           const SizedBox(height: MicrofiSpacing.gapLg),
           if (_entries.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  Icon(Icons.receipt_long, color: MicrofiColors.outlineVariant, size: 40),
-                  SizedBox(height: 10),
-                  Text('No contributions recorded yet.', style: TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+                  const Icon(Icons.receipt_long, color: MicrofiColors.outlineVariant, size: 40),
+                  const SizedBox(height: 10),
+                  Text(l10n.chNoContributionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
                 ],
               ),
             )
@@ -132,8 +134,8 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${_fmt(e.amountXaf)} XAF', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-                          Text('$date, $time • ${e.reference}', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                          Text(l10n.amountXaf(_fmt(e.amountXaf)), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                          Text(l10n.chDateTimeReferenceLine(date, time, e.reference), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
                         ],
                       ),
                     ),

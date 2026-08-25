@@ -1,11 +1,21 @@
 import 'package:geolocator/geolocator.dart';
+import '../l10n/app_localizations.dart';
+
+enum LocationUnavailableReason { servicesDisabled, permissionDenied }
 
 class LocationUnavailable implements Exception {
-  final String message;
-  LocationUnavailable(this.message);
+  final LocationUnavailableReason reason;
+  LocationUnavailable(this.reason);
+
+  /// Localized message for [reason] — call sites have a BuildContext (this is only ever thrown
+  /// from a location-capture flow driven by a widget), so the string is resolved at catch time.
+  String message(AppLocalizations l10n) => switch (reason) {
+        LocationUnavailableReason.servicesDisabled => l10n.locationErrorServicesDisabled,
+        LocationUnavailableReason.permissionDenied => l10n.locationErrorPermissionDenied,
+      };
 
   @override
-  String toString() => message;
+  String toString() => reason.toString();
 }
 
 /// BR-05/FR-12: a collection is rejected server-side without a GPS fix, so the app must capture
@@ -14,7 +24,7 @@ class LocationUnavailable implements Exception {
 Future<Position> captureCurrentLocation() async {
   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
-    throw LocationUnavailable('Location services are turned off on this device.');
+    throw LocationUnavailable(LocationUnavailableReason.servicesDisabled);
   }
 
   LocationPermission permission = await Geolocator.checkPermission();
@@ -22,7 +32,7 @@ Future<Position> captureCurrentLocation() async {
     permission = await Geolocator.requestPermission();
   }
   if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-    throw LocationUnavailable('Location permission was denied. Enable it to record a collection.');
+    throw LocationUnavailable(LocationUnavailableReason.permissionDenied);
   }
 
   return Geolocator.getCurrentPosition(

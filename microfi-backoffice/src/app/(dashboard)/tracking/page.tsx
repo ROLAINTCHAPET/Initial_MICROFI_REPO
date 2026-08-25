@@ -1,10 +1,14 @@
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import type { AgentResponse, BranchResponse, EscrowResponse, GeofenceAlertResponse, RouteResponse } from "@/lib/types";
 import { TrackingWorkspace, type TrackingAgent } from "./TrackingWorkspace";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
 
 export default async function TrackingPage() {
+  const dict = getDictionary(await getLocale());
   const [session, allAgents, branches] = await Promise.all([
     getSession(),
     api.get<AgentResponse[]>("/admin/agents"),
@@ -12,7 +16,10 @@ export default async function TrackingPage() {
   ]);
 
   // Same branch-scoping gap as Dashboard/Agents Overview: GET /admin/agents is network-wide.
-  const agents = session?.role === "ADMIN" ? allAgents : allAgents.filter((a) => a.branchId === session?.branchId);
+  // Suspended agents aren't in the field, so they're excluded from live tracking entirely.
+  const agents = (session?.role === "ADMIN" ? allAgents : allAgents.filter((a) => a.branchId === session?.branchId)).filter(
+    (a) => a.status !== "SUSPENDED"
+  );
   const branchById = new Map(branches.map((b) => [b.id, b]));
   const today = new Date().toISOString().slice(0, 10);
 
@@ -22,26 +29,41 @@ export default async function TrackingPage() {
     Promise.all(agents.map((a) => api.get<GeofenceAlertResponse[]>(`/admin/agents/${a.id}/geofence-alerts`).catch(() => []))),
   ]);
 
-  const trackingAgents: TrackingAgent[] = agents.map((agent, i) => {
-    const points = routes[i]?.points ?? [];
-    return {
-      id: agent.id,
-      fullName: agent.fullName,
-      employeeCode: agent.employeeCode,
-      phone: agent.phone,
-      branchName: branchById.get(agent.branchId)?.name ?? "—",
-      status: agent.status,
-      balanceXaf: escrows[i]?.balanceXaf ?? null,
-      lastPingAt: points.length > 0 ? points[points.length - 1].recordedAt : null,
-      hasActiveAlert: alertLists[i]?.some((a) => a.active) ?? false,
-    };
-  });
+  const trackingAgents: TrackingAgent[] = agents
+    .map((agent, i) => {
+      const points = routes[i]?.points ?? [];
+      const transactions = routes[i]?.transactions ?? [];
+      const lastCollectionAt =
+        transactions.length > 0
+          ? transactions.reduce((latest, t) => (t.collectedAt > latest ? t.collectedAt : latest), transactions[0].collectedAt)
+          : null;
+      return {
+        id: agent.id,
+        fullName: agent.fullName,
+        employeeCode: agent.employeeCode,
+        phone: agent.phone,
+        branchName: branchById.get(agent.branchId)?.name ?? "—",
+        status: agent.status,
+        balanceXaf: escrows[i]?.balanceXaf ?? null,
+        lastPingAt: points.length > 0 ? points[points.length - 1].recordedAt : null,
+        lastCollectionAt,
+        hasActiveAlert: alertLists[i]?.some((a) => a.active) ?? false,
+      };
+    })
+    // Agents who've just collected surface first (most recent collection first), everyone else follows.
+    .sort((a, b) => {
+      if (a.lastCollectionAt && b.lastCollectionAt) return b.lastCollectionAt.localeCompare(a.lastCollectionAt);
+      if (a.lastCollectionAt) return -1;
+      if (b.lastCollectionAt) return 1;
+      return 0;
+    });
 
   const canEditGeofence = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
 
   return (
     <div className="max-w-7xl mx-auto w-full h-full flex flex-col gap-6">
-      <PageHeader title="Geolocation" subtitle="Live field units, historical routes, and geofence boundaries." />
+      <AutoRefresh />
+      <PageHeader title={dict.sidebar.geolocation} subtitle={dict.tracking.page.subtitle} />
       <TrackingWorkspace agents={trackingAgents} canEditGeofence={canEditGeofence} />
     </div>
   );

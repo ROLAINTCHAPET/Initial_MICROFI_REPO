@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export function RecordVarianceModal({
   branchId,
@@ -18,6 +19,7 @@ export function RecordVarianceModal({
   shortageXaf: number;
 }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function RecordVarianceModal({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to record variance debt");
+        setError(body?.message ?? dict.ofj.recordVariance.failedToRecord);
         return;
       }
       setSucceeded(true);
@@ -47,7 +49,7 @@ export function RecordVarianceModal({
         router.refresh();
       }, 600);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -60,23 +62,26 @@ export function RecordVarianceModal({
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-full)] border-2 border-danger-red text-danger-red text-xs font-bold cursor-pointer transition-[background-color,transform] duration-150 ease-out hover:bg-danger-red/10 hover:scale-[1.03] active:scale-95"
       >
         <Icon name="warning" filled className="size-3.5" />
-        Record Variance
+        {dict.ofj.recordVariance.buttonLabel}
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Record Variance as Agent Debt">
+      <Modal open={open} onClose={() => setOpen(false)} title={dict.ofj.recordVariance.modalTitle}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex gap-3 items-start bg-error-container/40 border-2 border-error/30 rounded-[var(--radius-sm)] p-4">
             <Icon name="warning" filled className="size-5 text-danger-red shrink-0 mt-0.5" />
             <p className="text-sm text-on-error-container">
-              This formally charges <span className="font-semibold">{agentLabel}</span> a debt of{" "}
-              <span className="font-semibold tabular-nums">{shortageXaf.toLocaleString()} XAF</span> for today&apos;s shortage. This
-              cannot be undone from here.
+              {dict.ofj.recordVariance.warningPrefix}
+              <span className="font-semibold">{agentLabel}</span>
+              {dict.ofj.recordVariance.warningMiddle}
+              <span className="font-semibold tabular-nums">{shortageXaf.toLocaleString()} XAF</span>
+              {dict.ofj.recordVariance.warningSuffix}
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
             <label htmlFor="variance-comment" className="text-sm font-semibold text-on-surface">
-              Comment <span className="text-on-surface-variant font-normal">(optional)</span>
+              {dict.ofj.recordVariance.commentLabel}{" "}
+              <span className="text-on-surface-variant font-normal">{dict.ofj.recordVariance.optionalSuffix}</span>
             </label>
             <textarea
               id="variance-comment"
@@ -84,7 +89,7 @@ export function RecordVarianceModal({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}
-              placeholder="Context for this shortage…"
+              placeholder={dict.ofj.recordVariance.commentPlaceholder}
               className="w-full px-3 py-2 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface text-sm focus:outline-none focus:border-primary transition-colors resize-none"
             />
           </div>
@@ -93,7 +98,7 @@ export function RecordVarianceModal({
 
           <div className="flex justify-end gap-2 mt-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={succeeded}>
-              Cancel
+              {dict.common.cancel}
             </Button>
             <button
               type="submit"
@@ -105,14 +110,14 @@ export function RecordVarianceModal({
               {succeeded ? (
                 <>
                   <Icon name="check-circle" className="size-5" />
-                  Recorded
+                  {dict.ofj.recordVariance.recorded}
                 </>
               ) : loading ? (
-                "Recording…"
+                dict.ofj.recordVariance.recording
               ) : (
                 <>
                   <Icon name="warning" filled className="size-4" />
-                  Record Debt
+                  {dict.ofj.recordVariance.recordDebt}
                 </>
               )}
             </button>

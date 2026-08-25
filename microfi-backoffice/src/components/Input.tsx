@@ -1,6 +1,6 @@
 "use client";
 
-import type { InputHTMLAttributes, ReactNode } from "react";
+import type { InputHTMLAttributes, MouseEvent, ReactNode } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode;
@@ -22,9 +22,20 @@ export function Input({ label, error, success = false, disabled, id, icon, trail
     : success
       ? "border-2 border-success-emerald"
       : "border-2 border-outline-variant focus-visible:border-primary";
-  // type="time"/"date" behave like compound picker controls rather than free-text entry —
-  // browsers default them to a text cursor, which reads as non-interactive; override it.
-  const isPicker = props.type === "time" || props.type === "date";
+  // type="date" behaves like a compound picker control rather than free-text entry — browsers
+  // default it to a text cursor, which reads as non-interactive; override it, and open the native
+  // picker on click. (type="time" used to get the same treatment, but its cross-browser behavior
+  // was inconsistent enough — see TimePicker.tsx — that it's now a fully custom component instead.)
+  const isPicker = props.type === "date";
+
+  function openPickerOnClick(e: MouseEvent<HTMLInputElement>) {
+    try {
+      e.currentTarget.showPicker?.();
+    } catch {
+      e.currentTarget.focus();
+    }
+    props.onClick?.(e);
+  }
 
   return (
     <div className="flex flex-col gap-1">
@@ -39,6 +50,7 @@ export function Input({ label, error, success = false, disabled, id, icon, trail
           {...props}
           id={inputId}
           disabled={disabled}
+          onClick={isPicker && !disabled ? openPickerOnClick : props.onClick}
           className={`w-full min-h-12 ${icon ? "pl-10" : "pl-3"} ${trailing ? "pr-10" : "pr-3"} rounded-[var(--radius-sm)] outline-none text-sm bg-surface-container-lowest
             ${isPicker ? "cursor-pointer" : ""} disabled:cursor-not-allowed
             disabled:bg-surface-grey-100 disabled:text-text-grey-disabled disabled:border-transparent

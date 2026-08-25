@@ -7,24 +7,31 @@ import { Icon, type IconName } from "@/components/Icon";
 import type { BranchResponse, RegistrationApplicationResponse, RegistrationApplicationStatus } from "@/lib/types";
 import { ApproveButton } from "./ApproveButton";
 import { RejectApplicationModal } from "./RejectApplicationModal";
+import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
+import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
-const STATUS_BADGE: Record<RegistrationApplicationStatus, { status: BadgeStatus; label: string }> = {
-  SUBMITTED: { status: "PENDING", label: "Pending Review" },
-  APPROVED: { status: "ACTIVE", label: "Approved" },
-  REJECTED: { status: "SUSPENDED", label: "Rejected" },
+const STATUS_BADGE: Record<RegistrationApplicationStatus, BadgeStatus> = {
+  SUBMITTED: "PENDING",
+  APPROVED: "ACTIVE",
+  REJECTED: "SUSPENDED",
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  AGENT: "Field Agent",
-  BRANCH_MANAGER: "Branch Manager",
-  BRANCH_CASHIER: "Branch Cashier",
-};
+function roleLabel(dict: Dictionary): Record<string, string> {
+  return {
+    AGENT: dict.agents.fieldAgentLabel,
+    BRANCH_MANAGER: dict.roles.BRANCH_MANAGER,
+    BRANCH_CASHIER: dict.roles.BRANCH_CASHIER,
+  };
+}
 
 export default async function RegistrationsPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  const dict = getDictionary(await getLocale());
+  const ROLE_LABEL = roleLabel(dict);
   const params = await searchParams;
   const statusFilter = params.status === "APPROVED" || params.status === "REJECTED" ? params.status : "SUBMITTED";
 
@@ -43,13 +50,13 @@ export default async function RegistrationsPage({
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
-      <PageHeader title="Registrations" subtitle="Compliance-gated digital enrollment dossiers for agents, cashiers, and branch managers." />
+      <PageHeader title={dict.registrations.pageTitle} subtitle={dict.registrations.pageSubtitle} />
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="grid grid-cols-3 gap-4 flex-1">
-          <StatCard icon="edit-note" label="Pending Review" value={submittedCount.toLocaleString()} alert={submittedCount > 0} />
-          <StatCard icon="check-circle" label="Approved" value={approvedCount.toLocaleString()} />
-          <StatCard icon="warning" label="Rejected" value={rejectedCount.toLocaleString()} />
+          <StatCard icon="edit-note" label={dict.registrations.applicationStatus.SUBMITTED} value={submittedCount.toLocaleString()} alert={submittedCount > 0} />
+          <StatCard icon="check-circle" label={dict.registrations.applicationStatus.APPROVED} value={approvedCount.toLocaleString()} />
+          <StatCard icon="warning" label={dict.registrations.applicationStatus.REJECTED} value={rejectedCount.toLocaleString()} />
         </div>
         {canSubmit && (
           <Link
@@ -57,7 +64,7 @@ export default async function RegistrationsPage({
             className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
           >
             <Icon name="plus" className="size-5" />
-            New Application
+            {dict.registrations.newApplication}
           </Link>
         )}
       </div>
@@ -71,7 +78,7 @@ export default async function RegistrationsPage({
               statusFilter === s ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
             }`}
           >
-            {STATUS_BADGE[s].label}
+            {dict.registrations.applicationStatus[s]}
           </Link>
         ))}
       </div>
@@ -80,30 +87,33 @@ export default async function RegistrationsPage({
         <div className="divide-y divide-outline-variant">
           {applications.map((application) => {
             const branch = branchById.get(application.branchId);
-            const badge = STATUS_BADGE[application.status];
+            const badgeStatus = STATUS_BADGE[application.status];
+            const badgeLabel = dict.registrations.applicationStatus[application.status];
             return (
               <div key={application.id} className="card-interactive flex items-start gap-4 p-5">
-                <div className="flex-1 min-w-0">
+                <Link href={`/registrations/${application.id}`} className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-4">
-                    <Link href={`/registrations/${application.id}`} className="font-semibold text-on-surface hover:text-primary">
+                    <span className="font-semibold text-on-surface hover:text-primary">
                       {application.firstName} {application.lastName}
-                    </Link>
-                    <Badge status={badge.status} label={badge.label} />
+                    </span>
+                    <Badge status={badgeStatus} label={badgeLabel} />
                   </div>
                   <p className="text-sm text-text-slate mt-1">
                     {ROLE_LABEL[application.targetRole]} &middot; {branch ? `${branch.name} (${branch.code})` : application.branchId}
                   </p>
-                  <p className="text-xs text-text-grey-disabled mt-1">Submitted {new Date(application.submittedAt).toLocaleString()}</p>
-                  {application.status === "SUBMITTED" && canReview && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <ApproveButton applicationId={application.id} login={application.login} targetRole={application.targetRole} />
-                      <RejectApplicationModal applicationId={application.id} />
-                    </div>
-                  )}
+                  <p className="text-xs text-text-grey-disabled mt-1">
+                    {t(dict.registrations.submittedAt, { date: new Date(application.submittedAt).toLocaleString() })}
+                  </p>
                   {application.status === "REJECTED" && application.rejectionReason && (
-                    <p className="text-xs text-danger-red mt-2">Reason: {application.rejectionReason}</p>
+                    <p className="text-xs text-danger-red mt-2">{t(dict.registrations.reasonPrefix, { reason: application.rejectionReason })}</p>
                   )}
-                </div>
+                </Link>
+                {application.status === "SUBMITTED" && canReview && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <ApproveButton applicationId={application.id} login={application.login} targetRole={application.targetRole} />
+                    <RejectApplicationModal applicationId={application.id} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -111,7 +121,7 @@ export default async function RegistrationsPage({
         {applications.length === 0 && (
           <div className="p-10 flex flex-col items-center gap-2 text-center text-sm text-text-slate">
             <Icon name="edit-note" className="size-6 text-outline-variant" />
-            No {STATUS_BADGE[statusFilter].label.toLowerCase()} applications.
+            {t(dict.registrations.noApplications, { status: dict.registrations.applicationStatus[statusFilter].toLowerCase() })}
           </div>
         )}
       </div>

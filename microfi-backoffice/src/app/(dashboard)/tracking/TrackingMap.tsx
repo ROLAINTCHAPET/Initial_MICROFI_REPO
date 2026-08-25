@@ -85,12 +85,8 @@ export function TrackingMap({
             {t.amountXaf.toLocaleString()} XAF
             <br />
             {new Date(t.collectedAt).toLocaleTimeString()}
-            {t.locationName && (
-              <>
-                <br />
-                {t.locationName}
-              </>
-            )}
+            <br />
+            {t.locationName ?? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}`}
           </Popup>
         </CircleMarker>
       ))}

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/design_tokens.dart';
+import '../../core/language_picker.dart';
 import '../auth/pin_setup_screen.dart';
 import '../home/agent_profile.dart';
 import '../home/branch_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Mostly read-only — there's no self-service field on the backend an agent can safely edit
 /// themselves beyond their transaction PIN (employee code/IMEI are security-bound identity
@@ -42,10 +44,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final profile = _profile;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('My Profile')),
+      appBar: AppBar(title: Text(l10n.prMyProfileTitle), actions: const [Padding(padding: EdgeInsets.only(right: 12), child: LanguagePickerButton())]),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(MicrofiSpacing.page),
@@ -74,13 +77,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  _Row(label: 'Username', value: profile.username),
-                  _Row(label: 'Employee Code', value: profile.employeeCode),
-                  if (profile.email != null) _Row(label: 'Email', value: profile.email!),
-                  _Row(label: 'Phone', value: profile.phone),
-                  _Row(label: 'Device Binding', value: profile.imei != null ? 'Bound' : 'Not bound (own device)'),
-                  _Row(label: 'Branch', value: _branchName ?? '…'),
-                  _Row(label: 'Status', value: profile.status),
+                  _Row(label: l10n.lgUsernameLabel, value: profile.username),
+                  _Row(label: l10n.prEmployeeCodeLabel, value: profile.employeeCode),
+                  if (profile.email != null) _Row(label: l10n.prEmailLabel, value: profile.email!),
+                  _Row(label: l10n.prPhoneLabel, value: profile.phone),
+                  _Row(label: l10n.prDeviceBindingLabel, value: profile.imei != null ? l10n.prBound : l10n.prNotBoundOwnDevice),
+                  _Row(label: l10n.rpBranchLabel, value: _branchName ?? '…'),
+                  _Row(label: l10n.cwStatusLabel, value: profile.status),
                 ],
               ),
             ),
@@ -91,15 +94,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: OutlinedButton.icon(
                 onPressed: _changePin,
                 icon: const Icon(Icons.lock_reset_outlined),
-                label: const Text('Change Transaction PIN'),
+                label: Text(l10n.prChangeTransactionPin),
               ),
             ),
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
-                'To change your username, password, or other details, contact your branch back-office.',
-                style: TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+                l10n.prContactBackOfficeNote,
+                style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
               ),
             ),
           ],

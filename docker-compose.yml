@@ -65,6 +65,8 @@ services:
       # Compliance-gated registration document uploads (DocumentStorageService) — local disk,
       # matching the rest of this self-hosted stack rather than S3/MinIO.
       - REGISTRATION_DOCUMENTS_STORAGE_PATH=/data/registration-documents
+      # Escrow top-up deposit proof — same mounted volume, sibling subfolder, no new volume needed.
+      - ESCROW_DEPOSIT_PROOFS_STORAGE_PATH=/data/registration-documents/escrow-deposit-proofs
     volumes:
       - registration_documents:/data/registration-documents
     ports:

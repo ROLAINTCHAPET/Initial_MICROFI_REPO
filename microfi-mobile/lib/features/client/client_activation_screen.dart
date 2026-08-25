@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'client_repository.dart';
+import '../../l10n/app_localizations.dart';
 
 /// UC-19 step 1 of the two-party activation gate: the client sets their own login/PIN here.
 /// Steps 2/3 (agent sponsorship + the client's own payment confirmation) happen afterwards — the
@@ -44,7 +46,7 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
       setState(() => _successMessage = message);
     } catch (e) {
       if (!mounted) return;
-      await showErrorDialog(context, e, title: 'Activation Failed');
+      await showErrorDialog(context, e, title: AppLocalizations.of(context)!.caActivationFailedTitle);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -52,16 +54,17 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Activate My Booklet')),
+      appBar: AppBar(title: Text(l10n.caActivateMyBookletTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: _successMessage != null ? _buildSuccess() : _buildForm(),
+              child: _successMessage != null ? _buildSuccess(l10n) : _buildForm(l10n),
             ),
           ),
         ),
@@ -69,7 +72,7 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
     );
   }
 
-  Widget _buildSuccess() {
+  Widget _buildSuccess(AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -80,7 +83,7 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
           child: const Icon(Icons.check, color: Colors.white, size: 26),
         ),
         const SizedBox(height: 14),
-        const Text('Credentials Set', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+        Text(l10n.caCredentialsSetTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
         const SizedBox(height: 8),
         Text(_successMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
         const SizedBox(height: 18),
@@ -88,14 +91,14 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
           width: double.infinity,
           child: FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Back to Login'),
+            child: Text(l10n.caBackToLogin),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -106,9 +109,9 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
             color: MicrofiColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(MicrofiRadius.md),
           ),
-          child: const Text(
-            'Enter the Activation ID your branch gave you and choose a login and PIN. Afterwards, ask your agent to sponsor your activation, then confirm the payment yourself to receive your booklet.',
-            style: TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+          child: Text(
+            l10n.caIntroMessage,
+            style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
           ),
         ),
         const SizedBox(height: MicrofiSpacing.gapLg),
@@ -120,29 +123,30 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
             children: [
               TextFormField(
                 controller: _activationIdController,
-                decoration: const InputDecoration(labelText: 'Activation ID', prefixIcon: Icon(Icons.qr_code)),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                decoration: InputDecoration(labelText: l10n.caActivationIdLabel, prefixIcon: const Icon(Icons.qr_code)),
+                validator: (v) => (v == null || v.trim().isEmpty) ? l10n.commonRequiredField : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _loginController,
-                decoration: const InputDecoration(labelText: 'Choose a Login', prefixIcon: Icon(Icons.person_outline)),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                decoration: InputDecoration(labelText: l10n.caChooseLoginLabel, prefixIcon: const Icon(Icons.person_outline)),
+                validator: (v) => (v == null || v.trim().isEmpty) ? l10n.commonRequiredField : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _pinController,
-                decoration: const InputDecoration(labelText: 'Choose a PIN', prefixIcon: Icon(Icons.lock_outline)),
+                decoration: InputDecoration(labelText: l10n.caChoosePinLabel, prefixIcon: const Icon(Icons.lock_outline)),
                 obscureText: true,
                 keyboardType: TextInputType.number,
-                validator: (v) => (v == null || v.length < 4) ? 'Min. 4 digits' : null,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) => (v == null || v.length < 4 || v.length > 6) ? l10n.caPinDigitsError : null,
               ),
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Set My Credentials'),
+                    : Text(l10n.caSetCredentialsButton),
               ),
             ],
           ),

@@ -12,7 +12,9 @@ import com.microfi.authentication.repository.BranchScheduleDefaultsRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.notifications.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
@@ -30,6 +32,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = BranchController.class)
@@ -58,6 +63,12 @@ class BranchControllerTest {
 
     @MockitoBean
     private ClientDetailsService clientDetailsService;
+
+    @MockitoBean
+    private AgentDirectoryService agentDirectoryService;
+
+    @MockitoBean
+    private NotificationService notificationService;
 
     private Authentication adminAuthentication(AdminRole role) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")
@@ -343,6 +354,67 @@ class BranchControllerTest {
                 .expectBody()
                 .jsonPath("$.openTime").isEqualTo("07:00:00")
                 .jsonPath("$.closeTime").isEqualTo("18:00:00");
+    }
+
+    @Test
+    void testPutScheduleRejectsOpenTimeChangeAfterItHasAlreadyPassedToday() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central")
+                .openTime(LocalTime.of(7, 0)).closeTime(LocalTime.of(17, 0)).timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(agentDirectoryService.isBranchPastOpenTime(branch)).thenReturn(true);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"openTime\":\"08:00:00\",\"closeTime\":\"18:00:00\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+
+        verify(branchRepository, never()).save(any());
+    }
+
+    @Test
+    void testPutScheduleAllowsCloseTimeChangeAfterOpenTimeHasAlreadyPassedToday() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central")
+                .openTime(LocalTime.of(7, 0)).closeTime(LocalTime.of(17, 0)).timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agentDirectoryService.isBranchPastOpenTime(branch)).thenReturn(true);
+
+        // Same openTime as already stored — only closeTime actually changes.
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"openTime\":\"07:00:00\",\"closeTime\":\"19:00:00\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.closeTime").isEqualTo("19:00:00");
+
+        verify(notificationService).notifyBranchScheduleChange(eq(id), eq("Douala Central"), eq(LocalTime.of(19, 0)));
+    }
+
+    @Test
+    void testPutScheduleDoesNotNotifyWhenCloseTimeUnchanged() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central")
+                .openTime(LocalTime.of(7, 0)).closeTime(LocalTime.of(18, 0)).timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"openTime\":\"07:00:00\",\"closeTime\":\"18:00:00\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(notificationService, never()).notifyBranchScheduleChange(any(), any(), any());
     }
 
     @Test

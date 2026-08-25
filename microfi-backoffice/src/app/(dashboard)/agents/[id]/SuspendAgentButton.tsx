@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import type { AgentStatus } from "@/lib/types";
+import { useDictionary } from "@/lib/i18n/I18nProvider";
 
 export function SuspendAgentButton({ agentId, status, hasCeiling }: { agentId: string; status: AgentStatus; hasCeiling: boolean }) {
   const router = useRouter();
+  const dict = useDictionary();
   const [loading, setLoading] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function SuspendAgentButton({ agentId, status, hasCeiling }: { agentId: s
   const reactivateDisabled = !isSuspendAction && !hasCeiling;
 
   async function handleClick() {
-    if (isSuspendAction && !confirm("Suspend this agent? This immediately invalidates their active session.")) {
+    if (isSuspendAction && !confirm(dict.agents.suspend.confirmSuspend)) {
       return;
     }
     setError(null);
@@ -33,7 +35,7 @@ export function SuspendAgentButton({ agentId, status, hasCeiling }: { agentId: s
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.message ?? "Failed to update status");
+        setError(body?.message ?? dict.agents.suspend.failedToUpdateStatus);
         return;
       }
       setSucceeded(true);
@@ -41,7 +43,7 @@ export function SuspendAgentButton({ agentId, status, hasCeiling }: { agentId: s
         router.refresh();
       }, 500);
     } catch {
-      setError("Unable to reach the server");
+      setError(dict.common.unableToReachServer);
     } finally {
       setLoading(false);
     }
@@ -58,16 +60,16 @@ export function SuspendAgentButton({ agentId, status, hasCeiling }: { agentId: s
         {succeeded ? (
           <>
             <Icon name="check-circle" className="size-5" />
-            Done
+            {dict.agents.suspend.done}
           </>
         ) : isSuspendAction ? (
-          "Suspend Agent"
+          dict.agents.suspend.suspendAgent
         ) : (
-          "Reactivate Agent"
+          dict.agents.suspend.reactivateAgent
         )}
       </Button>
       {reactivateDisabled && !succeeded && (
-        <p className="text-xs text-on-surface-variant max-w-[220px]">Fund this agent&apos;s escrow account before reactivating.</p>
+        <p className="text-xs text-on-surface-variant max-w-[220px]">{dict.agents.suspend.fundBeforeReactivate}</p>
       )}
       {error && <p role="alert" className="text-sm text-danger-red">{error}</p>}
     </div>

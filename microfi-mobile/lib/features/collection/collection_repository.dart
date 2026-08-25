@@ -29,13 +29,15 @@ class CollectionSyncResult {
   final String deviceTxId;
   final bool success;
   final String? error;
+  final String? collectionId;
 
-  CollectionSyncResult({required this.deviceTxId, required this.success, this.error});
+  CollectionSyncResult({required this.deviceTxId, required this.success, this.error, this.collectionId});
 
   factory CollectionSyncResult.fromJson(Map<String, dynamic> json) => CollectionSyncResult(
         deviceTxId: json['deviceTxId'] as String,
         success: json['success'] as bool,
         error: json['error'] as String?,
+        collectionId: (json['collection'] as Map<String, dynamic>?)?['id'] as String?,
       );
 }
 

@@ -27,4 +27,12 @@ class BranchRepository {
     final json = await client.get('/agents/me/branch') as Map<String, dynamic>;
     return AgentBranch.fromJson(json);
   }
+
+  /// GET /agents/me/mfi-name — the org name printed on a receipt (BR-Notif-01), cached client-side
+  /// via ReceiptContextCache so an offline collection can still compose a compliant one.
+  Future<String> fetchMfiName() async {
+    final client = ApiClient(token: token);
+    final json = await client.get('/agents/me/mfi-name') as Map<String, dynamic>;
+    return json['name'] as String;
+  }
 }

@@ -87,7 +87,7 @@ public class RegistrationApplicationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "National ID Number format looks invalid for this phone's country");
         }
         if (!kycFormatValidator.isValidTaxId(request.getTaxIdNumber(), request.getPhone())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tax ID Number format looks invalid for this phone's country");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unique Identification Number (UIN) format looks invalid for this phone's country");
         }
         requireUnique(request);
 
@@ -97,6 +97,7 @@ public class RegistrationApplicationService {
                 .branchId(request.getBranchId())
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
+                .dateOfBirth(request.getDateOfBirth())
                 .phone(request.getPhone())
                 .login(request.getLogin())
                 .email(request.getEmail())
@@ -113,7 +114,7 @@ public class RegistrationApplicationService {
 
     /**
      * No two agents/cashiers/managers may share a username, phone, email, National ID Number, or
-     * Tax ID Number — checked here, at submission, as a final backstop. The same per-field checks
+     * Unique Identification Number (UIN) — checked here, at submission, as a final backstop. The same per-field checks
      * are also exposed live via {@link #isAvailable} (GET .../availability), called by the wizard
      * as each field is filled in — this is deliberately not the first time a duplicate surfaces;
      * it's the last-resort guarantee for whatever the live check missed (a race between two
@@ -133,16 +134,15 @@ public class RegistrationApplicationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "National ID Number is already in use or pending review");
         }
         if (request.getTaxIdNumber() != null && !request.getTaxIdNumber().isBlank() && isTaxIdTaken(request.getTaxIdNumber())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Tax ID Number is already in use or pending review");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Unique Identification Number (UIN) is already in use or pending review");
         }
     }
 
     /**
      * Live per-field uniqueness check backing GET .../availability — this is the one the wizard
      * actually calls as the person fills in each field, so a duplicate is caught immediately
-     * instead of only at the final "Submit for Review" click. A blank value is always available
-     * (both National ID and Tax ID are optional; the required fields are still enforced blank-or-not
-     * by the form itself).
+     * instead of only at the final "Submit for Review" click. A blank value is always available —
+     * National ID and UIN are mandatory, but that's enforced by the form/DTO, not this uniqueness check.
      */
     public boolean isAvailable(RegistrationAvailabilityField field, String value) {
         if (value == null || value.isBlank()) {
