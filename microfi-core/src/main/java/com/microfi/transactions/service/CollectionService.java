@@ -1,6 +1,7 @@
 package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.events.CollectionGeocodePublisher;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
@@ -48,7 +49,7 @@ public class CollectionService {
     private final ActivationDirectoryService activationDirectoryService;
     private final AgentDirectoryService agentDirectoryService;
     private final GeofenceService geofenceService;
-    private final GeocodingService geocodingService;
+    private final CollectionGeocodePublisher collectionGeocodePublisher;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
@@ -75,7 +76,12 @@ public class CollectionService {
                 .lat(request.getLat())
                 .lon(request.getLon())
                 .accuracyM(request.getAccuracyM())
-                .locationName(geocodingService.reverseGeocode(request.getLat(), request.getLon()))
+                // locationName starts null and is filled in asynchronously — see
+                // CollectionGeocodeListener. Was previously resolved synchronously right here via
+                // GeocodingService.reverseGeocode, a real blocking call to OpenStreetMap's
+                // rate-limited free Nominatim service; a burst of agents reconnecting together
+                // meant a burst of Core threads each held open for up to Nominatim's own timeout,
+                // for a field that was already best-effort/nullable on any lookup failure anyway.
                 .collectedAt(request.getCollectedAt())
                 .deviceTxId(request.getDeviceTxId())
                 .build();
@@ -91,6 +97,8 @@ public class CollectionService {
                         .build());
             }
         }
+
+        collectionGeocodePublisher.publish(collection.getId(), collection.getLat(), collection.getLon());
 
         return toResponse(collection, false);
     }

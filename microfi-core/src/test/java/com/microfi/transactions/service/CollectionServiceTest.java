@@ -1,6 +1,7 @@
 package com.microfi.transactions.service;
 
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.events.CollectionGeocodePublisher;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.CollectionRequest;
@@ -47,7 +48,7 @@ class CollectionServiceTest {
     @Mock
     private GeofenceService geofenceService;
     @Mock
-    private GeocodingService geocodingService;
+    private CollectionGeocodePublisher collectionGeocodePublisher;
 
     private CollectionService collectionService;
 
@@ -57,7 +58,7 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, geocodingService);
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, collectionGeocodePublisher);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
         when(geofenceService.isWithinAssignedGeofence(any(), anyDouble(), anyDouble())).thenReturn(true);
@@ -169,30 +170,42 @@ class CollectionServiceTest {
     }
 
     @Test
-    void capturesReverseGeocodedLocationName() {
+    void locationNameStartsNullAndIsResolvedAsynchronously() {
+        // Reverse-geocoding used to happen inline (a real blocking call to Nominatim) — it's now
+        // dispatched to CollectionGeocodeListener via CollectionGeocodePublisher instead, so the
+        // immediate response never carries a resolved name, only the async path fills it in later.
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
         when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
-        when(geocodingService.reverseGeocode(4.05, 9.70)).thenReturn("Akwa, Douala, Cameroon");
-
-        CollectionResponse response = collectionService.recordCollection(agentId, request);
-
-        assertThat(response.getLocationName()).isEqualTo("Akwa, Douala, Cameroon");
-    }
-
-    @Test
-    void recordsCollectionEvenWhenGeocodingFails() {
-        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
-        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
-        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
-        when(geocodingService.reverseGeocode(4.05, 9.70)).thenReturn(null);
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
         assertThat(response.isDuplicate()).isFalse();
         assertThat(response.getLocationName()).isNull();
+    }
+
+    @Test
+    void publishesGeocodeEventAfterSavingTheCollection() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        org.mockito.Mockito.verify(collectionGeocodePublisher).publish(response.getId(), 4.05, 9.70);
+    }
+
+    @Test
+    void doesNotPublishGeocodeEventOnIdempotentReplay() {
+        Collection existing = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("DEV-TX-1").build();
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.of(existing));
+
+        collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1))));
+
+        org.mockito.Mockito.verifyNoInteractions(collectionGeocodePublisher);
     }
 
     @Test

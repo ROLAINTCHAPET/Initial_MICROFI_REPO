@@ -48,6 +48,17 @@ services:
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES=true
+      # Never previously set — Spring Boot's RabbitMQ/Redis autoconfiguration silently defaulted
+      # to localhost:5672/6379 inside this container (nothing listens there), so every RabbitMQ
+      # connection attempt was failing before this. AuthEventPublisher's publish() already
+      # swallows that failure by design (a broker outage must never block a login), which is
+      # exactly why it went unnoticed rather than erroring loudly.
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=microfi
+      - SPRING_RABBITMQ_PASSWORD=microfi_password
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
       # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
       # Change these before any real deployment.
