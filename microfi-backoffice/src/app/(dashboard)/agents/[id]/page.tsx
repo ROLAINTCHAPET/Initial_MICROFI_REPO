@@ -6,7 +6,9 @@ import { Badge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { ceilingUtilizationPct } from "@/lib/format";
 import type { AgentResponse, BranchResponse, EscrowResponse } from "@/lib/types";
+import { AgentCollectionsPanel } from "./AgentCollectionsPanel";
 import { WaiverModal } from "./WaiverModal";
+import { DeleteAgentModal } from "./DeleteAgentModal";
 import { SuspendAgentButton } from "./SuspendAgentButton";
 import { ResetDeviceBindingModal } from "./ResetDeviceBindingModal";
 import { TopUpEscrowModal } from "./TopUpEscrowModal";
@@ -49,16 +51,28 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             </div>
             <p className="text-sm text-on-surface-variant mt-1">{agent.employeeCode} &middot; {branch?.name ?? "—"}</p>
           </div>
-          {canManage && (
-            <div className="flex gap-3">
+          {canManage && agent.status !== "DELETED" && (
+            <div className="flex flex-wrap gap-3">
               <SuspendAgentButton agentId={agent.id} status={agent.status} hasCeiling={(escrow?.baseCeilingXaf ?? 0) > 0} />
               <TopUpEscrowModal agentId={agent.id} isPendingCeiling={agent.status === "PENDING_CEILING"} />
               <WaiverModal agentId={agent.id} currentCeiling={escrow?.effectiveCeilingXaf ?? 0} />
               <ResetDeviceBindingModal agentId={agent.id} bound={agent.imei !== null} />
+              <DeleteAgentModal agentId={agent.id} />
             </div>
           )}
         </div>
       </div>
+
+      {agent.status === "DELETED" && (
+        <div className="mb-6 p-4 rounded-[var(--radius-md)] bg-error-container text-on-error-container">
+          <p className="font-semibold">{dict.agents.deletedBanner.title}</p>
+          {agent.deletionReason && (
+            <p className="text-sm mt-1">
+              {dict.agents.deletedBanner.reasonPrefix} {agent.deletionReason}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
         <div className="md:col-span-8 flex flex-col gap-4 md:gap-6">
@@ -142,6 +156,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 md:mt-6">
+        <AgentCollectionsPanel agentId={agent.id} />
       </div>
     </div>
   );

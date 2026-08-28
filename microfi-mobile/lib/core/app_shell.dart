@@ -99,7 +99,13 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle_outlined),
+            icon: Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: MicrofiColors.surfaceContainerLowest, shape: BoxShape.circle),
+              child: const Icon(Icons.person, color: MicrofiColors.primary, size: 18),
+            ),
             onSelected: (value) {
               if (value == 'profile') _openProfile();
               if (value == 'signout') _signOut();

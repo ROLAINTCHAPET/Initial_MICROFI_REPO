@@ -5,6 +5,7 @@ import 'core/jwt.dart';
 import 'core/locale_preference.dart';
 import 'core/session_entry.dart';
 import 'core/session_storage.dart';
+import 'features/auth/language_select_screen.dart';
 import 'features/auth/role_select_screen.dart';
 import 'features/client/client_session_entry.dart';
 import 'l10n/app_localizations.dart';
@@ -93,6 +94,9 @@ class _SessionGateState extends State<_SessionGate> {
   Widget build(BuildContext context) {
     if (!_checked) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!LocalePreference.instance.hasChosen) {
+      return LanguageSelectScreen(onSelected: () => setState(() {}));
     }
     if (_token != null && _principalType == 'CLIENT') {
       return ClientSessionEntry(token: _token!);

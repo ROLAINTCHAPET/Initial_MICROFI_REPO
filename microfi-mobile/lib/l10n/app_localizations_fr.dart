@@ -326,6 +326,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hsCollectionHistoryTitle => 'Historique des encaissements';
 
   @override
+  String get hsQuickActionHistory => 'Historique';
+
+  @override
   String get hsSosSentMessage =>
       'Alerte SOS envoyée — votre agence a été alertée.';
 

@@ -193,18 +193,19 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
   }
 
   return (
-    <div className="relative rounded-[var(--radius-md)] border-2 border-outline-variant overflow-hidden bg-surface-container-low h-[calc(100vh-220px)] min-h-[480px]">
-      <TrackingMap
-        points={route?.points ?? []}
-        transactions={route?.transactions ?? []}
-        geofence={geofence?.vertices ?? null}
-        editingVertices={editing ? draftVertices : null}
-        onMapClick={editing ? handleMapClick : undefined}
-      />
+    <div className="relative">
+      <div className="relative rounded-[var(--radius-md)] border-2 border-outline-variant overflow-hidden bg-surface-container-low h-[calc(100vh-220px)] min-h-[480px]">
+        <TrackingMap
+          points={route?.points ?? []}
+          transactions={route?.transactions ?? []}
+          geofence={geofence?.vertices ?? null}
+          editingVertices={editing ? draftVertices : null}
+          onMapClick={editing ? handleMapClick : undefined}
+        />
 
-      {/* Floating over the map, matching the design reference — not a layout column, so it never
-          fights the map for space and can't push it out of view. */}
-      <div className="absolute top-3 left-3 z-[1000] w-80 max-w-[calc(100%-1.5rem)] max-h-[min(60vh,520px)] flex flex-col bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-1)] overflow-hidden">
+        {/* Floating over the map, matching the design reference — not a layout column, so it never
+            fights the map for space and can't push it out of view. */}
+        <div className="absolute top-3 left-3 z-[1000] w-80 max-w-[calc(100%-1.5rem)] max-h-[min(60vh,520px)] flex flex-col bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-1)] overflow-hidden">
         <div className="px-4 py-3 border-b-2 border-outline-variant bg-surface-container-low flex items-center justify-between shrink-0">
           <h2 className="text-h2 text-on-surface">{dict.tracking.workspace.activeFieldUnits}</h2>
           <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-full)] bg-secondary-fixed text-on-secondary-fixed-variant text-xs font-bold">
@@ -251,7 +252,37 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
         </div>
       </div>
 
-      <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-3">
+      {activeAlert && selectedAgent && (
+        <div className="absolute bottom-3 right-3 left-3 sm:left-auto z-[1000] max-w-sm bg-error-container border-2 border-error rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-2)] p-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-on-error-container font-bold">
+            <Icon name="warning" filled className="size-5" />
+            {dict.tracking.workspace.geofenceBreach}
+          </div>
+          <p className="text-sm text-on-error-container">
+            <span className="font-semibold">{selectedAgent.fullName}</span>{" "}
+            {t(dict.tracking.workspace.outsideZoneSince, { time: new Date(activeAlert.firstDetectedOutsideAt).toLocaleTimeString() })}
+          </p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-on-error-container/80">{dict.tracking.workspace.liabilityAtRisk}</span>
+            <span className="font-bold tabular-nums text-on-error-container">
+              {selectedAgent.balanceXaf !== null ? `${selectedAgent.balanceXaf.toLocaleString()} XAF` : "—"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-on-error-container/80">{dict.tracking.workspace.breachDuration}</span>
+            <span className="font-bold tabular-nums text-on-error-container">{formatDuration(activeAlert.firstDetectedOutsideAt, nowMs)}</span>
+          </div>
+          <a
+            href={`tel:${selectedAgent.phone}`}
+            className="h-10 px-4 rounded-[var(--radius-sm)] bg-danger-red text-white text-sm font-semibold cursor-pointer flex items-center justify-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-95"
+          >
+            {t(dict.tracking.workspace.callAgent, { phone: selectedAgent.phone })}
+          </a>
+        </div>
+      )}
+      </div>
+
+      <div className="relative sm:absolute sm:top-3 sm:right-3 mt-3 sm:mt-0 z-[1000] flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
         <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-1)] px-4 py-3 flex items-center gap-3 flex-wrap">
           {selectedAgent && (
             <div className="text-right">
@@ -315,35 +346,6 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
           </div>
         )}
       </div>
-
-      {activeAlert && selectedAgent && (
-        <div className="absolute bottom-3 right-3 left-3 sm:left-auto z-[1000] max-w-sm bg-error-container border-2 border-error rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-2)] p-4 flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-on-error-container font-bold">
-            <Icon name="warning" filled className="size-5" />
-            {dict.tracking.workspace.geofenceBreach}
-          </div>
-          <p className="text-sm text-on-error-container">
-            <span className="font-semibold">{selectedAgent.fullName}</span>{" "}
-            {t(dict.tracking.workspace.outsideZoneSince, { time: new Date(activeAlert.firstDetectedOutsideAt).toLocaleTimeString() })}
-          </p>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-on-error-container/80">{dict.tracking.workspace.liabilityAtRisk}</span>
-            <span className="font-bold tabular-nums text-on-error-container">
-              {selectedAgent.balanceXaf !== null ? `${selectedAgent.balanceXaf.toLocaleString()} XAF` : "—"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-on-error-container/80">{dict.tracking.workspace.breachDuration}</span>
-            <span className="font-bold tabular-nums text-on-error-container">{formatDuration(activeAlert.firstDetectedOutsideAt, nowMs)}</span>
-          </div>
-          <a
-            href={`tel:${selectedAgent.phone}`}
-            className="h-10 px-4 rounded-[var(--radius-sm)] bg-danger-red text-white text-sm font-semibold cursor-pointer flex items-center justify-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-95"
-          >
-            {t(dict.tracking.workspace.callAgent, { phone: selectedAgent.phone })}
-          </a>
-        </div>
-      )}
     </div>
   );
 }

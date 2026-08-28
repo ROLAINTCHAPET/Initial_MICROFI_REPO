@@ -12,6 +12,7 @@ export type BadgeStatus =
   | "BLOCKED"
   | "ACTIVE"
   | "SUSPENDED"
+  | "DELETED"
   | "INACTIVE"
   | "EXPIRED"
   | "REVOKED"
@@ -30,6 +31,7 @@ const STATUS_STYLES: Record<BadgeStatus, { className: string; dot?: boolean }> =
   ACKNOWLEDGED: { className: "bg-surface-container text-on-surface-variant" },
   BLOCKED: { className: "bg-error-container text-on-error-container" },
   SUSPENDED: { className: "bg-error-container text-on-error-container" },
+  DELETED: { className: "bg-error-container text-on-error-container" },
   REVOKED: { className: "bg-error-container text-on-error-container" },
   CLOSED: { className: "bg-surface-container text-on-surface-variant" },
   INACTIVE: { className: "bg-surface-container text-on-surface-variant" },

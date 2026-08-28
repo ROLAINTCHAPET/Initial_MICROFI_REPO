@@ -102,6 +102,7 @@
   "csGenericClient": "client",
 
   "hsCollectionHistoryTitle": "Historique des encaissements",
+  "hsQuickActionHistory": "Historique",
   "hsSosSentMessage": "Alerte SOS envoyée — votre agence a été alertée.",
   "hsSosSendFailedMessage": "Impossible d'envoyer l'alerte SOS — vérifiez votre connexion et réessayez.",
   "hsSosAcknowledgedMessage": "Votre alerte SOS a été prise en compte par votre agence.",

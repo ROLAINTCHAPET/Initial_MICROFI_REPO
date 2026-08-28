@@ -1,6 +1,7 @@
 {
   "header": {
     "signOut": "Déconnexion",
+    "openMenu": "Ouvrir le menu de navigation",
     "sosTooltipUnresolved": "{count} alerte(s) SOS non résolue(s)",
     "sosTooltipNone": "Console SOS",
     "language": "Langue",
@@ -38,6 +39,7 @@
       "BLOCKED": "Bloqué",
       "ACTIVE": "Actif",
       "SUSPENDED": "Suspendu",
+      "DELETED": "Supprimé",
       "INACTIVE": "Inactif",
       "EXPIRED": "Expiré",
       "REVOKED": "Révoqué",
@@ -66,7 +68,7 @@
     "agents": "Agents",
     "team": "Équipe",
     "geolocation": "Géolocalisation",
-    "endOfDayOversight": "Supervision de fin de journée",
+    "endOfDayOversight": "Clôture de journée",
     "sosConsole": "Console SOS",
     "registrations": "Inscriptions",
     "settings": "Paramètres"
@@ -169,6 +171,21 @@
       "pinSet": "Défini",
       "lastDeviceReset": "Dernière réinitialisation d'appareil"
     },
+    "collections": {
+      "title": "Journal des encaissements",
+      "dateLabel": "Date",
+      "loading": "Chargement des encaissements…",
+      "error": "Impossible de charger les encaissements.",
+      "empty": "Aucun encaissement enregistré ce jour-là.",
+      "unknownClient": "Client inconnu",
+      "reconciled": "Rapproché",
+      "notReconciled": "Pas encore rapproché",
+      "totalLabel": "Total encaissé : {value} XAF",
+      "colClient": "Client",
+      "colAmount": "Montant",
+      "colTime": "Heure",
+      "colStatus": "Statut"
+    },
     "resetDeviceBinding": {
       "button": "Réinitialiser l'association de l'appareil",
       "title": "Réinitialiser l'association de l'appareil",
@@ -186,6 +203,20 @@
       "suspendAgent": "Suspendre l'agent",
       "reactivateAgent": "Réactiver l'agent",
       "fundBeforeReactivate": "Financez le compte séquestre de cet agent avant de le réactiver."
+    },
+    "deleteAgent": {
+      "button": "Supprimer l'agent",
+      "modalTitle": "Supprimer l'agent",
+      "warning": "Cette action retire définitivement cet agent de l'effectif actif et bloque sa connexion. Elle ne peut pas être annulée depuis cet écran.",
+      "reasonLabel": "Motif de la suppression",
+      "reasonPlaceholder": "ex. N'est plus employé(e) par l'IMF",
+      "confirm": "Supprimer l'agent",
+      "failedToDelete": "Échec de la suppression de l'agent",
+      "deletionFailedTitle": "Échec de la suppression"
+    },
+    "deletedBanner": {
+      "title": "Cet agent a été supprimé",
+      "reasonPrefix": "Motif :"
     },
     "topUpEscrow": {
       "uploadProofRequired": "Téléversez une preuve du dépôt en espèces avant de recharger.",
@@ -276,7 +307,7 @@
     "noBranches": "Aucune agence n'existe encore — veuillez d'abord en créer une.",
     "viewingBranch": "Agence consultée",
     "branchFallback": "Agence",
-    "reconcileCash": "Effectuer le rapprochement",
+    "reconcileCash": "Effectuer la réconciliation",
     "reconcileTooltip": "Le rapprochement s'ouvre après l'heure de fermeture{closeTimeSuffix} — les fonds de la journée ne sont pas encore tous rentrés.",
     "businessDate": "Date d'exercice : {date}",
     "tabs": {
@@ -359,6 +390,20 @@
       "newPasswordLabel": "Nouveau mot de passe (8 caractères min.)",
       "resetDone": "Réinitialisé",
       "setNewPassword": "Définir le nouveau mot de passe"
+    },
+    "deleteAccount": {
+      "button": "Supprimer le compte",
+      "modalTitle": "Supprimer le compte",
+      "warning": "Cette action retire définitivement ce compte de l'effectif actif. Elle ne peut pas être annulée depuis cet écran.",
+      "reasonLabel": "Motif de la suppression",
+      "reasonPlaceholder": "ex. N'est plus employé(e) par l'IMF",
+      "confirm": "Supprimer le compte",
+      "failedToDelete": "Échec de la suppression du compte",
+      "deletionFailedTitle": "Échec de la suppression"
+    },
+    "deletedBanner": {
+      "title": "Ce compte a été supprimé",
+      "reasonPrefix": "Motif :"
     }
   },
   "tracking": {
@@ -368,7 +413,7 @@
     "workspace": {
       "loadingMap": "Chargement de la carte…",
       "noAgents": "Aucun agent de terrain à suivre.",
-      "activeFieldUnits": "Unités de terrain actives",
+      "activeFieldUnits": "Agents actifs",
       "totalCount": "{count} au total",
       "outOfZone": "Hors zone",
       "inZone": "En zone",

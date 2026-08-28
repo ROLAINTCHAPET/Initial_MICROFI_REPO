@@ -7,8 +7,10 @@ import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.repository.AdminUserRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserEnrollmentService;
+import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.shared.dto.AdminUserResponse;
 import com.microfi.shared.dto.CreateAdminUserRequest;
+import com.microfi.shared.dto.DeleteAdminUserRequest;
 import com.microfi.shared.dto.ResetAdminUserPasswordRequest;
 import com.microfi.shared.dto.UpdateAdminUserRoleRequest;
 import com.microfi.shared.dto.UpdateAdminUserStatusRequest;
@@ -32,6 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -78,10 +81,13 @@ public class AdminUserManagementController {
                 .flatMapMany(caller -> Mono.fromCallable(() -> {
                     AdminUser callerUser = caller.getAdminUser();
                     if (callerUser.getRole() == AdminRole.ADMIN) {
-                        return adminUserRepository.findAll();
+                        return adminUserRepository.findAll().stream()
+                                .filter(u -> u.getStatus() != AdminUserStatus.DELETED)
+                                .toList();
                     }
                     return adminUserRepository.findAll().stream()
                             .filter(u -> Objects.equals(u.getBranchId(), callerUser.getBranchId()))
+                            .filter(u -> u.getStatus() != AdminUserStatus.DELETED)
                             .toList();
                 }).subscribeOn(Schedulers.boundedElastic())
                         .flatMapMany(Flux::fromIterable))
@@ -104,9 +110,37 @@ public class AdminUserManagementController {
     public Mono<AdminUserResponse> updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateAdminUserStatusRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
+                    if (request.getStatus() == AdminUserStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use DELETE /{id}/delete to delete an account, not this endpoint");
+                    }
                     AdminUser target = findOrThrow(id);
                     AdminAccess.requireBranchScope(caller, target.getBranchId());
+                    if (target.getStatus() == AdminUserStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has been deleted and can no longer be suspended or reactivated");
+                    }
                     target.setStatus(request.getStatus());
+                    return toResponse(adminUserRepository.save(target));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/{id}/delete")
+    @Operation(summary = "Delete Back-Office Account", description = "Soft-delete with a mandatory audit reason. ADMIN may delete any account; BRANCH_MANAGER may delete a BRANCH_MANAGER or BRANCH_CASHIER account within their own branch (never an ADMIN account, and never their own).")
+    public Mono<AdminUserResponse> delete(@PathVariable UUID id, @Valid @RequestBody DeleteAdminUserRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminUser callerUser = caller.getAdminUser();
+                    AdminUser target = findOrThrow(id);
+                    if (target.getId().equals(callerUser.getId())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot delete your own account");
+                    }
+                    AdminAccess.requireBranchScope(caller, target.getBranchId());
+                    if (target.getStatus() == AdminUserStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has already been deleted");
+                    }
+                    target.setStatus(AdminUserStatus.DELETED);
+                    target.setDeletionReason(request.getReason());
+                    target.setDeletedBy(callerUser.getId());
+                    target.setDeletedAt(Instant.now());
                     return toResponse(adminUserRepository.save(target));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -160,6 +194,8 @@ public class AdminUserManagementController {
                 .branchId(user.getBranchId())
                 .status(user.getStatus())
                 .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
+                .deletionReason(user.getDeletionReason())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 }

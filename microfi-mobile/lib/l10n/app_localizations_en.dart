@@ -321,6 +321,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hsCollectionHistoryTitle => 'Collection History';
 
   @override
+  String get hsQuickActionHistory => 'History';
+
+  @override
   String get hsSosSentMessage => 'SOS sent — your branch has been alerted.';
 
   @override

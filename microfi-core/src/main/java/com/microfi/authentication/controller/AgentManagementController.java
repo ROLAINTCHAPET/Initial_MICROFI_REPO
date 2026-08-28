@@ -8,6 +8,7 @@ import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AgentEnrollmentService;
 import com.microfi.shared.dto.AgentResponse;
+import com.microfi.shared.dto.DeleteAgentRequest;
 import com.microfi.shared.dto.RegisterRequest;
 import com.microfi.shared.dto.ResetAgentDeviceRequest;
 import com.microfi.shared.dto.UpdateAgentStatusRequest;
@@ -72,10 +73,12 @@ public class AgentManagementController {
     }
 
     @GetMapping
-    @Operation(summary = "List Agents", description = "Lists all enrolled agents. Any Back-Office role.")
+    @Operation(summary = "List Agents", description = "Lists all enrolled agents (deleted agents excluded). Any Back-Office role.")
     public Flux<AgentResponse> list(Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono)
-                .flatMapMany(caller -> Mono.fromCallable(agentRepository::findAll)
+                .flatMapMany(caller -> Mono.fromCallable(() -> agentRepository.findAll().stream()
+                                .filter(a -> a.getStatus() != AgentStatus.DELETED)
+                                .toList())
                         .subscribeOn(Schedulers.boundedElastic())
                         .flatMapMany(Flux::fromIterable))
                 .map(this::toResponse);
@@ -109,9 +112,15 @@ public class AgentManagementController {
     public Mono<AgentResponse> updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateAgentStatusRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
+                    if (request.getStatus() == AgentStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use DELETE /{id}/delete to delete an agent, not this endpoint");
+                    }
                     Agent agent = agentRepository.findById(id)
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + id));
                     AdminAccess.requireBranchScope(caller, agent.getBranchId());
+                    if (agent.getStatus() == AgentStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "This agent has been deleted and can no longer be suspended or reactivated");
+                    }
                     if (request.getStatus() == AgentStatus.ACTIVE) {
                         if (agent.getStatus() != AgentStatus.SUSPENDED) {
                             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -123,6 +132,25 @@ public class AgentManagementController {
                         }
                     }
                     agent.setStatus(request.getStatus());
+                    return toResponse(agentRepository.save(agent));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/{id}/delete")
+    @Operation(summary = "Delete Agent", description = "Soft-delete with a mandatory audit reason. Blocks future logins and excludes the agent from listings, but the row (and their collection history) is kept. ADMIN or BRANCH_MANAGER (own branch only).")
+    public Mono<AgentResponse> delete(@PathVariable UUID id, @Valid @RequestBody DeleteAgentRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    Agent agent = agentRepository.findById(id)
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + id));
+                    AdminAccess.requireBranchScope(caller, agent.getBranchId());
+                    if (agent.getStatus() == AgentStatus.DELETED) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "This agent has already been deleted");
+                    }
+                    agent.setStatus(AgentStatus.DELETED);
+                    agent.setDeletionReason(request.getReason());
+                    agent.setDeletedBy(caller.getAdminUser().getId());
+                    agent.setDeletedAt(Instant.now());
                     return toResponse(agentRepository.save(agent));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -173,6 +201,8 @@ public class AgentManagementController {
                 .pinMustChange(Boolean.TRUE.equals(agent.getPinMustChange()))
                 .deviceResetReason(agent.getDeviceResetReason())
                 .deviceResetAt(agent.getDeviceResetAt())
+                .deletionReason(agent.getDeletionReason())
+                .deletedAt(agent.getDeletedAt())
                 .build();
     }
 }

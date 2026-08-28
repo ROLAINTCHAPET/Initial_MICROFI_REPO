@@ -47,4 +47,8 @@ public class ActivationPayment {
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private PaymentTag tag = PaymentTag.ACTIVATION;
+
+    /** Same reconciliation-tracking pair as {@link com.microfi.transactions.domain.Collection#reconciledAt} — see that Javadoc. */
+    private Instant reconciledAt;
+    private UUID reconciledInLineId;
 }

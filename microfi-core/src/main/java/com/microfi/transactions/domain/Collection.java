@@ -60,4 +60,17 @@ public class Collection {
 
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    /**
+     * Null until this collection's amount has actually been counted in a cash reconciliation
+     * (see OfjService#reconcile) — deliberately NOT the same thing as {@link #collectedAt} falling
+     * within "today". An offline agent can sync a collection days after collecting it; its
+     * amount must still reach exactly one reconciliation, whichever one runs after it arrives,
+     * not the calendar day it happened to be collected on (which may already be closed, or may
+     * never see this collection at all under a same-day-only window).
+     */
+    private Instant reconciledAt;
+
+    /** Which {@code OfjAgentLine} counted this collection — lets CBS export post exactly the collections that were just reconciled, not everything with a matching calendar date. */
+    private UUID reconciledInLineId;
 }

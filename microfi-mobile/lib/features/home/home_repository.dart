@@ -30,4 +30,14 @@ class HomeRepository {
     });
     return AgentProfile.fromJson(json);
   }
+
+  /// Tells the server how many collections are still queued locally, unsynced — the only way it
+  /// can know, since a collection that hasn't reached it yet is otherwise invisible. This is what
+  /// actually lets OfjService's end-of-day close-blocking gate work: without it, a branch's
+  /// session could close (and export) while an agent still has real cash sitting on their phone.
+  Future<void> reportSyncStatus(String agentId, int pendingCount) async {
+    await _client.patchNoContent('/agents/$agentId/sync-status', {
+      'pendingCount': pendingCount,
+    });
+  }
 }

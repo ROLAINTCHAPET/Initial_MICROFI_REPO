@@ -52,10 +52,14 @@ public class AuthenticationController {
                 .flatMap(agentDetails -> {
                     Agent agent = agentDetails.getAgent();
 
-                    // Only a SUSPENDED agent is blocked from logging in (FR-02). A PENDING_CEILING
-                    // agent (escrow not yet funded) may still log in and use the app — they just
-                    // can't collect deposits yet, enforced separately at collection time (see
-                    // AgentDirectoryService#verifyTransactionPin).
+                    // A SUSPENDED or DELETED agent is blocked from logging in (FR-02). A
+                    // PENDING_CEILING agent (escrow not yet funded) may still log in and use the
+                    // app — they just can't collect deposits yet, enforced separately at
+                    // collection time (see AgentDirectoryService#verifyTransactionPin).
+                    if (agent.getStatus() == AgentStatus.DELETED) {
+                        authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                        return Mono.error(new InvalidCredentialsException("Agent account has been deleted"));
+                    }
                     if (agent.getStatus() == AgentStatus.SUSPENDED) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
                         return Mono.error(new InvalidCredentialsException("Agent account is suspended"));

@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -193,6 +196,41 @@ public class CollectionService {
                         .accuracyM(collection.getAccuracyM())
                         .locationName(collection.getLocationName())
                         .collectedAt(collection.getCollectedAt())
+                        .reconciledAt(collection.getReconciledAt())
+                        .syncStatus(collection.getSyncStatus())
+                        .deviceTxId(collection.getDeviceTxId())
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Back-Office agent oversight (branch manager/cashier/admin) — every collection this agent
+     * recorded on one specific calendar day, client names resolved, newest first. Distinct from
+     * {@link #findRecentByAgent}'s unbounded "last 50 ever": this lets a reviewer see exactly what
+     * an agent collected and from whom on a given day, independent of reconciliation status.
+     */
+    public List<CollectionResponse> findByAgentAndDay(UUID agentId, LocalDate date) {
+        Instant startOfDayUtc = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
+        List<Collection> collections = collectionRepository.findByAgentIdInAndCollectedAtBetween(
+                List.of(agentId), startOfDayUtc, endOfDayUtc);
+        Map<UUID, String> namesByClientId = clientDirectoryService.findFullNames(
+                collections.stream().map(Collection::getClientId).collect(Collectors.toSet()));
+
+        return collections.stream()
+                .sorted(Comparator.comparing(Collection::getCollectedAt).reversed())
+                .map(collection -> CollectionResponse.builder()
+                        .id(collection.getId())
+                        .agentId(collection.getAgentId())
+                        .clientId(collection.getClientId())
+                        .clientName(namesByClientId.get(collection.getClientId()))
+                        .amountXaf(collection.getAmountXaf())
+                        .lat(collection.getLat())
+                        .lon(collection.getLon())
+                        .accuracyM(collection.getAccuracyM())
+                        .locationName(collection.getLocationName())
+                        .collectedAt(collection.getCollectedAt())
+                        .reconciledAt(collection.getReconciledAt())
                         .syncStatus(collection.getSyncStatus())
                         .deviceTxId(collection.getDeviceTxId())
                         .build())
@@ -219,6 +257,7 @@ public class CollectionService {
                 .accuracyM(collection.getAccuracyM())
                 .locationName(collection.getLocationName())
                 .collectedAt(collection.getCollectedAt())
+                .reconciledAt(collection.getReconciledAt())
                 .syncStatus(collection.getSyncStatus())
                 .deviceTxId(collection.getDeviceTxId())
                 .denominationLines(lines)

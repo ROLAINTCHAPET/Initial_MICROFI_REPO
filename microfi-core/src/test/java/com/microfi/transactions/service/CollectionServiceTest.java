@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -298,5 +299,29 @@ class CollectionServiceTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getClientName()).isEqualTo("Jean Client");
         assertThat(results.get(0).getAmountXaf()).isEqualTo(5000);
+    }
+
+    @Test
+    void findByAgentAndDayResolvesClientNamesAndOrdersNewestFirst() {
+        java.time.LocalDate date = java.time.LocalDate.of(2026, 8, 20);
+        Instant morning = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().plus(9, java.time.temporal.ChronoUnit.HOURS);
+        Instant afternoon = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().plus(15, java.time.temporal.ChronoUnit.HOURS);
+        UUID otherClientId = UUID.randomUUID();
+        Collection earlier = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(3000).lat(4.05).lon(9.70).collectedAt(morning).deviceTxId("DEV-TX-1").build();
+        Collection later = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(otherClientId)
+                .amountXaf(7000).lat(4.05).lon(9.70).collectedAt(afternoon).deviceTxId("DEV-TX-2").build();
+        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(eq(List.of(agentId)), any(), any()))
+                .thenReturn(List.of(earlier, later));
+        when(clientDirectoryService.findFullNames(any())).thenReturn(java.util.Map.of(
+                clientId, "Jean Client", otherClientId, "Marie Client"));
+
+        List<CollectionResponse> results = collectionService.findByAgentAndDay(agentId, date);
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getClientName()).isEqualTo("Marie Client");
+        assertThat(results.get(0).getAmountXaf()).isEqualTo(7000);
+        assertThat(results.get(1).getClientName()).isEqualTo("Jean Client");
+        assertThat(results.get(1).getAmountXaf()).isEqualTo(3000);
     }
 }

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { Icon, type IconName } from "./Icon";
 import type { AdminRole } from "@/lib/types";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { useMobileNav } from "./MobileNavContext";
 
 function navItems(dict: Dictionary): { href: string; label: string; icon: IconName }[] {
   return [
@@ -25,20 +27,11 @@ function navItems(dict: Dictionary): { href: string; label: string; icon: IconNa
 // cashier cap/IMEI requirement; Registrations submits/reviews compliance dossiers — only ADMIN
 // can approve/reject, and BRANCH_CASHIER never creates accounts either), so BRANCH_CASHIER
 // doesn't see either.
-export function Sidebar({ role }: { role: AdminRole }) {
-  const pathname = usePathname();
-  const dict = useDictionary();
-  const items =
-    role === "ADMIN" || role === "BRANCH_MANAGER"
-      ? [
-          ...navItems(dict),
-          { href: "/registrations", label: dict.sidebar.registrations, icon: "edit-note" as IconName },
-          { href: "/settings", label: dict.sidebar.settings, icon: "settings" as IconName },
-        ]
-      : navItems(dict);
+type NavItem = { href: string; label: string; icon: IconName };
 
+function SidebarContent({ items, pathname, dict, onNavigate }: { items: NavItem[]; pathname: string | null; dict: Dictionary; onNavigate?: () => void }) {
   return (
-    <aside className="hidden md:flex md:flex-col h-screen w-64 fixed left-0 top-0 bg-primary-container z-30 py-6">
+    <>
       <div className="flex items-center gap-3 px-6 pb-8">
         <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-primary flex items-center justify-center shrink-0">
           <Icon name="building" className="size-5 text-on-primary" />
@@ -52,6 +45,7 @@ export function Sidebar({ role }: { role: AdminRole }) {
       <div className="px-4 mb-4">
         <Link
           href="/cashier"
+          onClick={onNavigate}
           className="w-full h-12 bg-secondary text-on-secondary font-semibold text-sm rounded-[var(--radius-sm)] flex items-center justify-center gap-2 hover:bg-secondary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
         >
           <Icon name="plus" className="size-5" />
@@ -66,6 +60,7 @@ export function Sidebar({ role }: { role: AdminRole }) {
             <li key={item.href}>
               <Link
                 href={item.href}
+                onClick={onNavigate}
                 className={`flex items-center gap-3 px-4 py-3 rounded-[var(--radius-sm)] text-sm font-medium transition-[background-color,color,transform] duration-150 ease-out hover:scale-[1.02] active:scale-[0.98] border-l-4 ${
                   active
                     ? "bg-white/10 text-secondary-fixed border-secondary-fixed"
@@ -79,6 +74,51 @@ export function Sidebar({ role }: { role: AdminRole }) {
           );
         })}
       </ul>
-    </aside>
+    </>
+  );
+}
+
+export function Sidebar({ role }: { role: AdminRole }) {
+  const pathname = usePathname();
+  const dict = useDictionary();
+  const { open, setOpen } = useMobileNav();
+  const items =
+    role === "ADMIN" || role === "BRANCH_MANAGER"
+      ? [
+          ...navItems(dict),
+          { href: "/registrations", label: dict.sidebar.registrations, icon: "edit-note" as IconName },
+          { href: "/settings", label: dict.sidebar.settings, icon: "settings" as IconName },
+        ]
+      : navItems(dict);
+
+  // Closes the drawer whenever the route actually changes — a safety net alongside each link's
+  // own onClick, so back/forward navigation or a link that doesn't fire onClick still closes it.
+  useEffect(() => {
+    setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  return (
+    <>
+      <aside className="hidden md:flex md:flex-col h-screen w-64 fixed left-0 top-0 bg-primary-container z-30 py-6">
+        <SidebarContent items={items} pathname={pathname} dict={dict} />
+      </aside>
+
+      {open && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="overlay-fade-in fixed inset-0 bg-primary/60" onClick={() => setOpen(false)} />
+          <aside className="drawer-slide-in relative flex flex-col h-screen w-64 max-w-[80vw] bg-primary-container py-6 overflow-y-auto">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label={dict.common.close}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-on-primary-container hover:bg-white/10 transition-colors duration-150"
+            >
+              <Icon name="close" className="size-5" />
+            </button>
+            <SidebarContent items={items} pathname={pathname} dict={dict} onNavigate={() => setOpen(false)} />
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

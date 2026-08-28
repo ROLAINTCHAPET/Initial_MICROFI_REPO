@@ -24,4 +24,7 @@ public class AgentResponse {
     /** ADMIN/BRANCH_MANAGER-only — left null by AgentSelfController so an agent never sees their own reset history. */
     private String deviceResetReason;
     private Instant deviceResetAt;
+
+    private String deletionReason;
+    private Instant deletedAt;
 }

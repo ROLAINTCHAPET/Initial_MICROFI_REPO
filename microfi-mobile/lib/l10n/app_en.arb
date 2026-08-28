@@ -228,7 +228,9 @@
   "@csGenericClient": {"description": "Collection stepper — generic fallback noun used in the queued-offline message when the client's name isn't available."},
 
   "hsCollectionHistoryTitle": "Collection History",
-  "@hsCollectionHistoryTitle": {"description": "Home screen — AppBar title of the collection history screen, and the quick-action label that opens it."},
+  "@hsCollectionHistoryTitle": {"description": "Home screen — AppBar title of the collection history screen."},
+  "hsQuickActionHistory": "History",
+  "@hsQuickActionHistory": {"description": "Home screen — short label on the quick-action card that opens collection history (narrow card, must stay one line in both languages)."},
   "hsSosSentMessage": "SOS sent — your branch has been alerted.",
   "@hsSosSentMessage": {"description": "Home screen — SnackBar shown after a successful SOS send."},
   "hsSosSendFailedMessage": "Unable to send SOS — check your connection and try again.",

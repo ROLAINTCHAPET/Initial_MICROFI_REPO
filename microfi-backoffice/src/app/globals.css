@@ -209,6 +209,16 @@ dialog.modal-transition[open]::backdrop {
   animation: panelScaleIn 150ms ease-out both;
 }
 
+/* Entry transition for the mobile Sidebar drawer — slides in from the left edge it's anchored
+   to, unlike panel-scale-in's centered scale, which reads wrong for an edge-anchored panel. */
+@keyframes drawerSlideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.drawer-slide-in {
+  animation: drawerSlideIn 200ms ease-out both;
+}
+
 /* One-shot confirmation pulse for buttons that just completed a save. */
 @keyframes successPop {
   0% { transform: scale(1); }

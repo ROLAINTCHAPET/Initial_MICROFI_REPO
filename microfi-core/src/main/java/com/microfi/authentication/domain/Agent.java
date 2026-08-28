@@ -91,4 +91,9 @@ public class Agent {
      */
     @Builder.Default
     private Integer pendingSyncCount = 0;
+
+    /** Populated only when {@link #status} is {@link AgentStatus#DELETED} — soft-delete, row is kept for audit. */
+    private String deletionReason;
+    private UUID deletedBy;
+    private Instant deletedAt;
 }

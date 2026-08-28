@@ -48,6 +48,17 @@ class ApiClient {
     return _decode(response);
   }
 
+  /// For endpoints that reply 204 No Content — `patch()` can't be reused here since its return
+  /// type expects a decoded JSON object back, and `_decode` returns null for an empty body.
+  Future<void> patchNoContent(String path, Map<String, dynamic> body) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    _decode(response);
+  }
+
   /// For endpoints taking/returning a JSON array rather than an object (e.g. batch sync).
   Future<dynamic> postJson(String path, dynamic body) async {
     final response = await http.post(

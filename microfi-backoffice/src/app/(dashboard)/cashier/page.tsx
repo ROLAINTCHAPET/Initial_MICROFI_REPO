@@ -63,8 +63,8 @@ export default async function CashierPortalPage({
 
       <div className="flex items-center justify-between flex-wrap gap-4 max-w-7xl mx-auto w-full">
         {session?.role === "ADMIN" ? (
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
+          <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
+            <span className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant shrink-0">
               <Icon name="location-on" className="size-5 text-primary" />
               {dict.cashier.viewingBranch}
             </span>

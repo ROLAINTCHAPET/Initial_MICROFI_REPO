@@ -114,6 +114,23 @@ class AdminAuthenticationControllerTest {
     }
 
     @Test
+    void testLoginDeletedAdminRejected() {
+        AdminLoginRequest req = new AdminLoginRequest();
+        req.setLogin("admin");
+        req.setPassword("ChangeMe123!");
+        com.microfi.authentication.AdminUserDetails details = new com.microfi.authentication.AdminUserDetails(adminUser(AdminUserStatus.DELETED));
+
+        when(adminUserDetailsService.findByUsername("admin")).thenReturn(Mono.just((UserDetails) details));
+
+        webTestClient.post()
+                .uri("/api/v1/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
     void testLoginUnknownUserRejected() {
         AdminLoginRequest req = new AdminLoginRequest();
         req.setLogin("ghost");

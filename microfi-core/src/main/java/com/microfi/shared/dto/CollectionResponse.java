@@ -28,6 +28,8 @@ public class CollectionResponse {
     private Float accuracyM;
     private String locationName;
     private Instant collectedAt;
+    /** Null until this collection's amount has actually been swept into a reconciliation — see OfjService#reconcile. Distinct from collectedAt: a collection synced days late keeps its original collectedAt but is reconciled on whatever day it actually arrives. */
+    private Instant reconciledAt;
     private String syncStatus;
     private String deviceTxId;
     private List<DenominationLineDto> denominationLines;

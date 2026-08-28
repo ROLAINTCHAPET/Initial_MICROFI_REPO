@@ -29,6 +29,16 @@ public class ActivationDirectoryService {
         return activationPaymentRepository.sumAmountByAgentAndWindow(agentId, start, end);
     }
 
+    /** UC-16: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
+    public long sumUnreconciled(UUID agentId, Instant cutoff) {
+        return activationPaymentRepository.sumUnreconciledByAgent(agentId, cutoff);
+    }
+
+    /** Marks exactly the payments {@link #sumUnreconciled} just summed as reconciled. */
+    public void markReconciled(UUID agentId, Instant cutoff, UUID lineId) {
+        activationPaymentRepository.markReconciled(agentId, cutoff, lineId);
+    }
+
     /**
      * True if the agent has registered cash for an activation the client hasn't confirmed yet (or
      * vice versa) — until that gate closes, the agent's cash-in-hand for that client is invisible
@@ -42,6 +52,13 @@ public class ActivationDirectoryService {
     /** UC-16/18: line-level detail (not just a sum) for posting a branch's activation-fee cash to the CBS on export, same as Collection. */
     public List<ActivationCashLine> findByAgentIdsAndWindow(List<UUID> agentIds, Instant start, Instant end) {
         return activationPaymentRepository.findByAgentIdInAndPaidAtBetween(agentIds, start, end).stream()
+                .map(payment -> new ActivationCashLine(payment.getId(), payment.getClientId(), payment.getAmountXaf(), payment.getPaidAt()))
+                .toList();
+    }
+
+    /** UC-16/18: exactly the activation-fee cash a given set of OfjAgentLines reconciled, for CBS export — see CollectionRepository#findByReconciledInLineIdIn. */
+    public List<ActivationCashLine> findByReconciledInLineIds(List<UUID> lineIds) {
+        return activationPaymentRepository.findByReconciledInLineIdIn(lineIds).stream()
                 .map(payment -> new ActivationCashLine(payment.getId(), payment.getClientId(), payment.getAmountXaf(), payment.getPaidAt()))
                 .toList();
     }

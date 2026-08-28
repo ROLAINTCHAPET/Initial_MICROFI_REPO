@@ -40,12 +40,12 @@ public class AgentDetails implements UserDetails {
     }
 
     // PENDING_CEILING agents may still hold a session (they can log in and use the app; they just
-    // can't collect — see AgentDirectoryService#verifyTransactionPin). Only SUSPENDED locks the
-    // account out of every request, which is what actually makes a suspend take effect on an
-    // already-issued token (JwtService#isTokenValid rechecks these on every call).
+    // can't collect — see AgentDirectoryService#verifyTransactionPin). SUSPENDED or DELETED locks
+    // the account out of every request, which is what actually makes a suspend/delete take effect
+    // on an already-issued token (JwtService#isTokenValid rechecks these on every call).
     @Override
     public boolean isAccountNonLocked() {
-        return agent.getStatus() != AgentStatus.SUSPENDED;
+        return agent.getStatus() != AgentStatus.SUSPENDED && agent.getStatus() != AgentStatus.DELETED;
     }
 
     @Override
@@ -55,6 +55,6 @@ public class AgentDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return agent.getStatus() != AgentStatus.SUSPENDED;
+        return agent.getStatus() != AgentStatus.SUSPENDED && agent.getStatus() != AgentStatus.DELETED;
     }
 }

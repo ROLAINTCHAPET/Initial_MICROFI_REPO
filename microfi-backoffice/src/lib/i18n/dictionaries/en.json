@@ -1,6 +1,7 @@
 {
   "header": {
     "signOut": "Sign out",
+    "openMenu": "Open navigation menu",
     "sosTooltipUnresolved": "{count} unresolved SOS alert(s)",
     "sosTooltipNone": "SOS Console",
     "language": "Language",
@@ -38,6 +39,7 @@
       "BLOCKED": "Blocked",
       "ACTIVE": "Active",
       "SUSPENDED": "Suspended",
+      "DELETED": "Deleted",
       "INACTIVE": "Inactive",
       "EXPIRED": "Expired",
       "REVOKED": "Revoked",
@@ -169,6 +171,21 @@
       "pinSet": "Set",
       "lastDeviceReset": "Last Device Reset"
     },
+    "collections": {
+      "title": "Collections Ledger",
+      "dateLabel": "Date",
+      "loading": "Loading collections…",
+      "error": "Unable to load collections.",
+      "empty": "No collections recorded on this day.",
+      "unknownClient": "Unknown client",
+      "reconciled": "Reconciled",
+      "notReconciled": "Not yet reconciled",
+      "totalLabel": "Total collected: {value} XAF",
+      "colClient": "Client",
+      "colAmount": "Amount",
+      "colTime": "Time",
+      "colStatus": "Status"
+    },
     "resetDeviceBinding": {
       "button": "Reset Device Binding",
       "title": "Reset Device Binding",
@@ -186,6 +203,20 @@
       "suspendAgent": "Suspend Agent",
       "reactivateAgent": "Reactivate Agent",
       "fundBeforeReactivate": "Fund this agent's escrow account before reactivating."
+    },
+    "deleteAgent": {
+      "button": "Delete Agent",
+      "modalTitle": "Delete Agent",
+      "warning": "This permanently removes this agent from the active roster and blocks their login. This cannot be undone from here.",
+      "reasonLabel": "Reason for deletion",
+      "reasonPlaceholder": "e.g. No longer employed by the MFI",
+      "confirm": "Delete Agent",
+      "failedToDelete": "Failed to delete agent",
+      "deletionFailedTitle": "Deletion Failed"
+    },
+    "deletedBanner": {
+      "title": "This agent has been deleted",
+      "reasonPrefix": "Reason:"
     },
     "topUpEscrow": {
       "uploadProofRequired": "Upload proof of the cash deposit before funding.",
@@ -359,6 +390,20 @@
       "newPasswordLabel": "New Password (min. 8 characters)",
       "resetDone": "Reset",
       "setNewPassword": "Set New Password"
+    },
+    "deleteAccount": {
+      "button": "Delete Account",
+      "modalTitle": "Delete Account",
+      "warning": "This permanently removes this account from the active team roster. This cannot be undone from here.",
+      "reasonLabel": "Reason for deletion",
+      "reasonPlaceholder": "e.g. No longer employed by the MFI",
+      "confirm": "Delete Account",
+      "failedToDelete": "Failed to delete account",
+      "deletionFailedTitle": "Deletion Failed"
+    },
+    "deletedBanner": {
+      "title": "This account has been deleted",
+      "reasonPrefix": "Reason:"
     }
   },
   "tracking": {

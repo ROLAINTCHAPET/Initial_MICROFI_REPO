@@ -80,8 +80,12 @@ class AgentManagementControllerTest {
     private OfjService ofjService;
 
     private Authentication adminAuthentication(AdminRole role) {
+        return adminAuthentication(role, null);
+    }
+
+    private Authentication adminAuthentication(AdminRole role, UUID scopedBranchId) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")
-                .role(role).status(AdminUserStatus.ACTIVE).build();
+                .role(role).branchId(scopedBranchId).status(AdminUserStatus.ACTIVE).build();
         AdminUserDetails details = new AdminUserDetails(adminUser);
         return new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
     }
@@ -517,6 +521,148 @@ class AgentManagementControllerTest {
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .get()
                 .uri("/api/v1/admin/agents/" + id + "/variance-debts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void testDeleteByAdminSuccess() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"No longer employed by the MFI\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("DELETED")
+                .jsonPath("$.deletionReason").isEqualTo("No longer employed by the MFI");
+    }
+
+    @Test
+    void testDeleteByManagerOwnBranchSuccess() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Left the branch\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("DELETED");
+    }
+
+    @Test
+    void testDeleteByManagerOutOfBranchScopeForbidden() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(UUID.randomUUID()).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testDeleteByCashierForbidden() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testDeleteAlreadyDeletedConflict() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.DELETED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testDeleteBlankReasonRejected() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testUpdateStatusOnDeletedAgentConflict() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").branchId(branchId).status(AgentStatus.DELETED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"SUSPENDED\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testUpdateStatusToDeletedRejected() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"DELETED\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testListExcludesDeletedAgents() {
+        UUID branchId = UUID.randomUUID();
+        Agent active = Agent.builder().id(UUID.randomUUID()).employeeCode("AGT001").branchId(branchId).status(AgentStatus.ACTIVE).build();
+        Agent deleted = Agent.builder().id(UUID.randomUUID()).employeeCode("AGT002").branchId(branchId).status(AgentStatus.DELETED).build();
+        when(agentRepository.findAll()).thenReturn(List.of(active, deleted));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/admin/agents")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBodyList(Object.class).hasSize(1);

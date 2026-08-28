@@ -317,7 +317,7 @@ export function NewRegistrationForm({
                   value={branchId}
                   onChange={(e) => setBranchId(e.target.value)}
                   disabled={selectableBranches.length === 1}
-                  className="min-h-12 px-3 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-base disabled:text-text-grey-disabled disabled:bg-surface-grey-100"
+                  className="min-h-12 px-3 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-base disabled:text-text-grey-disabled disabled:bg-surface-grey-100 w-full min-w-0 max-w-full"
                   required
                 >
                   {selectableBranches.map((b) => (

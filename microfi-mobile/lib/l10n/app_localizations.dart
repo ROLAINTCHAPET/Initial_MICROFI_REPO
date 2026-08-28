@@ -614,11 +614,17 @@ abstract class AppLocalizations {
   /// **'client'**
   String get csGenericClient;
 
-  /// Home screen — AppBar title of the collection history screen, and the quick-action label that opens it.
+  /// Home screen — AppBar title of the collection history screen.
   ///
   /// In en, this message translates to:
   /// **'Collection History'**
   String get hsCollectionHistoryTitle;
+
+  /// Home screen — short label on the quick-action card that opens collection history (narrow card, must stay one line in both languages).
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get hsQuickActionHistory;
 
   /// Home screen — SnackBar shown after a successful SOS send.
   ///

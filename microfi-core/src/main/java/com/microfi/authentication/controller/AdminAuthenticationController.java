@@ -38,6 +38,9 @@ public class AdminAuthenticationController {
         return adminUserDetailsService.findByUsername(request.getLogin())
                 .cast(AdminUserDetails.class)
                 .flatMap(adminDetails -> {
+                    if (adminDetails.getAdminUser().getStatus() == AdminUserStatus.DELETED) {
+                        return Mono.error(new InvalidCredentialsException("Admin account has been deleted"));
+                    }
                     if (adminDetails.getAdminUser().getStatus() != AdminUserStatus.ACTIVE) {
                         return Mono.error(new InvalidCredentialsException("Admin account is suspended"));
                     }

@@ -28,7 +28,7 @@ export function Button({ variant = "primary", loading = false, disabled, classNa
     <button
       {...props}
       disabled={isDisabled}
-      className={`inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold cursor-pointer
+      className={`inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold cursor-pointer whitespace-nowrap shrink-0
         transition-[background-color,border-color,color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary
         disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100

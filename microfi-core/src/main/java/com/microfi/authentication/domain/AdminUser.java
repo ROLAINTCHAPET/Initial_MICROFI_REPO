@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -56,4 +57,9 @@ public class AdminUser {
      * through {@code AdminUserManagementController#create} going forward.
      */
     private Boolean mustChangePassword;
+
+    /** Populated only when {@link #status} is {@link AdminUserStatus#DELETED} — soft-delete, row is kept for audit. */
+    private String deletionReason;
+    private UUID deletedBy;
+    private Instant deletedAt;
 }

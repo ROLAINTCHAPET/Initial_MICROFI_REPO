@@ -470,4 +470,174 @@ class AdminUserManagementControllerTest {
                 .exchange()
                 .expectStatus().isForbidden();
     }
+
+    @Test
+    void testDeleteByAdminSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_MANAGER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"No longer employed by the MFI\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("DELETED")
+                .jsonPath("$.deletionReason").isEqualTo("No longer employed by the MFI");
+    }
+
+    @Test
+    void testDeleteByManagerOwnBranchCashierSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Left the branch\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("DELETED");
+    }
+
+    @Test
+    void testDeleteByManagerOwnBranchPeerManagerSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("peer-mgr").role(AdminRole.BRANCH_MANAGER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Role consolidated\"}")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void testDeleteByManagerOfAdminForbidden() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("root-admin").role(AdminRole.ADMIN).branchId(null).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testDeleteByManagerOutOfBranchScopeForbidden() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(UUID.randomUUID()).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testDeleteOwnAccountRejected() {
+        UUID callerId = UUID.randomUUID();
+        AdminUser caller = AdminUser.builder().id(callerId).login("caller").role(AdminRole.ADMIN).branchId(null).status(AdminUserStatus.ACTIVE).build();
+        AdminUserDetails details = new AdminUserDetails(caller);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
+        when(adminUserRepository.findById(callerId)).thenReturn(Optional.of(caller));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(authentication))
+                .patch()
+                .uri("/api/v1/admin/users/" + callerId + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testDeleteAlreadyDeletedConflict() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.DELETED).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"attempt\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testDeleteBlankReasonRejected() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testUpdateStatusOnDeletedAccountConflict() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.DELETED).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    void testUpdateStatusToDeletedRejected() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"DELETED\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testListExcludesDeletedAccounts() {
+        AdminUser active = AdminUser.builder().id(UUID.randomUUID()).login("a").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        AdminUser deleted = AdminUser.builder().id(UUID.randomUUID()).login("b").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.DELETED).build();
+        when(adminUserRepository.findAll()).thenReturn(List.of(active, deleted));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .get()
+                .uri("/api/v1/admin/users")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
 }

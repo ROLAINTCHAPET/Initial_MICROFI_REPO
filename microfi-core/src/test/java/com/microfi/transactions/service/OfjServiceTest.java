@@ -134,7 +134,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(4000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(4000L);
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
@@ -150,8 +150,8 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(3000L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(1000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(3000L);
+        when(activationDirectoryService.sumUnreconciled(any(), any())).thenReturn(1000L);
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(4000, 1));
@@ -167,13 +167,38 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(varianceDebtRepository.findByOfjAgentLineId(any())).thenReturn(Optional.empty());
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(3000, 1));
 
         assertThat(response.getDeltaXaf()).isEqualTo(-2000);
         assertThat(response.isResolved()).isFalse();
+    }
+
+    /**
+     * Nothing stops an agent from reconciling twice in one session (they sync more cash after
+     * already balancing once) — the second call must ADD the newly-unreconciled amount to the
+     * existing line's digitalTotalXaf, not overwrite it and silently lose the first amount. The
+     * mock simulates this directly: the first sweep's collections are gone (already marked
+     * reconciled), so a second call to sumUnreconciledByAgent only sees what's newly arrived.
+     */
+    @Test
+    void reconcileAccumulatesDigitalTotalAcrossRepeatedCallsInSameSession() {
+        OfjSession session = openSession();
+        OfjAgentLine existingLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId)
+                .collectionsTotalXaf(4000L).activationsTotalXaf(0L).digitalTotalXaf(4000L).physicalTotalXaf(4000L).deltaXaf(0L).build();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.of(existingLine));
+        // Only the NEW, still-unreconciled cash since the first reconcile — the 4000 already
+        // counted was marked reconciled and no longer shows up here.
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(1500L);
+
+        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5500, 1));
+
+        assertThat(response.getDigitalTotalXaf()).isEqualTo(5500);
+        assertThat(response.getPhysicalTotalXaf()).isEqualTo(5500);
+        assertThat(response.getDeltaXaf()).isEqualTo(0);
     }
 
     /**
@@ -219,7 +244,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -241,12 +266,12 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
         when(exportBatchRepository.findByOfjId(session.getId())).thenReturn(Optional.empty());
-        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(any(), any(), any())).thenReturn(List.of());
+        when(collectionRepository.findByReconciledInLineIdIn(any())).thenReturn(List.of());
         when(cbsClientService.submitDailyExport(any(), anyString(), anyString()))
                 .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-AUTO").build()));
         when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -265,12 +290,12 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
         when(exportBatchRepository.findByOfjId(session.getId())).thenReturn(Optional.empty());
-        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(any(), any(), any()))
+        when(collectionRepository.findByReconciledInLineIdIn(any()))
                 .thenThrow(new RuntimeException("CBS unreachable"));
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
@@ -284,7 +309,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -307,7 +332,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         when(agentDirectoryService.hasPendingUnsyncedCollections(List.of(agentId))).thenReturn(true);
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
@@ -331,7 +356,7 @@ class OfjServiceTest {
         UUID otherAgentId = UUID.randomUUID();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
         // Branch has two active agents; only the first has reconciled (exact match, resolved).
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId, otherAgentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
@@ -444,8 +469,10 @@ class OfjServiceTest {
         UUID clientId = UUID.randomUUID();
         Collection collection = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
                 .amountXaf(2000L).collectedAt(Instant.now()).build();
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(any(), any(), any())).thenReturn(List.of(collection));
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
+        when(collectionRepository.findByReconciledInLineIdIn(List.of(line.getId()))).thenReturn(List.of(collection));
         when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
         when(cbsClientService.postTransactions(any(), anyString()))
                 .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
@@ -464,7 +491,8 @@ class OfjServiceTest {
                 .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-1").build()));
         when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(any(), any(), any())).thenReturn(List.of());
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of());
+        when(collectionRepository.findByReconciledInLineIdIn(any())).thenReturn(List.of());
 
         ofjService.exportDaily(branchId, new ExportRequest());
 
@@ -486,9 +514,11 @@ class OfjServiceTest {
         when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UUID clientId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(collectionRepository.findByAgentIdInAndCollectedAtBetween(any(), any(), any())).thenReturn(List.of());
-        when(activationDirectoryService.findByAgentIdsAndWindow(any(), any(), any()))
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
+        when(collectionRepository.findByReconciledInLineIdIn(List.of(line.getId()))).thenReturn(List.of());
+        when(activationDirectoryService.findByReconciledInLineIds(List.of(line.getId())))
                 .thenReturn(List.of(new ActivationCashLine(UUID.randomUUID(), clientId, 1000L, Instant.now())));
         when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-ACT-1");
         when(cbsClientService.postTransactions(any(), anyString()))
@@ -572,18 +602,15 @@ class OfjServiceTest {
     }
 
     /**
-     * The whole point of {@code listPendingAgents}: an agent who's collected cash today but never
-     * been reconciled has no {@code OfjAgentLine} yet — so {@code summary.agentLines} alone can't
-     * surface them as "awaiting reconciliation." This is the cashier's actual queue source.
+     * The whole point of {@code listPendingAgents}: an agent with unreconciled digital cash needs
+     * to surface even before any {@code OfjAgentLine} exists for them — this is the cashier's
+     * actual queue source, driven directly by {@code reconciledAt IS NULL}.
      */
     @Test
-    void listPendingAgentsIncludesActiveAgentWithCollectionsAndNoExistingLine() {
-        OfjSession session = openSession();
-        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+    void listPendingAgentsIncludesActiveAgentWithUnreconciledCash() {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
-        when(collectionRepository.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(4000L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(500L);
+        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(4000L);
+        when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(500L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
 
@@ -594,15 +621,17 @@ class OfjServiceTest {
         assertThat(pending.get(0).getDigitalTotalXaf()).isEqualTo(4500);
     }
 
+    /**
+     * Once a collection has actually been swept into a reconciliation (reconciledAt set), it stops
+     * contributing to the unreconciled sum, so a fully-reconciled agent correctly drops out of the
+     * pending queue — driven by what's outstanding right now, not by comparing against whatever an
+     * {@code OfjAgentLine} snapshot happened to record last time.
+     */
     @Test
-    void listPendingAgentsExcludesAgentsWhoseLineIsStillCurrent() {
-        OfjSession session = openSession();
-        OfjAgentLine existingLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).digitalTotalXaf(4500L).build();
-        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+    void listPendingAgentsExcludesAgentsWithNothingUnreconciled() {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(existingLine));
-        when(collectionRepository.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(4000L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(500L);
+        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(0L);
+        when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(0L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
 
@@ -610,47 +639,27 @@ class OfjServiceTest {
     }
 
     /**
-     * Regression test for a bug caught by live testing: an agent whose collections started, got
-     * reconciled once (recording an OfjAgentLine), and then collected MORE afterward was silently
-     * excluded from the pending queue forever, since the old logic only checked "does a line
-     * exist" rather than "is the line still current" — the cashier never saw the new cash at all.
+     * Regression test for the multi-day-offline reconciliation gap: a collection whose collectedAt
+     * is days in the past (an agent who just came back online after being offline for a while)
+     * still counts as unreconciled cash today, as long as it was never swept into a reconciliation
+     * — this is exactly what makes the backlog visible instead of silently lost.
      */
     @Test
-    void listPendingAgentsIncludesAgentsWhoseLineIsStale() {
-        OfjSession session = openSession();
-        OfjAgentLine staleLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).digitalTotalXaf(4500L).build();
-        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+    void listPendingAgentsIncludesBacklogFromAMultiDayOfflineAgent() {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(staleLine));
-        // Agent has collected more since the line was recorded.
-        when(collectionRepository.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(8000L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(500L);
+        // Represents a collection collected 3 days ago that only just synced — still unreconciled,
+        // so it's summed regardless of how far in the past its collectedAt is.
+        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(15000L);
+        when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(0L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
 
         assertThat(pending).hasSize(1);
-        assertThat(pending.get(0).getAgentId()).isEqualTo(agentId);
-        assertThat(pending.get(0).getDigitalTotalXaf()).isEqualTo(8500);
-    }
-
-    @Test
-    void listPendingAgentsExcludesAgentsWithNoCollectionsToday() {
-        OfjSession session = openSession();
-        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
-        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
-        when(collectionRepository.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(0L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(eq(agentId), any(), any())).thenReturn(0L);
-
-        List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
-
-        assertThat(pending).isEmpty();
+        assertThat(pending.get(0).getDigitalTotalXaf()).isEqualTo(15000);
     }
 
     @Test
     void listPendingAgentsReturnsEmptyWhenBranchHasNoActiveAgents() {
-        OfjSession session = openSession();
-        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of());
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);

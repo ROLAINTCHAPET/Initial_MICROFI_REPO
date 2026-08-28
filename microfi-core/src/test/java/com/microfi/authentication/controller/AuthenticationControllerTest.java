@@ -228,6 +228,22 @@ class AuthenticationControllerTest {
     }
 
     @Test
+    void testLoginDeletedAgentBlocked() {
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.DELETED).build();
+        AgentDetails details = new AgentDetails(agent);
+
+        when(agentDetailsService.findByUsername("agt.dupont")).thenReturn(Mono.just(details));
+
+        webTestClient.post()
+                .uri("/api/v1/auth/agent/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
     void testLoginAllowedWithinScheduleWindow() {
         AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
         UUID branchId = UUID.randomUUID();

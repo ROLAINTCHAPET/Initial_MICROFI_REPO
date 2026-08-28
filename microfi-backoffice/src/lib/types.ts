@@ -2,8 +2,8 @@
 // from the actual DTO source, not guessed. Keep in sync if the backend DTOs change.
 
 export type AdminRole = "ADMIN" | "BRANCH_MANAGER" | "BRANCH_CASHIER";
-export type AgentStatus = "PENDING_CEILING" | "ACTIVE" | "SUSPENDED";
-export type AdminUserStatus = "ACTIVE" | "SUSPENDED";
+export type AgentStatus = "PENDING_CEILING" | "ACTIVE" | "SUSPENDED" | "DELETED";
+export type AdminUserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 export type ClientStatus = "ACTIVE" | "INACTIVE";
 export type VarianceDebtStatus = "OPEN" | "RESOLVED";
 export type OfjSessionStatus = "OPEN" | "CLOSED";
@@ -45,6 +45,8 @@ export interface AgentResponse {
   pinMustChange: boolean;
   deviceResetReason: string | null;
   deviceResetAt: string | null;
+  deletionReason: string | null;
+  deletedAt: string | null;
 }
 
 export interface AdminUserResponse {
@@ -56,6 +58,8 @@ export interface AdminUserResponse {
   branchId: string | null;
   status: AdminUserStatus;
   mustChangePassword: boolean;
+  deletionReason: string | null;
+  deletedAt: string | null;
 }
 
 export interface EscrowResponse {
@@ -114,6 +118,17 @@ export interface SosResponse {
   raisedAt: string;
   acknowledgedBy: string | null;
   acknowledgedAt: string | null;
+}
+
+export interface CollectionResponse {
+  id: string;
+  agentId: string;
+  clientId: string;
+  clientName: string | null;
+  amountXaf: number;
+  locationName: string | null;
+  collectedAt: string;
+  reconciledAt: string | null;
 }
 
 export interface RoutePointResponse {

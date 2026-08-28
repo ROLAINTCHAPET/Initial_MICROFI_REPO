@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { PageHeaderProvider } from "@/components/PageHeaderContext";
+import { MobileNavProvider } from "@/components/MobileNavContext";
 import type { SosResponse } from "@/lib/types";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -18,13 +19,15 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <PageHeaderProvider>
-      <div className="h-full font-body text-body text-on-surface antialiased overflow-hidden">
-        <Header login={session.sub} role={session.role} unresolvedSosCount={unresolvedSos.length} />
-        <Sidebar role={session.role} />
-        <main className="ml-64 mt-20 p-6 md:p-6 h-[calc(100vh-80px)] overflow-y-auto relative z-10 flex-col flex">
-          {children}
-        </main>
-      </div>
+      <MobileNavProvider>
+        <div className="h-full font-body text-body text-on-surface antialiased overflow-hidden">
+          <Header login={session.sub} role={session.role} unresolvedSosCount={unresolvedSos.length} />
+          <Sidebar role={session.role} />
+          <main className="md:ml-64 mt-20 p-4 md:p-6 h-[calc(100vh-80px)] overflow-y-auto relative z-10 flex-col flex">
+            {children}
+          </main>
+        </div>
+      </MobileNavProvider>
     </PageHeaderProvider>
   );
 }

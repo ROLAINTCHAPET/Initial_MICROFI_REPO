@@ -103,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _pendingCount = pending.length;
       });
       LocalCeilingCache(profile.id).save(effectiveCeilingXaf: escrow.effectiveCeilingXaf, cumulativeTodayXaf: escrow.cumulativeTodayXaf);
+      unawaited(_reportSyncStatusBestEffort(profile.id, pending.length));
       _refreshReceiptContext();
       _checkSosStatus();
       _checkBranchNotices();
@@ -178,6 +179,18 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       // The collection already synced successfully — a notify failure here is not retried and
       // must never be treated as a sync failure.
+    }
+  }
+
+  // Best-effort, same as _notifyBestEffort: this is purely informational for the server's OFJ
+  // close-blocking gate (see HomeRepository#reportSyncStatus) — a failed report here must never
+  // block the Home screen or get surfaced as an error, it just means the gate stays as accurate
+  // as the last successful report until the next one goes through.
+  Future<void> _reportSyncStatusBestEffort(String agentId, int pendingCount) async {
+    try {
+      await _repository.reportSyncStatus(agentId, pendingCount);
+    } catch (_) {
+      // Retried on the next _load() (app resume, connectivity change, or post-sync reload).
     }
   }
 
@@ -407,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(child: _QuickAction(icon: Icons.map, label: l10n.hsMyRoute, onTap: _openMyRoute)),
               const SizedBox(width: MicrofiSpacing.gapLg),
-              Expanded(child: _QuickAction(icon: Icons.history, label: l10n.hsCollectionHistoryTitle, onTap: _openHistory)),
+              Expanded(child: _QuickAction(icon: Icons.history, label: l10n.hsQuickActionHistory, onTap: _openHistory)),
             ],
           ),
           const SizedBox(height: MicrofiSpacing.gap),

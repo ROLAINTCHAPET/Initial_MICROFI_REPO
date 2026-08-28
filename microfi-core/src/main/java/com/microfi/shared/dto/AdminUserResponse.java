@@ -5,6 +5,7 @@ import com.microfi.authentication.domain.AdminUserStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -18,4 +19,6 @@ public class AdminUserResponse {
     private UUID branchId;
     private AdminUserStatus status;
     private boolean mustChangePassword;
+    private String deletionReason;
+    private Instant deletedAt;
 }

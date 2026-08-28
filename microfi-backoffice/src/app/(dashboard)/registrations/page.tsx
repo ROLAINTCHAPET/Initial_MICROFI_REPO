@@ -52,8 +52,8 @@ export default async function RegistrationsPage({
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
       <PageHeader title={dict.registrations.pageTitle} subtitle={dict.registrations.pageSubtitle} />
 
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="grid grid-cols-3 gap-4 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
           <StatCard icon="edit-note" label={dict.registrations.applicationStatus.SUBMITTED} value={submittedCount.toLocaleString()} alert={submittedCount > 0} />
           <StatCard icon="check-circle" label={dict.registrations.applicationStatus.APPROVED} value={approvedCount.toLocaleString()} />
           <StatCard icon="warning" label={dict.registrations.applicationStatus.REJECTED} value={rejectedCount.toLocaleString()} />
@@ -61,7 +61,7 @@ export default async function RegistrationsPage({
         {canSubmit && (
           <Link
             href="/registrations/new"
-            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] w-full sm:w-auto"
           >
             <Icon name="plus" className="size-5" />
             {dict.registrations.newApplication}

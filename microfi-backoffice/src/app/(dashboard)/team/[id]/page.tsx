@@ -5,6 +5,7 @@ import { Badge } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
 import type { AdminRole, AdminUserResponse, BranchResponse } from "@/lib/types";
 import { AdminUserStatusButton } from "./AdminUserStatusButton";
+import { DeleteAdminUserModal } from "./DeleteAdminUserModal";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
@@ -25,6 +26,8 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
   const branch = user.branchId ? await api.get<BranchResponse>(`/admin/branches/${user.branchId}/schedule`).catch(() => null) : null;
 
   const canManage = session?.role === "ADMIN" || (session?.role === "BRANCH_MANAGER" && user.branchId === session?.branchId);
+  const isSelf = session?.sub === user.login;
+  const canDelete = canManage && !isSelf;
   const meta = roleMeta(dict)[user.role];
 
   return (
@@ -46,14 +49,26 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
             </div>
             <p className="text-sm text-on-surface-variant mt-1">{meta.label}</p>
           </div>
-          {canManage && (
-            <div className="flex gap-3">
+          {canManage && user.status !== "DELETED" && (
+            <div className="flex flex-wrap gap-3">
               <ResetPasswordModal userId={user.id} login={user.login} />
               <AdminUserStatusButton userId={user.id} status={user.status} />
+              {canDelete && <DeleteAdminUserModal userId={user.id} />}
             </div>
           )}
         </div>
       </div>
+
+      {user.status === "DELETED" && (
+        <div className="mb-6 p-4 rounded-[var(--radius-md)] bg-error-container text-on-error-container">
+          <p className="font-semibold">{dict.team.deletedBanner.title}</p>
+          {user.deletionReason && (
+            <p className="text-sm mt-1">
+              {dict.team.deletedBanner.reasonPrefix} {user.deletionReason}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-xl p-6">
         <div className="flex items-center gap-4 mb-6 pb-6 border-b-2 border-outline-variant">
@@ -70,7 +85,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <InfoField label={dict.team.detail.login} value={user.login} mono />
-          <InfoField label={dict.agents.detail.status} value={user.status === "ACTIVE" ? dict.common.status.ACTIVE : dict.common.status.SUSPENDED} />
+          <InfoField label={dict.agents.detail.status} value={dict.common.status[user.status]} />
           <InfoField label={dict.agents.detail.branch} value={branch?.name ?? (user.role === "ADMIN" ? dict.team.detail.allBranchesGlobal : "—")} />
           <InfoField label={dict.team.detail.accountId} value={user.id} mono />
         </div>

@@ -39,7 +39,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -90,36 +89,25 @@ public class OfjService {
     }
 
     /**
-     * Active agents in the branch who currently have digital cash the cashier still needs to
-     * reconcile — either they have no {@code OfjAgentLine} yet for today's session, or they do,
-     * but it's stale: the agent has collected more since the last time they were reconciled (a
-     * genuinely common case, since nothing stops an agent from collecting again after their
-     * session line balanced and auto-closed the branch's session for the day — see
-     * {@link #maybeCloseSession} and {@link #reconcile}, the only place a line gets written).
-     * {@code OfjAgentLineResponse}/{@code summary.agentLines} can't answer this alone: that list
-     * reflects whatever totals were true as of each agent's *last* reconciliation, not now.
+     * Active agents in the branch who currently have unreconciled digital cash the cashier still
+     * needs to look at. Driven directly by {@code reconciledAt IS NULL} (see
+     * CollectionRepository#sumUnreconciledByAgent), not by comparing against a stale
+     * {@code OfjAgentLine} snapshot — an agent's unreconciled total already reflects everything
+     * since their last reconciliation, including a multi-day-offline backlog that only just synced.
      */
     public List<OfjPendingLineResponse> listPendingAgents(UUID branchId) {
-        OfjSession session = getOrCreateSession(branchId);
         List<UUID> activeAgentIds = agentDirectoryService.findActiveAgentIdsByBranch(branchId);
         if (activeAgentIds.isEmpty()) {
             return List.of();
         }
 
-        Map<UUID, OfjAgentLine> lineByAgent = ofjAgentLineRepository.findByOfjId(session.getId()).stream()
-                .collect(Collectors.toMap(OfjAgentLine::getAgentId, line -> line));
-
+        Instant now = Instant.now();
         List<OfjPendingLineResponse> pending = new ArrayList<>();
         for (UUID agentId : activeAgentIds) {
-            long collectionsTotal = sumCollectionsForAgentToday(agentId);
-            long activationsTotal = sumActivationsForAgentToday(agentId);
+            long collectionsTotal = collectionRepository.sumUnreconciledByAgent(agentId, now);
+            long activationsTotal = activationDirectoryService.sumUnreconciled(agentId, now);
             long digitalTotal = collectionsTotal + activationsTotal;
             if (digitalTotal <= 0) {
-                continue;
-            }
-            OfjAgentLine existing = lineByAgent.get(agentId);
-            boolean alreadyCurrent = existing != null && existing.getDigitalTotalXaf() >= digitalTotal;
-            if (alreadyCurrent) {
                 continue;
             }
             pending.add(OfjPendingLineResponse.builder()
@@ -181,22 +169,35 @@ public class OfjService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "OFJ session is not open for this branch/day");
         }
 
-        long collectionsTotal = sumCollectionsForAgentToday(request.getAgentId());
-        long activationsTotal = sumActivationsForAgentToday(request.getAgentId());
-        long digitalTotal = collectionsTotal + activationsTotal;
+        // A fixed instant, not "current DB state" — sumUnreconciledByAgent and markReconciled below
+        // both filter on collectedAt/paidAt < cutoff, so they see exactly the same rows regardless
+        // of anything concurrently syncing in mid-transaction. Whatever's still unreconciled and
+        // older than this moment gets swept up now — including a multi-day-offline agent's entire
+        // backlog, however far back it goes, not just "today".
+        Instant cutoff = Instant.now();
+        long newCollections = collectionRepository.sumUnreconciledByAgent(request.getAgentId(), cutoff);
+        long newActivations = activationDirectoryService.sumUnreconciled(request.getAgentId(), cutoff);
         long physicalTotal = request.getPhysicalDenominationLines().stream()
                 .mapToLong(line -> line.getFaceValueXaf() * line.getQuantity())
                 .sum();
-        long delta = physicalTotal - digitalTotal;
 
         OfjAgentLine line = ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), request.getAgentId())
-                .orElseGet(() -> OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(request.getAgentId()).build());
+                .orElseGet(() -> OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(request.getAgentId())
+                        .digitalTotalXaf(0L).collectionsTotalXaf(0L).activationsTotalXaf(0L).build());
+        // Accumulate, don't overwrite: nothing stops an agent reconciling twice in one session (they
+        // sync more after balancing once), and each newly-unreconciled sweep is additional cash on
+        // top of whatever this line already counted, not a replacement for it. physicalTotalXaf is
+        // the opposite — it's what the cashier just counted in hand right now, so it does overwrite.
+        long digitalTotal = nz(line.getCollectionsTotalXaf()) + nz(line.getActivationsTotalXaf()) + newCollections + newActivations;
+        line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) + newCollections);
+        line.setActivationsTotalXaf(nz(line.getActivationsTotalXaf()) + newActivations);
         line.setDigitalTotalXaf(digitalTotal);
-        line.setCollectionsTotalXaf(collectionsTotal);
-        line.setActivationsTotalXaf(activationsTotal);
         line.setPhysicalTotalXaf(physicalTotal);
-        line.setDeltaXaf(delta);
+        line.setDeltaXaf(physicalTotal - digitalTotal);
         ofjAgentLineRepository.save(line);
+
+        collectionRepository.markReconciled(request.getAgentId(), cutoff, line.getId());
+        activationDirectoryService.markReconciled(request.getAgentId(), cutoff, line.getId());
 
         ofjPhysicalDenomRepository.deleteByOfjAgentLineId(line.getId());
         for (DenominationLineDto denom : request.getPhysicalDenominationLines()) {
@@ -290,11 +291,14 @@ public class OfjService {
             return;
         }
 
-        Instant startOfDayUtc = session.getBusinessDate().atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
+        // Posts exactly what THIS session's lines actually reconciled, not "whatever has a
+        // collectedAt matching this calendar date" — a collection recorded offline days ago and
+        // only just synced keeps its original collectedAt, so a date-window query here would
+        // silently never post it even though reconcile() already counted it in digitalTotalXaf.
+        List<UUID> lineIds = ofjAgentLineRepository.findByOfjId(session.getId()).stream().map(OfjAgentLine::getId).toList();
 
         List<MiddlewareCollectionLine> lines = new ArrayList<>();
-        collectionRepository.findByAgentIdInAndCollectedAtBetween(activeAgentIds, startOfDayUtc, endOfDayUtc).stream()
+        collectionRepository.findByReconciledInLineIdIn(lineIds).stream()
                 .map(collection -> MiddlewareCollectionLine.builder()
                         .collectionId(collection.getId())
                         .memberId(clientDirectoryService.findCbsRef(collection.getClientId()))
@@ -302,7 +306,7 @@ public class OfjService {
                         .collectedAt(collection.getCollectedAt())
                         .build())
                 .forEach(lines::add);
-        activationDirectoryService.findByAgentIdsAndWindow(activeAgentIds, startOfDayUtc, endOfDayUtc).stream()
+        activationDirectoryService.findByReconciledInLineIds(lineIds).stream()
                 .map(payment -> MiddlewareCollectionLine.builder()
                         .collectionId(payment.id())
                         .memberId(clientDirectoryService.findCbsRef(payment.clientId()))
@@ -392,17 +396,8 @@ public class OfjService {
         return line.getDeltaXaf() >= 0 || varianceDebtRepository.findByOfjAgentLineId(line.getId()).isPresent();
     }
 
-    private long sumCollectionsForAgentToday(UUID agentId) {
-        Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
-        return collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
-    }
-
-    /** FR-19 activation fees collected in cash also count as digital totals the agent must reconcile against. */
-    private long sumActivationsForAgentToday(UUID agentId) {
-        Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
-        return activationDirectoryService.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
+    private long nz(Long value) {
+        return value == null ? 0L : value;
     }
 
     private OfjSummaryResponse toSummary(OfjSession session) {
