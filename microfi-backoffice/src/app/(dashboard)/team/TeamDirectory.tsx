@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
+import { ExportButtons } from "@/components/ExportButtons";
 import type { AgentStatus, AdminUserStatus } from "@/lib/types";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { ExportColumn } from "@/lib/export";
 
 export type TeamMemberKind = "ADMIN" | "BRANCH_MANAGER" | "BRANCH_CASHIER" | "AGENT";
 
@@ -32,10 +34,27 @@ function initials(login: string) {
   return login.slice(0, 2).toUpperCase();
 }
 
-export function TeamDirectory({ rows, actions }: { rows: TeamRow[]; actions?: ReactNode }) {
+export function TeamDirectory({
+  rows,
+  actions,
+  scope,
+  generatedBy,
+}: {
+  rows: TeamRow[];
+  actions?: ReactNode;
+  scope: string;
+  generatedBy: string;
+}) {
   const dict = useDictionary();
   const ROLE_META = useMemo(() => roleMeta(dict), [dict]);
   const [query, setQuery] = useState("");
+
+  const columns: ExportColumn<TeamRow>[] = [
+    { header: dict.team.directory.colLogin, value: (r) => r.login },
+    { header: dict.team.directory.colRole, value: (r) => ROLE_META[r.role].label },
+    { header: dict.team.directory.colBranch, value: (r) => r.branchName ?? dict.team.directory.allBranches },
+    { header: dict.team.directory.colStatus, value: (r) => r.status },
+  ];
 
   const stats = useMemo(
     () => ({
@@ -65,7 +84,17 @@ export function TeamDirectory({ rows, actions }: { rows: TeamRow[]; actions?: Re
             className="w-full h-11 pl-10 pr-4 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:border-primary transition-colors"
           />
         </div>
-        {actions}
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            filenameBase={`microfi-team-members_${scope}`}
+            sheetName={dict.team.directory.exportTitle}
+            pdfTitle={dict.team.directory.exportTitle}
+            meta={{ scope, generatedBy }}
+            columns={columns}
+            rows={filtered}
+          />
+          {actions}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

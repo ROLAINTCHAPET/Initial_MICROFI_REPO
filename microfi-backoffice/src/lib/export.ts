@@ -10,8 +10,8 @@ export interface ExportColumn<T> {
 
 export interface ExportMeta {
   scope: string; // e.g. a branch name, or "All branches"
-  from: string; // ISO date, "2026-08-01"
-  to: string; // ISO date, "2026-09-01"
+  from?: string; // ISO date, "2026-08-01" — omit for a live-snapshot export with no natural period (e.g. a directory listing)
+  to?: string; // ISO date, "2026-09-01"
   generatedBy: string; // admin login
   locale: Locale; // the platform's current locale — the generated document follows it, not the browser's
 }
@@ -42,7 +42,9 @@ const LABELS: Record<Locale, { scope: string; period: string; periodSeparator: s
   },
 };
 
-function formatPeriod(meta: ExportMeta): string {
+/** Null when the export has no natural period (e.g. a directory listing) — the caller then omits the "Period" line entirely rather than printing an empty/misleading range. */
+function formatPeriod(meta: ExportMeta): string | null {
+  if (!meta.from || !meta.to) return null;
   const labels = LABELS[meta.locale];
   return `${meta.from} ${labels.periodSeparator} ${meta.to}`;
 }
@@ -50,10 +52,11 @@ function formatPeriod(meta: ExportMeta): string {
 /** Real, verifiable .xlsx export (SheetJS): a metadata block on top, then the data table. */
 export function exportToExcel<T>(filename: string, sheetName: string, meta: ExportMeta, columns: ExportColumn<T>[], rows: T[]) {
   const labels = LABELS[meta.locale];
+  const period = formatPeriod(meta);
   const metaRows: (string | number)[][] = [
     [`MICROFI: ${sheetName}`],
     [labels.scope, meta.scope],
-    [labels.period, formatPeriod(meta)],
+    ...(period ? [[labels.period, period]] : []),
     [labels.generatedAt, new Date().toLocaleString(LOCALE_TAG[meta.locale])],
     [labels.generatedBy, meta.generatedBy],
     [],
@@ -90,9 +93,10 @@ export function exportToPdf<T>(filename: string, title: string, meta: ExportMeta
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   let y = 32;
+  const period = formatPeriod(meta);
   for (const line of [
     `${labels.scope}: ${meta.scope}`,
-    `${labels.period}: ${formatPeriod(meta)}`,
+    ...(period ? [`${labels.period}: ${period}`] : []),
     `${labels.generatedAt}: ${new Date().toLocaleString(LOCALE_TAG[meta.locale])}`,
     `${labels.generatedBy}: ${meta.generatedBy}`,
   ]) {

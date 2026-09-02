@@ -338,6 +338,7 @@ export default async function RegionalDashboardPage() {
             editable
             branches={branchRows}
             actions={<CreateBranchModal />}
+            generatedBy={session?.sub ?? ""}
           />
         </div>
       )}

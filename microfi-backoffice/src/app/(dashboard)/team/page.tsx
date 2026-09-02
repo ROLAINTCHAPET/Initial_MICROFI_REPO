@@ -98,6 +98,8 @@ export default async function TeamPage({
 
       <TeamDirectory
         rows={rows}
+        scope={branch ? `${branch.name} (${branch.code})` : dict.team.branchFallback}
+        generatedBy={session?.sub ?? ""}
         actions={
           canCreate ? (
             <Link

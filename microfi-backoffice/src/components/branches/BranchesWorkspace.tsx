@@ -12,11 +12,13 @@ export function BranchesWorkspace({
   editable,
   branches,
   actions,
+  generatedBy,
 }: {
   scheduleDefaults: ScheduleDefaultsResponse;
   editable: boolean;
   branches: BranchRow[];
   actions?: ReactNode;
+  generatedBy: string;
 }) {
   const dict = useDictionary();
   const [locked, setLocked] = useState(false);
@@ -33,7 +35,7 @@ export function BranchesWorkspace({
           setToastVisible(true);
         }}
       />
-      <BranchDirectory branches={branches} actions={actions} locked={locked} />
+      <BranchDirectory branches={branches} actions={actions} locked={locked} generatedBy={generatedBy} />
       {toastVisible && <Toast message={dict.branches.workspace.scheduleSaved} onDismiss={() => setToastVisible(false)} />}
     </>
   );

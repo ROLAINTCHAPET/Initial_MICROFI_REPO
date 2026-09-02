@@ -2,9 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
+import { ExportButtons } from "@/components/ExportButtons";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/format";
 import { BranchSettingsModal } from "./BranchSettingsModal";
+import type { ExportColumn } from "@/lib/export";
 
 export interface BranchRow {
   id: string;
@@ -21,7 +23,17 @@ export interface BranchRow {
   canEdit: boolean;
 }
 
-export function BranchDirectory({ branches, actions, locked = false }: { branches: BranchRow[]; actions?: ReactNode; locked?: boolean }) {
+export function BranchDirectory({
+  branches,
+  actions,
+  locked = false,
+  generatedBy,
+}: {
+  branches: BranchRow[];
+  actions?: ReactNode;
+  locked?: boolean;
+  generatedBy: string;
+}) {
   const dict = useDictionary();
   const [query, setQuery] = useState("");
 
@@ -30,6 +42,17 @@ export function BranchDirectory({ branches, actions, locked = false }: { branche
     if (!q) return branches;
     return branches.filter((b) => `${b.name} ${b.code} ${b.timezone ?? ""}`.toLowerCase().includes(q));
   }, [branches, query]);
+
+  const columns: ExportColumn<BranchRow>[] = [
+    { header: dict.branches.directory.colName, value: (b) => b.name },
+    { header: dict.branches.directory.colCode, value: (b) => b.code },
+    { header: dict.branches.directory.colPhone, value: (b) => b.phone ?? "" },
+    { header: dict.branches.directory.colTimezone, value: (b) => b.timezone ?? "" },
+    { header: dict.branches.directory.colHours, value: (b) => (b.openTime && b.closeTime ? `${b.openTime.slice(0, 5)}-${b.closeTime.slice(0, 5)}` : "") },
+    { header: dict.branches.directory.colMaxCashiers, value: (b) => b.maxCashiers },
+    { header: dict.branches.directory.colRequireImei, value: (b) => (b.requireImei ? dict.common.yes : dict.common.no) },
+    { header: dict.branches.directory.colDefaultCeilingPct, value: (b) => b.defaultCeilingPct },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,7 +67,17 @@ export function BranchDirectory({ branches, actions, locked = false }: { branche
             className="w-full h-11 pl-10 pr-4 rounded-[var(--radius-sm)] border-2 border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:border-primary transition-colors"
           />
         </div>
-        {actions}
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            filenameBase="microfi-branches"
+            sheetName={dict.branches.directory.exportTitle}
+            pdfTitle={dict.branches.directory.exportTitle}
+            meta={{ scope: dict.export.scopeAllBranches, generatedBy }}
+            columns={columns}
+            rows={filtered}
+          />
+          {actions}
+        </div>
       </div>
 
       <div className="relative bg-surface-container-lowest rounded-[var(--radius-md)] border-2 border-outline-variant overflow-hidden">

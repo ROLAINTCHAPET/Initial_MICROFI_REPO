@@ -472,7 +472,12 @@
       "statSuspended": "Suspended",
       "allBranches": "All branches",
       "noTeamMembersYet": "No team members yet.",
-      "noTeamMembersMatch": "No team members match your search."
+      "noTeamMembersMatch": "No team members match your search.",
+      "exportTitle": "Team Members",
+      "colLogin": "Login",
+      "colRole": "Role",
+      "colBranch": "Branch",
+      "colStatus": "Status"
     },
     "detail": {
       "login": "Login",
@@ -745,7 +750,16 @@
       "idLabel": "ID: {code}",
       "hoursNotSet": "Hours not set",
       "noContactNumber": "No contact number",
-      "editRestrictedTooltip": "Only an Administrator or this branch's own manager can edit its settings"
+      "editRestrictedTooltip": "Only an Administrator or this branch's own manager can edit its settings",
+      "exportTitle": "Branches",
+      "colName": "Name",
+      "colCode": "Code",
+      "colPhone": "Phone",
+      "colTimezone": "Timezone",
+      "colHours": "Hours",
+      "colMaxCashiers": "Max Cashiers",
+      "colRequireImei": "Requires Device Binding",
+      "colDefaultCeilingPct": "Default Ceiling %"
     },
     "workspace": {
       "scheduleSaved": "New schedule saved"
