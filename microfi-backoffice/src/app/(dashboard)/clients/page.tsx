@@ -48,7 +48,11 @@ export default async function ClientsPage({
         </div>
       )}
 
-      <ClientsExplorer clients={clients} />
+      <ClientsExplorer
+        clients={clients}
+        scope={branch ? `${branch.name} (${branch.code})` : dict.clients.branchFallback}
+        generatedBy={session?.sub ?? ""}
+      />
     </div>
   );
 }

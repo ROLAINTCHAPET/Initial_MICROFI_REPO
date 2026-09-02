@@ -302,6 +302,7 @@
     "colMemberNo": "Member No.",
     "colPhone": "Phone",
     "colStatus": "Status",
+    "exportTitle": "Clients",
     "noClients": "No clients found for this branch.",
     "noMatches": "No clients match this search.",
     "backToClients": "Back to Clients",

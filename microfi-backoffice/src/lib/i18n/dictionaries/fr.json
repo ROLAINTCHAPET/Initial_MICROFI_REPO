@@ -302,6 +302,7 @@
     "colMemberNo": "N° de membre",
     "colPhone": "Téléphone",
     "colStatus": "Statut",
+    "exportTitle": "Clients",
     "noClients": "Aucun client trouvé pour cette agence.",
     "noMatches": "Aucun client ne correspond à cette recherche.",
     "backToClients": "Retour aux clients",
