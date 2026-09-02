@@ -73,9 +73,14 @@ export function AuditExplorer({
   // to a real account (no role to know).
   const actorRoleLabel = (log: AuditLogResponse) => (log.actorRole ? dict.roles[log.actorRole] : dict.audit.actorType[log.actorType]);
 
+  // Falls back to the raw machine code for any eventType not yet in the map — new event types
+  // introduced on the backend still show up (untranslated) instead of silently disappearing.
+  const eventTypeLabel = (eventType: string) =>
+    (dict.audit.eventType as Record<string, string>)[eventType] ?? eventType;
+
   const columns: ExportColumn<AuditLogResponse>[] = [
     { header: dict.audit.table.colTime, value: (r) => new Date(r.occurredAt).toLocaleString() },
-    { header: dict.audit.table.colEvent, value: (r) => r.eventType },
+    { header: dict.audit.table.colEvent, value: (r) => eventTypeLabel(r.eventType) },
     { header: dict.audit.table.colCategory, value: (r) => dict.audit.category[r.category] },
     { header: dict.audit.table.colActor, value: (r) => r.actorLabel },
     { header: dict.audit.table.colActorRole, value: (r) => actorRoleLabel(r) },
@@ -190,7 +195,7 @@ export function AuditExplorer({
             {logs.map((log) => (
               <Tr key={log.id} tint={log.status === "FAILED"}>
                 <Td className="text-on-surface-variant whitespace-nowrap">{new Date(log.occurredAt).toLocaleString()}</Td>
-                <Td className="font-medium text-on-surface">{log.eventType}</Td>
+                <Td className="font-medium text-on-surface">{eventTypeLabel(log.eventType)}</Td>
                 <Td>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
                     <Icon name={log.category === "SECURITY" ? "lock" : log.category === "COMPLIANCE" ? "public" : "account-balance-wallet"} className="size-4" />

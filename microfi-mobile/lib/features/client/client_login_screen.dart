@@ -4,6 +4,7 @@ import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../../core/session_storage.dart';
 import 'client_activation_screen.dart';
+import 'client_forgot_pin_screen.dart';
 import 'client_repository.dart';
 import 'client_session_entry.dart';
 import '../../l10n/app_localizations.dart';
@@ -145,6 +146,17 @@ class _ClientLoginScreenState extends State<ClientLoginScreen> {
                             child: _loading
                                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                 : Text(l10n.clSignInButton),
+                          ),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton(
+                              onPressed: _loading
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                        MaterialPageRoute(builder: (_) => const ClientForgotPinScreen()),
+                                      ),
+                              child: Text(l10n.clForgotPinLink),
+                            ),
                           ),
                         ],
                       ),

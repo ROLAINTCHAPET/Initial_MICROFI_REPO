@@ -699,6 +699,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clFirstTimeActivate => 'First time? Activate my booklet';
 
   @override
+  String get clForgotPinLink => 'Forgot PIN?';
+
+  @override
   String get psPinMismatchError => 'New PIN and confirmation do not match.';
 
   @override
@@ -801,6 +804,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fpBackToLogin => 'Back to Login';
+
+  @override
+  String get cfpTitle => 'Forgot PIN';
+
+  @override
+  String get cfpRequestSubtitle =>
+      'Enter your login. We\'ll send a verification code by SMS to your registered phone.';
+
+  @override
+  String get cfpLoginLabel => 'Login';
+
+  @override
+  String get cfpSendCodeButton => 'Send Code';
+
+  @override
+  String get cfpCodeSentMessage =>
+      'If that login exists, a code has been sent by SMS.';
+
+  @override
+  String get cfpConfirmSubtitle =>
+      'Enter the code you received and choose a new PIN.';
+
+  @override
+  String get cfpOtpLabel => 'Verification Code';
+
+  @override
+  String get cfpNewPinLabel => 'New PIN';
+
+  @override
+  String get cfpConfirmPinLabel => 'Confirm New PIN';
+
+  @override
+  String get cfpPinInvalidFormat => 'PIN must be 4 to 6 digits';
+
+  @override
+  String get cfpPinMismatch => 'PINs do not match';
+
+  @override
+  String get cfpResetButton => 'Reset PIN';
+
+  @override
+  String get cfpSuccessMessage => 'PIN updated. You can now log in.';
+
+  @override
+  String get cfpResendCode => 'Resend code';
+
+  @override
+  String get cfpBackToLogin => 'Back to Login';
 
   @override
   String get seUnableToCheckLocation => 'Unable to check location.';

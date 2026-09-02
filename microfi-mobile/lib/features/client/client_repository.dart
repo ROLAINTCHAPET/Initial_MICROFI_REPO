@@ -26,6 +26,25 @@ class ClientAuthRepository {
       mfiName: response['mfiName'] as String,
     );
   }
+
+  /// Step 1 of 2 — self-service PIN recovery (no agent/admin involved), mirrors
+  /// AuthRepository.requestPasswordReset for the agent flow but against the client endpoint.
+  Future<void> requestPinReset({required String login}) async {
+    await _client.post('/auth/client/forgot-password', {'login': login});
+  }
+
+  /// Step 2 — confirms the SMS code and sets the new login PIN.
+  Future<void> confirmPinReset({
+    required String login,
+    required String otp,
+    required String newPin,
+  }) async {
+    await _client.post('/auth/client/reset-password', {
+      'login': login,
+      'otp': otp,
+      'newPin': newPin,
+    });
+  }
 }
 
 class ClientSelfRepository {

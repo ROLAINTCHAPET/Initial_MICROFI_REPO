@@ -1298,6 +1298,12 @@ abstract class AppLocalizations {
   /// **'First time? Activate my booklet'**
   String get clFirstTimeActivate;
 
+  /// Client login screen — link to the client forgot-PIN flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot PIN?'**
+  String get clForgotPinLink;
+
   /// PIN setup screen — validation error when the new PIN and confirmation differ.
   ///
   /// In en, this message translates to:
@@ -1495,6 +1501,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to Login'**
   String get fpBackToLogin;
+
+  /// Client forgot-PIN screen — app bar title.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot PIN'**
+  String get cfpTitle;
+
+  /// Client forgot-PIN screen — step 1 (request code) subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your login. We\'ll send a verification code by SMS to your registered phone.'**
+  String get cfpRequestSubtitle;
+
+  /// Client forgot-PIN screen — login field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Login'**
+  String get cfpLoginLabel;
+
+  /// Client forgot-PIN screen — step 1 submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Code'**
+  String get cfpSendCodeButton;
+
+  /// Client forgot-PIN screen — generic acknowledgement shown after requesting a code, whether or not the login exists.
+  ///
+  /// In en, this message translates to:
+  /// **'If that login exists, a code has been sent by SMS.'**
+  String get cfpCodeSentMessage;
+
+  /// Client forgot-PIN screen — step 2 (confirm code + new PIN) subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code you received and choose a new PIN.'**
+  String get cfpConfirmSubtitle;
+
+  /// Client forgot-PIN screen — OTP field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification Code'**
+  String get cfpOtpLabel;
+
+  /// Client forgot-PIN screen — new PIN field label.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN'**
+  String get cfpNewPinLabel;
+
+  /// Client forgot-PIN screen — confirm new PIN field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm New PIN'**
+  String get cfpConfirmPinLabel;
+
+  /// Client forgot-PIN screen — new PIN field validator error.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN must be 4 to 6 digits'**
+  String get cfpPinInvalidFormat;
+
+  /// Client forgot-PIN screen — confirm PIN field validator error.
+  ///
+  /// In en, this message translates to:
+  /// **'PINs do not match'**
+  String get cfpPinMismatch;
+
+  /// Client forgot-PIN screen — step 2 submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset PIN'**
+  String get cfpResetButton;
+
+  /// Client forgot-PIN screen — shown after a successful reset, before returning to login.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN updated. You can now log in.'**
+  String get cfpSuccessMessage;
+
+  /// Client forgot-PIN screen — link on step 2 to go back and request a new code.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get cfpResendCode;
+
+  /// Client forgot-PIN screen — link back to the login screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Login'**
+  String get cfpBackToLogin;
 
   /// Session entry screen — generic (non-LocationUnavailable) location-check failure.
   ///

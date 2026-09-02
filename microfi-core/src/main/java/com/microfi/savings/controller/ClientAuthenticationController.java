@@ -9,11 +9,15 @@ import com.microfi.savings.ClientDetails;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.service.ClientActivationService;
 import com.microfi.savings.service.ClientDetailsService;
+import com.microfi.savings.service.ClientPasswordResetService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.AuthResponse;
 import com.microfi.shared.dto.ClientActivateRequest;
 import com.microfi.shared.dto.ClientActivationPendingResponse;
+import com.microfi.shared.dto.ClientForgotPasswordRequest;
 import com.microfi.shared.dto.ClientLoginRequest;
+import com.microfi.shared.dto.ClientResetPasswordWithOtpRequest;
+import com.microfi.shared.dto.MessageResponse;
 import com.microfi.shared.exception.InvalidCredentialsException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,9 +47,14 @@ public class ClientAuthenticationController {
 
     private final ClientActivationService clientActivationService;
     private final ClientDetailsService clientDetailsService;
+    private final ClientPasswordResetService clientPasswordResetService;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+
+    private static final MessageResponse FORGOT_PASSWORD_ACK = MessageResponse.builder()
+            .message("If that login exists, a reset code has been sent by SMS.")
+            .build();
 
     @PostMapping("/activate")
     @Operation(summary = "Self-Activation Step 1", description = "Client enters their CBS Activation ID and sets their own login/PIN. Awaits agent sponsorship for the fee split and token issuance (UC-19).")
@@ -82,6 +91,32 @@ public class ClientAuthenticationController {
                     auditFailedClientLogin(request.getLogin(), e.getMessage());
                     return Mono.error(new InvalidCredentialsException("Authentication failed: " + e.getMessage()));
                 });
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Client Forgot Password", description = "Self-service, no agent/admin involved. Sends a one-time SMS code to the client's registered phone. Always returns the same generic acknowledgement, whether or not the login exists, so this can't be used to enumerate valid client logins.")
+    public Mono<MessageResponse> forgotPassword(@Valid @RequestBody ClientForgotPasswordRequest request) {
+        return clientPasswordResetService.requestReset(request.getLogin())
+                .thenReturn(FORGOT_PASSWORD_ACK);
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Client Reset PIN With Code", description = "Confirms the SMS code from /forgot-password and sets a new login PIN.")
+    public Mono<MessageResponse> resetPassword(@Valid @RequestBody ClientResetPasswordWithOtpRequest request) {
+        return clientPasswordResetService.confirmReset(request.getLogin(), request.getOtp(), request.getNewPin())
+                .doOnSuccess(v -> auditSelfServicePasswordReset(request.getLogin()))
+                .thenReturn(MessageResponse.builder().message("PIN updated. You can now log in.").build());
+    }
+
+    /** Self-service — only the login is known at this layer, the OTP flow doesn't otherwise resolve the client's id/branch here. */
+    private void auditSelfServicePasswordReset(String login) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("CLIENT_PASSWORD_RESET")
+                .actorType(AuditActorType.CLIENT)
+                .actorLabel(login)
+                .details("PIN reset via self-service SMS code")
+                .build());
     }
 
     private void auditClientLogin(ClientProfile client, String attemptedLogin, AuditStatus status, String details) {

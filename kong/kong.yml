@@ -20,6 +20,8 @@ services:
         paths:
           - /api/v1/auth/agent/forgot-password
           - /api/v1/auth/agent/reset-password
+          - /api/v1/auth/client/forgot-password
+          - /api/v1/auth/client/reset-password
         strip_path: false
         plugins:
           - name: rate-limiting

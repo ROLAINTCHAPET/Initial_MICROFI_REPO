@@ -710,6 +710,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get clFirstTimeActivate => 'Première visite ? Activez mon livret';
 
   @override
+  String get clForgotPinLink => 'Code confidentiel oublié ?';
+
+  @override
   String get psPinMismatchError =>
       'Le nouveau code confidentiel et sa confirmation ne correspondent pas.';
 
@@ -818,6 +821,56 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get fpBackToLogin => 'Retour à la connexion';
+
+  @override
+  String get cfpTitle => 'Code confidentiel oublié';
+
+  @override
+  String get cfpRequestSubtitle =>
+      'Entrez votre identifiant. Nous enverrons un code de vérification par SMS à votre téléphone enregistré.';
+
+  @override
+  String get cfpLoginLabel => 'Identifiant';
+
+  @override
+  String get cfpSendCodeButton => 'Envoyer le code';
+
+  @override
+  String get cfpCodeSentMessage =>
+      'Si cet identifiant existe, un code a été envoyé par SMS.';
+
+  @override
+  String get cfpConfirmSubtitle =>
+      'Entrez le code reçu et choisissez un nouveau code confidentiel.';
+
+  @override
+  String get cfpOtpLabel => 'Code de vérification';
+
+  @override
+  String get cfpNewPinLabel => 'Nouveau code confidentiel';
+
+  @override
+  String get cfpConfirmPinLabel => 'Confirmer le nouveau code confidentiel';
+
+  @override
+  String get cfpPinInvalidFormat =>
+      'Le code confidentiel doit contenir de 4 à 6 chiffres';
+
+  @override
+  String get cfpPinMismatch => 'Les codes confidentiels ne correspondent pas';
+
+  @override
+  String get cfpResetButton => 'Réinitialiser le code confidentiel';
+
+  @override
+  String get cfpSuccessMessage =>
+      'Code confidentiel mis à jour. Vous pouvez maintenant vous connecter.';
+
+  @override
+  String get cfpResendCode => 'Renvoyer le code';
+
+  @override
+  String get cfpBackToLogin => 'Retour à la connexion';
 
   @override
   String get seUnableToCheckLocation => 'Impossible de vérifier la position.';
