@@ -1,5 +1,6 @@
 package com.microfi.transactions.service;
 
+import com.microfi.events.SosGeocodeEvent;
 import com.microfi.shared.dto.LocationPingRequest;
 import com.microfi.shared.dto.LocationPingResponse;
 import com.microfi.shared.dto.RoutePointDto;
@@ -14,6 +15,7 @@ import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.LocationPingRepository;
 import com.microfi.transactions.repository.SosEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,7 @@ public class TrackingService {
     private final SosEventRepository sosEventRepository;
     private final CollectionRepository collectionRepository;
     private final GeofenceService geofenceService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public LocationPingResponse recordLocation(UUID agentId, LocationPingRequest request) {
         LocationPing ping = LocationPing.builder()
@@ -106,6 +109,12 @@ public class TrackingService {
                 .build();
         sosEventRepository.save(event);
 
+        // SOS is "never gated on GPS availability" (see class doc) — a fix-less trigger has
+        // nothing to geocode, so only publish when both coordinates are actually present.
+        if (event.getLat() != null && event.getLon() != null) {
+            applicationEventPublisher.publishEvent(new SosGeocodeEvent(event.getId(), event.getLat(), event.getLon()));
+        }
+
         return toSosResponse(event);
     }
 
@@ -153,6 +162,7 @@ public class TrackingService {
                 .agentId(event.getAgentId())
                 .lat(event.getLat())
                 .lon(event.getLon())
+                .locationName(event.getLocationName())
                 .raisedAt(event.getRaisedAt())
                 .acknowledgedBy(event.getAcknowledgedBy())
                 .acknowledgedAt(event.getAcknowledgedAt())

@@ -35,6 +35,9 @@ public class SosEvent {
 
     private Double lon;
 
+    /** Resolved asynchronously by reverse geocoding, same best-effort pattern as {@link Collection#getLocationName()} — never blocks the SOS request itself, null until (if ever) the lookup succeeds. */
+    private String locationName;
+
     private Instant raisedAt;
 
     private UUID acknowledgedBy;

@@ -31,7 +31,7 @@ export function ClientsExplorer({
     { header: dict.clients.colName, value: (c) => c.fullName },
     { header: dict.clients.colMemberNo, value: (c) => c.mfiMemberNo },
     { header: dict.clients.colPhone, value: (c) => c.phone },
-    { header: dict.clients.colStatus, value: (c) => c.status },
+    { header: dict.clients.colStatus, value: (c) => dict.common.status[c.status] },
   ];
 
   return (

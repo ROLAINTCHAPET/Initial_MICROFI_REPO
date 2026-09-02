@@ -86,7 +86,7 @@ export function AuditExplorer({
     { header: dict.audit.table.colActorRole, value: (r) => actorRoleLabel(r) },
     { header: dict.audit.table.colBranch, value: (r) => r.branchLabel ?? "" },
     { header: dict.audit.table.colDetails, value: (r) => r.details },
-    { header: dict.audit.table.colStatus, value: (r) => r.status },
+    { header: dict.audit.table.colStatus, value: (r) => dict.common.status[r.status] },
   ];
 
   const scopeLabel = branchId
@@ -210,9 +210,9 @@ export function AuditExplorer({
                 <Td className="text-on-surface-variant max-w-[320px]">{log.details}</Td>
                 <Td>
                   {log.status === "SUCCESS" ? (
-                    <Badge status="ACTIVE" label={log.status} />
+                    <Badge status="ACTIVE" label={dict.common.status.SUCCESS} />
                   ) : (
-                    <Badge status="SUSPENDED" label={log.status} />
+                    <Badge status="SUSPENDED" label={dict.common.status.FAILED} />
                   )}
                 </Td>
               </Tr>

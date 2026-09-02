@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +35,8 @@ class TrackingServiceTest {
     private CollectionRepository collectionRepository;
     @Mock
     private GeofenceService geofenceService;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private TrackingService trackingService;
 
@@ -42,7 +45,7 @@ class TrackingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        trackingService = new TrackingService(locationPingRepository, sosEventRepository, collectionRepository, geofenceService);
+        trackingService = new TrackingService(locationPingRepository, sosEventRepository, collectionRepository, geofenceService, applicationEventPublisher);
         when(locationPingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(sosEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -73,6 +76,7 @@ class TrackingServiceTest {
         assertThat(response.getAgentId()).isEqualTo(agentId);
         assertThat(response.getLat()).isEqualTo(4.05);
         assertThat(response.getRaisedAt()).isNotNull();
+        verify(applicationEventPublisher).publishEvent(any(com.microfi.events.SosGeocodeEvent.class));
     }
 
     @Test
@@ -85,6 +89,8 @@ class TrackingServiceTest {
         assertThat(response.getLat()).isNull();
         assertThat(response.getLon()).isNull();
         assertThat(response.getRaisedAt()).isNotNull();
+        // Nothing to geocode without a fix — must not publish an event with a null lat/lon.
+        verify(applicationEventPublisher, org.mockito.Mockito.never()).publishEvent(any());
     }
 
     @Test
@@ -112,13 +118,15 @@ class TrackingServiceTest {
 
     @Test
     void listSosEventsUnrestrictedWhenAgentIdsNull() {
-        SosEvent event = SosEvent.builder().id(UUID.randomUUID()).agentId(agentId).raisedAt(Instant.now()).build();
+        SosEvent event = SosEvent.builder().id(UUID.randomUUID()).agentId(agentId).raisedAt(Instant.now())
+                .locationName("Douala, Cameroon").build();
         when(sosEventRepository.findAllByOrderByRaisedAtDesc()).thenReturn(List.of(event));
 
         List<SosResponse> result = trackingService.listSosEvents(null, false);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAgentId()).isEqualTo(agentId);
+        assertThat(result.get(0).getLocationName()).isEqualTo("Douala, Cameroon");
     }
 
     @Test

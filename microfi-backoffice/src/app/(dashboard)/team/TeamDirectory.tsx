@@ -53,7 +53,7 @@ export function TeamDirectory({
     { header: dict.team.directory.colLogin, value: (r) => r.login },
     { header: dict.team.directory.colRole, value: (r) => ROLE_META[r.role].label },
     { header: dict.team.directory.colBranch, value: (r) => r.branchName ?? dict.team.directory.allBranches },
-    { header: dict.team.directory.colStatus, value: (r) => r.status },
+    { header: dict.team.directory.colStatus, value: (r) => dict.common.status[r.status] },
   ];
 
   const stats = useMemo(

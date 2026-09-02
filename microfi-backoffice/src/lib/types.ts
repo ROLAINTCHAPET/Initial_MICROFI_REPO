@@ -118,6 +118,7 @@ export interface SosResponse {
   agentId: string;
   lat: number | null;
   lon: number | null;
+  locationName: string | null;
   raisedAt: string;
   acknowledgedBy: string | null;
   acknowledgedAt: string | null;

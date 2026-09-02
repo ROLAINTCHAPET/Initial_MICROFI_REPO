@@ -78,7 +78,14 @@ export default async function SosConsolePage({
                   </div>
                   <p className="text-sm text-text-slate mt-1 flex items-center gap-1.5">
                     <Icon name="location" className="size-4 shrink-0" />
-                    {event.lat !== null && event.lon !== null ? `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}` : dict.sos.locationUnavailable}
+                    {event.lat !== null && event.lon !== null ? (
+                      <span>
+                        {event.locationName ?? "N/A"}
+                        <span className="text-text-grey-disabled"> ({event.lat.toFixed(5)}, {event.lon.toFixed(5)})</span>
+                      </span>
+                    ) : (
+                      dict.sos.locationUnavailable
+                    )}
                   </p>
                   <p className="text-xs text-text-grey-disabled mt-1">{new Date(event.raisedAt).toLocaleString()}</p>
                   <div className="mt-3 flex items-center gap-3">

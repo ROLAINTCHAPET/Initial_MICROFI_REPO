@@ -47,7 +47,9 @@
       "CLOSED": "Fermé",
       "RESOLVED": "Résolu",
       "ACKNOWLEDGED": "Accusé de réception",
-      "WRITTEN_OFF": "Annulée"
+      "WRITTEN_OFF": "Annulée",
+      "SUCCESS": "Succès",
+      "FAILED": "Échec"
     },
     "gauge": {
       "ceilingReached": "Plafond atteint : nouveaux encaissements bloqués",
@@ -562,7 +564,7 @@
   "registrations": {
     "pageTitle": "Inscriptions",
     "pageSubtitle": "Dossiers d'inscription numériques soumis à validation de conformité pour les agents, caissiers et chefs d'agence.",
-    "newApplication": "Nouvelle demande",
+    "newApplication": "Nouvel Utilisateur",
     "submittedAt": "Soumis le {date}",
     "reasonPrefix": "Motif : {reason}",
     "noApplications": "Aucune demande {status}.",

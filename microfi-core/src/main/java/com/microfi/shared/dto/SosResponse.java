@@ -17,6 +17,7 @@ public class SosResponse {
     private UUID agentId;
     private Double lat;
     private Double lon;
+    private String locationName;
     private Instant raisedAt;
     private UUID acknowledgedBy;
     private Instant acknowledgedAt;

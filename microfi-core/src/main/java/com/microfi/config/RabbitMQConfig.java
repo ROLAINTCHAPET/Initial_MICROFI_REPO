@@ -29,6 +29,13 @@ public class RabbitMQConfig {
     public static final String COLLECTION_GEOCODE_QUEUE = "collection.geocode.queue";
     public static final String COLLECTION_GEOCODE_KEY = "collection.geocode";
 
+    // UC-14: same fire-and-forget reverse-geocoding as collections, applied to an SOS alert's
+    // lat/lon — resolving a place name is a display nicety for the Back-Office SOS console, never
+    // something an emergency trigger should wait on. Shares the collection exchange rather than
+    // standing up a new one; only the routing key differs.
+    public static final String SOS_GEOCODE_QUEUE = "sos.geocode.queue";
+    public static final String SOS_GEOCODE_KEY = "sos.geocode";
+
     // The actual burst-protection this system was designed around: many agents reconnecting
     // together each submit a batch of offline collections at once. Recording a collection can't
     // be fire-and-forget the way geocoding is — the caller needs a real pass/fail per item
@@ -81,6 +88,16 @@ public class RabbitMQConfig {
     @Bean
     public Binding collectionGeocodeBinding(Queue collectionGeocodeQueue, TopicExchange collectionExchange) {
         return BindingBuilder.bind(collectionGeocodeQueue).to(collectionExchange).with(COLLECTION_GEOCODE_KEY);
+    }
+
+    @Bean
+    public Queue sosGeocodeQueue() {
+        return new Queue(SOS_GEOCODE_QUEUE, true);
+    }
+
+    @Bean
+    public Binding sosGeocodeBinding(Queue sosGeocodeQueue, TopicExchange collectionExchange) {
+        return BindingBuilder.bind(sosGeocodeQueue).to(collectionExchange).with(SOS_GEOCODE_KEY);
     }
 
     @Bean

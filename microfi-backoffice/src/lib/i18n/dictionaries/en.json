@@ -47,7 +47,9 @@
       "CLOSED": "Closed",
       "RESOLVED": "Resolved",
       "ACKNOWLEDGED": "Acknowledged",
-      "WRITTEN_OFF": "Written Off"
+      "WRITTEN_OFF": "Written Off",
+      "SUCCESS": "Success",
+      "FAILED": "Failed"
     },
     "gauge": {
       "ceilingReached": "Ceiling reached: new collections blocked",
@@ -562,7 +564,7 @@
   "registrations": {
     "pageTitle": "Registrations",
     "pageSubtitle": "Compliance-gated digital enrollment dossiers for agents, cashiers, and branch managers.",
-    "newApplication": "New Application",
+    "newApplication": "New User",
     "submittedAt": "Submitted {date}",
     "reasonPrefix": "Reason: {reason}",
     "noApplications": "No {status} applications.",
