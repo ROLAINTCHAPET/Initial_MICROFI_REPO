@@ -126,7 +126,7 @@ public class AdminUserManagementController {
                     target.setStatus(request.getStatus());
                     AdminUser saved = adminUserRepository.save(target);
                     auditTarget(caller, request.getStatus() == AdminUserStatus.SUSPENDED ? "ADMIN_USER_SUSPENDED" : "ADMIN_USER_REACTIVATED",
-                            target, request.getStatus() == AdminUserStatus.SUSPENDED ? "Account suspended" : "Account reactivated");
+                            target, "ADMIN_USER_STATUS_CHANGED", request.getStatus().name());
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -150,7 +150,7 @@ public class AdminUserManagementController {
                     target.setDeletedBy(callerUser.getId());
                     target.setDeletedAt(Instant.now());
                     AdminUser saved = adminUserRepository.save(target);
-                    auditTarget(caller, "ADMIN_USER_DELETED", target, "Account deleted: " + request.getReason());
+                    auditTarget(caller, "ADMIN_USER_DELETED", target, "ADMIN_USER_DELETED_REASON", request.getReason());
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -178,12 +178,18 @@ public class AdminUserManagementController {
                     target.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
                     target.setMustChangePassword(true);
                     AdminUser saved = adminUserRepository.save(target);
-                    auditTarget(caller, "ADMIN_USER_PASSWORD_RESET", target, "Password reset by Back-Office");
+                    auditTarget(caller, "ADMIN_USER_PASSWORD_RESET", target, "ADMIN_USER_PASSWORD_RESET_DETAIL", null);
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private void auditTarget(AdminUserDetails caller, String eventType, AdminUser target, String details) {
+    /**
+     * {@code extraParam} (nullable) fills {@code {param1}} in {@code detailsKey}'s template — the
+     * target's own login/role always fill {@code {param2}}/{@code {param3}}, spelled out (not just
+     * "ADMIN_USER_...") since the event type alone doesn't say whether the affected account was a
+     * Branch Manager or a Branch Cashier — same precision gap the actor's own actorRole fixes.
+     */
+    private void auditTarget(AdminUserDetails caller, String eventType, AdminUser target, String detailsKey, String extraParam) {
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.SECURITY)
                 .eventType(eventType)
@@ -193,10 +199,10 @@ public class AdminUserManagementController {
                 .actorRole(caller.getAdminUser().getRole())
                 .branchId(target.getBranchId())
                 .targetAdminUserId(target.getId())
-                // The target's own role is spelled out here (not just "ADMIN_USER_...") since the
-                // event type alone doesn't say whether the affected account was a Branch Manager
-                // or a Branch Cashier — same precision gap the actor's own actorRole fixes.
-                .details(details + " (" + target.getLogin() + ", " + target.getRole() + ")")
+                .detailsKey(detailsKey)
+                .detailsParam1(extraParam)
+                .detailsParam2(target.getLogin())
+                .detailsParam3(target.getRole().name())
                 .build());
     }
 

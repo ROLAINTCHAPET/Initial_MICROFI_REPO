@@ -741,7 +741,37 @@
     "noResults": "No matching audit events in this period.",
     "loading": "Loading audit log…",
     "error": "Unable to load the audit log.",
-    "exportTitle": "Security & Administrative Trail"
+    "exportTitle": "Security & Administrative Trail",
+    "detailsTemplates": {
+      "LOGIN_SUCCEEDED": "Login succeeded",
+      "LOGIN_FAILED_ACCOUNT_DELETED": "Login failed: account has been deleted",
+      "LOGIN_FAILED_ACCOUNT_SUSPENDED": "Login failed: account is suspended",
+      "LOGIN_FAILED_INVALID_CREDENTIALS": "Login failed: invalid credentials",
+      "LOGIN_FAILED_LOCKED_OUT": "Login failed: too many failed attempts, account locked",
+      "LOGIN_FAILED_UNRECOGNIZED_DEVICE": "Login failed: unrecognized device",
+      "LOGIN_FAILED_DEVICE_REQUIRED": "Login failed: a registered device is required",
+      "LOGIN_FAILED_WITH_REASON": "Login failed: {param1}",
+      "PASSWORD_RESET_SELF_SERVICE": "Password reset via self-service SMS code",
+      "PIN_RESET_SELF_SERVICE": "PIN reset via self-service SMS code",
+      "AGENT_STATUS_CHANGED": "Agent status changed to {param1}",
+      "AGENT_DELETED_REASON": "Agent deleted, reason: {param1}",
+      "AGENT_DEVICE_RESET_REASON": "Device binding reset, reason: {param1}",
+      "PASSWORD_RESET_BY_ADMIN": "Password reset by Back-Office",
+      "AGENT_CEILING_WAIVER_DETAIL": "Temporary ceiling waiver: {param1} XAF until {param2}, reason: {param3}",
+      "ADMIN_USER_STATUS_CHANGED": "Account for {param2} ({param3}) changed to {param1}",
+      "ADMIN_USER_DELETED_REASON": "Account for {param2} ({param3}) deleted, reason: {param1}",
+      "ADMIN_USER_PASSWORD_RESET_DETAIL": "Password reset by Back-Office for {param2} ({param3})",
+      "AGENT_GEOFENCE_SET_DETAIL": "Geofence perimeter set/updated ({param1} vertices)",
+      "BRANCH_GEOFENCE_BULK_APPLIED_DETAIL": "Bulk geofence applied to {param1} agent(s)",
+      "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Shortage of {param1} XAF written off, reason: {param2}",
+      "COLLECTION_RECORDED_DETAIL": "{param1} XAF collected from {param2}",
+      "REGISTRATION_APPROVED_DETAIL": "Registration application approved for {param1} ({param2})",
+      "REGISTRATION_REJECTED_DETAIL": "Registration application rejected for {param1}, reason: {param2}",
+      "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Activation cash payment registered for client, status: {param1}, reference: {param2}",
+      "CLIENT_ACTIVATION_PAYMENT_CONFIRMED_DETAIL": "Activation payment confirmed, status: {param1}, reference: {param2}",
+      "SOS_RAISED_WITH_FIX": "SOS raised at {param1}, {param2}",
+      "SOS_RAISED_NO_FIX": "SOS raised (no location fix)"
+    }
   },
   "branches": {
     "directory": {

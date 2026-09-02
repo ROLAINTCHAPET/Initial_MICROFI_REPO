@@ -72,13 +72,13 @@ public class ClientAuthenticationController {
                 .flatMap(clientDetails -> {
                     ClientProfile client = clientDetails.getClient();
                     if (!passwordEncoder.matches(request.getPin(), clientDetails.getPassword())) {
-                        auditClientLogin(client, request.getLogin(), AuditStatus.FAILED, "Login failed: invalid credentials");
+                        auditClientLogin(client, request.getLogin(), AuditStatus.FAILED, "LOGIN_FAILED_INVALID_CREDENTIALS");
                         return Mono.error(new InvalidCredentialsException("Invalid credentials"));
                     }
                     Map<String, Object> extraClaims = new HashMap<>();
                     extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_CLIENT);
                     String token = jwtService.generateToken(extraClaims, clientDetails);
-                    auditClientLogin(client, request.getLogin(), AuditStatus.SUCCESS, "Login succeeded");
+                    auditClientLogin(client, request.getLogin(), AuditStatus.SUCCESS, "LOGIN_SUCCEEDED");
                     return Mono.just(AuthResponse.builder().token(token).build());
                 })
                 .onErrorResume(e -> {
@@ -115,11 +115,11 @@ public class ClientAuthenticationController {
                 .eventType("CLIENT_PASSWORD_RESET")
                 .actorType(AuditActorType.CLIENT)
                 .actorLabel(login)
-                .details("PIN reset via self-service SMS code")
+                .detailsKey("PIN_RESET_SELF_SERVICE")
                 .build());
     }
 
-    private void auditClientLogin(ClientProfile client, String attemptedLogin, AuditStatus status, String details) {
+    private void auditClientLogin(ClientProfile client, String attemptedLogin, AuditStatus status, String detailsKey) {
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.SECURITY)
                 .eventType("CLIENT_LOGIN")
@@ -127,7 +127,7 @@ public class ClientAuthenticationController {
                 .actorId(client.getId())
                 .actorLabel(attemptedLogin)
                 .branchId(client.getBranchId())
-                .details(details)
+                .detailsKey(detailsKey)
                 .status(status)
                 .build());
     }
@@ -139,7 +139,8 @@ public class ClientAuthenticationController {
                 .eventType("CLIENT_LOGIN")
                 .actorType(AuditActorType.CLIENT)
                 .actorLabel(attemptedLogin)
-                .details("Login failed: " + reason)
+                .detailsKey("LOGIN_FAILED_WITH_REASON")
+                .detailsParam1(reason)
                 .status(AuditStatus.FAILED)
                 .build());
     }

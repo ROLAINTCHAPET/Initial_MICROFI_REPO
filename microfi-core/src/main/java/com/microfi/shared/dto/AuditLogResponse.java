@@ -25,6 +25,12 @@ public class AuditLogResponse {
     private String branchLabel;
     private UUID agentId;
     private String agentLabel;
+    /** Legacy plain-text fallback, rendered as-is only when {@link #detailsKey} is null (a row written before it existed) — see {@code AuditLog#details}. */
     private String details;
+    /** Names a frontend detailsTemplates entry the viewer's own dictionary renders in their language; params fill in its {@code {param1}}/{@code {param2}}/{@code {param3}} placeholders. */
+    private String detailsKey;
+    private String detailsParam1;
+    private String detailsParam2;
+    private String detailsParam3;
     private AuditStatus status;
 }

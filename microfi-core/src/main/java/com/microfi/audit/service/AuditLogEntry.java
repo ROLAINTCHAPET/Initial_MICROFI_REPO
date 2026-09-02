@@ -23,7 +23,13 @@ public class AuditLogEntry {
     UUID branchId;
     UUID agentId;
     UUID targetAdminUserId;
+    /** Legacy free-text fallback — new call sites should set {@link #detailsKey} instead so the frontend can render it in the viewer's own language; see {@code AuditLog#details}. */
     String details;
+    /** Machine code naming a frontend detailsTemplates entry — see {@code AuditLog#detailsKey}. */
+    String detailsKey;
+    String detailsParam1;
+    String detailsParam2;
+    String detailsParam3;
     @Builder.Default
     AuditStatus status = AuditStatus.SUCCESS;
 }

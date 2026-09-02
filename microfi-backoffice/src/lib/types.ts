@@ -236,7 +236,13 @@ export interface AuditLogResponse {
   branchLabel: string | null;
   agentId: string | null;
   agentLabel: string | null;
+  /** Legacy plain-text fallback, rendered as-is only when detailsKey is null (a row written before it existed). */
   details: string;
+  /** Names an entry in dict.audit.detailsTemplates, rendered via t() with detailsParam1/2/3 — see AuditExplorer's detailsLabel. */
+  detailsKey: string | null;
+  detailsParam1: string | null;
+  detailsParam2: string | null;
+  detailsParam3: string | null;
   status: AuditStatus;
 }
 

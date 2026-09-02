@@ -79,8 +79,29 @@ public class AuditLog {
     /** The back-office account this event is about, when applicable (e.g. one admin resetting another's password). */
     private UUID targetAdminUserId;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    /**
+     * Legacy free-text description, written in whatever language the server happened to compose
+     * it in (always English, historically) — a viewer's locale can never change it after the
+     * fact. New rows should always set {@link #detailsKey} instead, which the frontend renders
+     * through its own English/French template so the same row reads correctly in either
+     * language; {@code details} stays only as the rendering fallback for rows written before
+     * {@link #detailsKey} existed, and is nullable for that reason.
+     */
+    @Column(columnDefinition = "TEXT")
     private String details;
+
+    /** Machine code naming a frontend-rendered, parametrized template (e.g. {@code LOGIN_SUCCEEDED}) — see AuditExplorer's detailsTemplates map. Null only for legacy rows predating this field. */
+    private String detailsKey;
+
+    /** Positional substitution values for {@link #detailsKey}'s template placeholders ({@code {param1}}, {@code {param2}}, {@code {param3}}) — free-text values (reasons, names, amounts) that are data, not translatable UI copy, so they pass through unchanged regardless of viewer locale. */
+    @Column(columnDefinition = "TEXT")
+    private String detailsParam1;
+
+    @Column(columnDefinition = "TEXT")
+    private String detailsParam2;
+
+    @Column(columnDefinition = "TEXT")
+    private String detailsParam3;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

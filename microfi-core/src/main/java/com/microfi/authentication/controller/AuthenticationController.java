@@ -75,19 +75,19 @@ public class AuthenticationController {
                     // collection time (see AgentDirectoryService#verifyTransactionPin).
                     if (agent.getStatus() == AgentStatus.DELETED) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                        auditAgentLogin(agent, request.getUsername(), "Login failed: account deleted");
+                        auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_ACCOUNT_DELETED");
                         return Mono.error(new InvalidCredentialsException("Agent account has been deleted"));
                     }
                     if (agent.getStatus() == AgentStatus.SUSPENDED) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                        auditAgentLogin(agent, request.getUsername(), "Login failed: account suspended");
+                        auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_ACCOUNT_SUSPENDED");
                         return Mono.error(new InvalidCredentialsException("Agent account is suspended"));
                     }
 
                     // UC-01 §4.1: locked out after too many failed login attempts — rejected before the password is even checked.
                     if (agent.getLockedUntil() != null && agent.getLockedUntil().isAfter(Instant.now())) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                        auditAgentLogin(agent, request.getUsername(), "Login failed: too many failed attempts, locked out");
+                        auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_LOCKED_OUT");
                         return Mono.error(new ResponseStatusException(HttpStatus.LOCKED,
                                 "Too many failed login attempts. Try again after " + DateTimeFormatter.ISO_INSTANT.format(agent.getLockedUntil())));
                     }
@@ -98,7 +98,7 @@ public class AuthenticationController {
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .then(Mono.defer(() -> {
                                     authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                                    auditAgentLogin(agent, request.getUsername(), "Login failed: invalid password");
+                                    auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_INVALID_CREDENTIALS");
                                     return Mono.error(new InvalidCredentialsException("Invalid password"));
                                 }));
                     }
@@ -131,14 +131,14 @@ public class AuthenticationController {
                                 || (request.getImei() != null && terminalRepository.findByDeviceId(request.getImei()).isPresent());
                         if (!knownTerminal) {
                             authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                            auditAgentLogin(agent, request.getUsername(), "Login failed: unrecognized device IMEI");
+                            auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_UNRECOGNIZED_DEVICE");
                             return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
                         }
                         recognizeDeviceNow = true;
                     } else if (requiresImei) {
                         if (request.getImei() == null || request.getImei().isBlank()) {
                             authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                            auditAgentLogin(agent, request.getUsername(), "Login failed: device IMEI required but missing");
+                            auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_DEVICE_REQUIRED");
                             return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
                         }
                         recognizeDeviceNow = true;
@@ -190,12 +190,12 @@ public class AuthenticationController {
                 .actorLabel(attemptedUsername)
                 .branchId(agent.getBranchId())
                 .agentId(agent.getId())
-                .details("Login succeeded")
+                .detailsKey("LOGIN_SUCCEEDED")
                 .status(AuditStatus.SUCCESS)
                 .build());
     }
 
-    private void auditAgentLogin(Agent agent, String attemptedUsername, String details) {
+    private void auditAgentLogin(Agent agent, String attemptedUsername, String detailsKey) {
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.SECURITY)
                 .eventType("AGENT_LOGIN")
@@ -204,7 +204,7 @@ public class AuthenticationController {
                 .actorLabel(attemptedUsername)
                 .branchId(agent.getBranchId())
                 .agentId(agent.getId())
-                .details(details)
+                .detailsKey(detailsKey)
                 .status(AuditStatus.FAILED)
                 .build());
     }
@@ -216,7 +216,8 @@ public class AuthenticationController {
                 .eventType("AGENT_LOGIN")
                 .actorType(AuditActorType.AGENT)
                 .actorLabel(attemptedUsername)
-                .details("Login failed: " + reason)
+                .detailsKey("LOGIN_FAILED_WITH_REASON")
+                .detailsParam1(reason)
                 .status(AuditStatus.FAILED)
                 .build());
     }
@@ -243,7 +244,7 @@ public class AuthenticationController {
                 .eventType("AGENT_PASSWORD_RESET")
                 .actorType(AuditActorType.AGENT)
                 .actorLabel(username)
-                .details("Password reset via self-service SMS code")
+                .detailsKey("PASSWORD_RESET_SELF_SERVICE")
                 .build());
     }
 

@@ -68,7 +68,9 @@ public class VarianceDebtController {
                                             .actorRole(caller.getAdminUser().getRole())
                                             .branchId(agentDirectoryService.requireBranchIdForAgent(result.getAgentId()))
                                             .agentId(result.getAgentId())
-                                            .details("Shortage of " + result.getAmountXaf() + " XAF written off: " + request.getReason())
+                                            .detailsKey("VARIANCE_DEBT_WRITTEN_OFF_DETAIL")
+                                            .detailsParam1(String.valueOf(result.getAmountXaf()))
+                                            .detailsParam2(request.getReason())
                                             .build());
                                     return result;
                                 })

@@ -741,7 +741,37 @@
     "noResults": "Aucun événement correspondant sur cette période.",
     "loading": "Chargement du journal d'audit…",
     "error": "Impossible de charger le journal d'audit.",
-    "exportTitle": "Trace de sécurité et administrative"
+    "exportTitle": "Trace de sécurité et administrative",
+    "detailsTemplates": {
+      "LOGIN_SUCCEEDED": "Connexion réussie",
+      "LOGIN_FAILED_ACCOUNT_DELETED": "Échec de connexion : le compte a été supprimé",
+      "LOGIN_FAILED_ACCOUNT_SUSPENDED": "Échec de connexion : le compte est suspendu",
+      "LOGIN_FAILED_INVALID_CREDENTIALS": "Échec de connexion : identifiants invalides",
+      "LOGIN_FAILED_LOCKED_OUT": "Échec de connexion : trop de tentatives échouées, compte verrouillé",
+      "LOGIN_FAILED_UNRECOGNIZED_DEVICE": "Échec de connexion : appareil non reconnu",
+      "LOGIN_FAILED_DEVICE_REQUIRED": "Échec de connexion : un appareil enregistré est requis",
+      "LOGIN_FAILED_WITH_REASON": "Échec de connexion : {param1}",
+      "PASSWORD_RESET_SELF_SERVICE": "Mot de passe réinitialisé via code SMS en libre-service",
+      "PIN_RESET_SELF_SERVICE": "Code confidentiel réinitialisé via code SMS en libre-service",
+      "AGENT_STATUS_CHANGED": "Statut de l'agent changé à {param1}",
+      "AGENT_DELETED_REASON": "Agent supprimé, motif : {param1}",
+      "AGENT_DEVICE_RESET_REASON": "Association d'appareil réinitialisée, motif : {param1}",
+      "PASSWORD_RESET_BY_ADMIN": "Mot de passe réinitialisé par le Back-Office",
+      "AGENT_CEILING_WAIVER_DETAIL": "Dérogation temporaire de plafond : {param1} XAF jusqu'au {param2}, motif : {param3}",
+      "ADMIN_USER_STATUS_CHANGED": "Compte de {param2} ({param3}) changé à {param1}",
+      "ADMIN_USER_DELETED_REASON": "Compte de {param2} ({param3}) supprimé, motif : {param1}",
+      "ADMIN_USER_PASSWORD_RESET_DETAIL": "Mot de passe réinitialisé par le Back-Office pour {param2} ({param3})",
+      "AGENT_GEOFENCE_SET_DETAIL": "Périmètre géographique défini/mis à jour ({param1} sommets)",
+      "BRANCH_GEOFENCE_BULK_APPLIED_DETAIL": "Zone géographique appliquée en masse à {param1} agent(s)",
+      "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Écart de {param1} XAF annulé, motif : {param2}",
+      "COLLECTION_RECORDED_DETAIL": "{param1} XAF encaissés auprès de {param2}",
+      "REGISTRATION_APPROVED_DETAIL": "Demande d'inscription approuvée pour {param1} ({param2})",
+      "REGISTRATION_REJECTED_DETAIL": "Demande d'inscription rejetée pour {param1}, motif : {param2}",
+      "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Paiement d'activation en espèces enregistré pour le client, statut : {param1}, référence : {param2}",
+      "CLIENT_ACTIVATION_PAYMENT_CONFIRMED_DETAIL": "Paiement d'activation confirmé, statut : {param1}, référence : {param2}",
+      "SOS_RAISED_WITH_FIX": "Alerte SOS déclenchée à {param1}, {param2}",
+      "SOS_RAISED_NO_FIX": "Alerte SOS déclenchée (pas de position GPS)"
+    }
   },
   "branches": {
     "directory": {

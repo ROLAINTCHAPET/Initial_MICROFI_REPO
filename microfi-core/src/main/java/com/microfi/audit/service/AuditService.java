@@ -43,6 +43,10 @@ public class AuditService {
                     .agentId(entry.getAgentId())
                     .targetAdminUserId(entry.getTargetAdminUserId())
                     .details(entry.getDetails())
+                    .detailsKey(entry.getDetailsKey())
+                    .detailsParam1(entry.getDetailsParam1())
+                    .detailsParam2(entry.getDetailsParam2())
+                    .detailsParam3(entry.getDetailsParam3())
                     .status(entry.getStatus())
                     .build());
         } catch (Exception e) {

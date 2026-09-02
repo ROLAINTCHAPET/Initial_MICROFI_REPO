@@ -141,7 +141,7 @@ public class AgentManagementController {
                     agent.setStatus(request.getStatus());
                     Agent saved = agentRepository.save(agent);
                     auditAgent(caller, request.getStatus() == AgentStatus.SUSPENDED ? "AGENT_SUSPENDED" : "AGENT_REACTIVATED",
-                            agent, request.getStatus() == AgentStatus.SUSPENDED ? "Agent suspended" : "Agent reactivated");
+                            agent, "AGENT_STATUS_CHANGED", request.getStatus().name());
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -162,7 +162,7 @@ public class AgentManagementController {
                     agent.setDeletedBy(caller.getAdminUser().getId());
                     agent.setDeletedAt(Instant.now());
                     Agent saved = agentRepository.save(agent);
-                    auditAgent(caller, "AGENT_DELETED", agent, "Agent deleted: " + request.getReason());
+                    auditAgent(caller, "AGENT_DELETED", agent, "AGENT_DELETED_REASON", request.getReason());
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -179,7 +179,7 @@ public class AgentManagementController {
                     agent.setDeviceResetReason(request.getReason());
                     agent.setDeviceResetAt(Instant.now());
                     Agent saved = agentRepository.save(agent);
-                    auditAgent(caller, "AGENT_DEVICE_RESET", agent, "Device binding reset: " + request.getReason());
+                    auditAgent(caller, "AGENT_DEVICE_RESET", agent, "AGENT_DEVICE_RESET_REASON", request.getReason());
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -195,7 +195,7 @@ public class AgentManagementController {
                     agent.setFailedPinAttempts(0);
                     agent.setLockedUntil(null);
                     Agent saved = agentRepository.save(agent);
-                    auditAgent(caller, "AGENT_PASSWORD_RESET", agent, "Password reset by Back-Office");
+                    auditAgent(caller, "AGENT_PASSWORD_RESET", agent, "PASSWORD_RESET_BY_ADMIN");
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -209,14 +209,14 @@ public class AgentManagementController {
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + id));
                     AdminAccess.requireBranchScope(caller, agent.getBranchId());
                     EscrowResponse result = escrowService.applyCeilingOverride(id, request.getTempCeilingXaf(), request.getReason(), request.getValidUntil());
-                    auditAgent(caller, "AGENT_CEILING_WAIVER", agent,
-                            "Temporary ceiling waiver: " + request.getTempCeilingXaf() + " XAF until " + request.getValidUntil() + ", reason: " + request.getReason());
+                    auditAgent(caller, "AGENT_CEILING_WAIVER", agent, "AGENT_CEILING_WAIVER_DETAIL",
+                            String.valueOf(request.getTempCeilingXaf()), String.valueOf(request.getValidUntil()), request.getReason());
                     return result;
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private void auditAgent(AdminUserDetails caller, String eventType, Agent agent, String details) {
-        auditService.record(AuditLogEntry.builder()
+    private void auditAgent(AdminUserDetails caller, String eventType, Agent agent, String detailsKey, String... detailsParams) {
+        AuditLogEntry.AuditLogEntryBuilder entry = AuditLogEntry.builder()
                 .category(AuditCategory.SECURITY)
                 .eventType(eventType)
                 .actorType(AuditActorType.ADMIN)
@@ -225,8 +225,11 @@ public class AgentManagementController {
                 .actorRole(caller.getAdminUser().getRole())
                 .branchId(agent.getBranchId())
                 .agentId(agent.getId())
-                .details(details)
-                .build());
+                .detailsKey(detailsKey);
+        if (detailsParams.length > 0) entry.detailsParam1(detailsParams[0]);
+        if (detailsParams.length > 1) entry.detailsParam2(detailsParams[1]);
+        if (detailsParams.length > 2) entry.detailsParam3(detailsParams[2]);
+        auditService.record(entry.build());
     }
 
     private Agent findAgentOrThrow(UUID id) {

@@ -47,15 +47,15 @@ public class AdminAuthenticationController {
                 .flatMap(adminDetails -> {
                     AdminUser adminUser = adminDetails.getAdminUser();
                     if (adminUser.getStatus() == AdminUserStatus.DELETED) {
-                        auditLogin(adminUser, AuditStatus.FAILED, "Login failed: account has been deleted");
+                        auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_ACCOUNT_DELETED");
                         return Mono.error(new InvalidCredentialsException("Admin account has been deleted"));
                     }
                     if (adminUser.getStatus() != AdminUserStatus.ACTIVE) {
-                        auditLogin(adminUser, AuditStatus.FAILED, "Login failed: account is suspended");
+                        auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_ACCOUNT_SUSPENDED");
                         return Mono.error(new InvalidCredentialsException("Admin account is suspended"));
                     }
                     if (!passwordEncoder.matches(request.getPassword(), adminDetails.getPassword())) {
-                        auditLogin(adminUser, AuditStatus.FAILED, "Login failed: invalid credentials");
+                        auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_INVALID_CREDENTIALS");
                         return Mono.error(new InvalidCredentialsException("Invalid credentials"));
                     }
 
@@ -66,7 +66,7 @@ public class AdminAuthenticationController {
                     extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_ADMIN_USER);
 
                     String token = jwtService.generateToken(extraClaims, adminDetails);
-                    auditLogin(adminUser, AuditStatus.SUCCESS, "Login succeeded");
+                    auditLogin(adminUser, AuditStatus.SUCCESS, "LOGIN_SUCCEEDED");
                     return Mono.just(AuthResponse.builder().token(token).build());
                 })
                 .onErrorResume(e -> {
@@ -84,7 +84,7 @@ public class AdminAuthenticationController {
                 });
     }
 
-    private void auditLogin(AdminUser adminUser, AuditStatus status, String details) {
+    private void auditLogin(AdminUser adminUser, AuditStatus status, String detailsKey) {
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.SECURITY)
                 .eventType("ADMIN_LOGIN")
@@ -93,7 +93,7 @@ public class AdminAuthenticationController {
                 .actorLabel(adminUser.getLogin())
                 .actorRole(adminUser.getRole())
                 .branchId(adminUser.getBranchId())
-                .details(details)
+                .detailsKey(detailsKey)
                 .status(status)
                 .build());
     }
@@ -105,7 +105,8 @@ public class AdminAuthenticationController {
                 .eventType("ADMIN_LOGIN")
                 .actorType(AuditActorType.ADMIN)
                 .actorLabel(attemptedLogin)
-                .details("Login failed: " + reason)
+                .detailsKey("LOGIN_FAILED_WITH_REASON")
+                .detailsParam1(reason)
                 .status(AuditStatus.FAILED)
                 .build());
     }

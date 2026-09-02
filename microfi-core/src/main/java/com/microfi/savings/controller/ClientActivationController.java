@@ -113,7 +113,9 @@ public class ClientActivationController {
                 .actorLabel(agentInfo.username())
                 .branchId(agentInfo.branchId())
                 .agentId(agentId)
-                .details("Activation cash payment registered for client, status=" + result.getStatus() + ", reference=" + result.getPaymentReference())
+                .detailsKey("CLIENT_ACTIVATION_SPONSORED_DETAIL")
+                .detailsParam1(result.getStatus())
+                .detailsParam2(result.getPaymentReference())
                 .build());
     }
 
@@ -125,7 +127,9 @@ public class ClientActivationController {
                 .actorId(client.getId())
                 .actorLabel(client.getLogin())
                 .branchId(client.getBranchId())
-                .details("Activation payment confirmed, status=" + result.getStatus() + ", reference=" + result.getPaymentReference())
+                .detailsKey("CLIENT_ACTIVATION_PAYMENT_CONFIRMED_DETAIL")
+                .detailsParam1(result.getStatus())
+                .detailsParam2(result.getPaymentReference())
                 .build());
     }
 

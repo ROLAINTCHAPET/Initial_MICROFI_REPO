@@ -90,7 +90,8 @@ public class AdminTrackingController {
                             .actorRole(caller.getAdminUser().getRole())
                             .branchId(branchId)
                             .agentId(id)
-                            .details("Geofence perimeter set/updated (" + request.getVertices().size() + " vertices)")
+                            .detailsKey("AGENT_GEOFENCE_SET_DETAIL")
+                            .detailsParam1(String.valueOf(request.getVertices().size()))
                             .build());
                     return result;
                 }).subscribeOn(Schedulers.boundedElastic()));

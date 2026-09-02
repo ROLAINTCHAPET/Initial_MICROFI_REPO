@@ -68,16 +68,24 @@ public class TrackingController {
                     }
                     return Mono.fromCallable(() -> trackingService.raiseSos(agentId, request))
                             .subscribeOn(Schedulers.boundedElastic())
-                            .doOnNext(result -> auditService.record(AuditLogEntry.builder()
-                                    .category(AuditCategory.SECURITY)
-                                    .eventType("AGENT_SOS_TRIGGERED")
-                                    .actorType(AuditActorType.AGENT)
-                                    .actorId(agent.getId())
-                                    .actorLabel(agent.getUsername())
-                                    .branchId(agent.getBranchId())
-                                    .agentId(agent.getId())
-                                    .details("SOS raised" + (request.getLat() != null ? (" at " + request.getLat() + "," + request.getLon()) : " (no location fix)"))
-                                    .build()));
+                            .doOnNext(result -> {
+                                AuditLogEntry.AuditLogEntryBuilder entry = AuditLogEntry.builder()
+                                        .category(AuditCategory.SECURITY)
+                                        .eventType("AGENT_SOS_TRIGGERED")
+                                        .actorType(AuditActorType.AGENT)
+                                        .actorId(agent.getId())
+                                        .actorLabel(agent.getUsername())
+                                        .branchId(agent.getBranchId())
+                                        .agentId(agent.getId());
+                                if (request.getLat() != null) {
+                                    entry.detailsKey("SOS_RAISED_WITH_FIX")
+                                            .detailsParam1(String.valueOf(request.getLat()))
+                                            .detailsParam2(String.valueOf(request.getLon()));
+                                } else {
+                                    entry.detailsKey("SOS_RAISED_NO_FIX");
+                                }
+                                auditService.record(entry.build());
+                            });
                 });
     }
 

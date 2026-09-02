@@ -6,6 +6,8 @@ import { Icon } from "@/components/Icon";
 import { Table, Thead, Th, Tbody, Tr, Td, EmptyState } from "@/components/Table";
 import { ExportButtons } from "@/components/ExportButtons";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { AdminRole, AuditActorType, AuditCategory, AuditLogResponse, BranchResponse } from "@/lib/types";
 import type { ExportColumn } from "@/lib/export";
 
@@ -13,6 +15,57 @@ function isoDaysAgo(days: number) {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toISOString().slice(0, 10);
+}
+
+type ParamSlot = "param1" | "param2" | "param3";
+
+// A handful of detailsTemplates keys carry a raw role or status code as one of their params
+// (captured verbatim at write time, same reasoning as actorLabel — the account's own role/status
+// can change later) — these need translating through the same maps the rest of the UI uses before
+// substitution, unlike a free-text reason/name param, which stays as literal data regardless of
+// locale.
+const ROLE_PARAM: Partial<Record<string, ParamSlot>> = {
+  ADMIN_USER_STATUS_CHANGED: "param3",
+  ADMIN_USER_DELETED_REASON: "param3",
+  ADMIN_USER_PASSWORD_RESET_DETAIL: "param3",
+  REGISTRATION_APPROVED_DETAIL: "param2",
+};
+const STATUS_PARAM: Partial<Record<string, ParamSlot>> = {
+  AGENT_STATUS_CHANGED: "param1",
+  ADMIN_USER_STATUS_CHANGED: "param1",
+};
+
+// dict.roles only names the three back-office roles — a registration's targetRole can also be
+// AGENT, which lives under a different dictionary branch entirely.
+function roleLabel(dict: Dictionary, code: string): string {
+  if (code === "AGENT") return dict.team.directory.fieldAgent;
+  return (dict.roles as Record<string, string>)[code] ?? code;
+}
+
+/**
+ * Renders a row's details through its own English/French template so the same audit_log row
+ * reads correctly in either language — falls back to the legacy plain-text `details` column for
+ * rows written before detailsKey existed, or for a key not yet in the map.
+ */
+function detailsLabel(dict: Dictionary, log: AuditLogResponse): string {
+  if (!log.detailsKey) return log.details;
+  const template = (dict.audit.detailsTemplates as Record<string, string>)[log.detailsKey];
+  if (!template) return log.details;
+
+  const params: Record<ParamSlot, string> = {
+    param1: log.detailsParam1 ?? "",
+    param2: log.detailsParam2 ?? "",
+    param3: log.detailsParam3 ?? "",
+  };
+  const statusSlot = STATUS_PARAM[log.detailsKey];
+  if (statusSlot && params[statusSlot]) {
+    params[statusSlot] = (dict.common.status as Record<string, string>)[params[statusSlot]] ?? params[statusSlot];
+  }
+  const roleSlot = ROLE_PARAM[log.detailsKey];
+  if (roleSlot && params[roleSlot]) {
+    params[roleSlot] = roleLabel(dict, params[roleSlot]);
+  }
+  return t(template, params);
 }
 
 export function AuditExplorer({
@@ -85,7 +138,7 @@ export function AuditExplorer({
     { header: dict.audit.table.colActor, value: (r) => r.actorLabel },
     { header: dict.audit.table.colActorRole, value: (r) => actorRoleLabel(r) },
     { header: dict.audit.table.colBranch, value: (r) => r.branchLabel ?? "" },
-    { header: dict.audit.table.colDetails, value: (r) => r.details },
+    { header: dict.audit.table.colDetails, value: (r) => detailsLabel(dict, r) },
     { header: dict.audit.table.colStatus, value: (r) => dict.common.status[r.status] },
   ];
 
@@ -207,7 +260,7 @@ export function AuditExplorer({
                   <span className="block text-xs text-on-surface-variant">{actorRoleLabel(log)}</span>
                 </Td>
                 <Td className="text-on-surface-variant">{log.branchLabel ?? "N/A"}</Td>
-                <Td className="text-on-surface-variant max-w-[320px]">{log.details}</Td>
+                <Td className="text-on-surface-variant max-w-[320px]">{detailsLabel(dict, log)}</Td>
                 <Td>
                   {log.status === "SUCCESS" ? (
                     <Badge status="ACTIVE" label={dict.common.status.SUCCESS} />

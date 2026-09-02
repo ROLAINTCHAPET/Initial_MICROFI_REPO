@@ -94,6 +94,10 @@ public class AuditLogController {
                         .agentId(log.getAgentId())
                         .agentLabel(agentNames.get(log.getAgentId()))
                         .details(log.getDetails())
+                        .detailsKey(log.getDetailsKey())
+                        .detailsParam1(log.getDetailsParam1())
+                        .detailsParam2(log.getDetailsParam2())
+                        .detailsParam3(log.getDetailsParam3())
                         .status(log.getStatus())
                         .build())
                 .toList();

@@ -258,7 +258,8 @@ public class BranchController {
                                 .actorLabel(caller.getAdminUser().getLogin())
                                 .actorRole(caller.getAdminUser().getRole())
                                 .branchId(id)
-                                .details("Bulk geofence applied to " + count + " agent(s)")
+                                .detailsKey("BRANCH_GEOFENCE_BULK_APPLIED_DETAIL")
+                                .detailsParam1(String.valueOf(count))
                                 .build());
                         return MessageResponse.builder().message("Applied to " + count + " agent(s)").build();
                     }).subscribeOn(Schedulers.boundedElastic());

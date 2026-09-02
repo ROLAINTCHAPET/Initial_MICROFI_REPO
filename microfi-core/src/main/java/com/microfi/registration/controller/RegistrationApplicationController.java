@@ -151,8 +151,9 @@ public class RegistrationApplicationController {
                                 .actorLabel(caller.getAdminUser().getLogin())
                                 .actorRole(caller.getAdminUser().getRole())
                                 .branchId(result.application().getBranchId())
-                                .details("Registration application approved for " + result.application().getFirstName() + " " + result.application().getLastName()
-                                        + " (" + result.application().getTargetRole() + ")")
+                                .detailsKey("REGISTRATION_APPROVED_DETAIL")
+                                .detailsParam1(result.application().getFirstName() + " " + result.application().getLastName())
+                                .detailsParam2(result.application().getTargetRole().name())
                                 .build())))
                 .map(result -> toResponse(result.application(), result.tempPassword(), result.tempPin()));
     }
@@ -172,7 +173,9 @@ public class RegistrationApplicationController {
                                     .actorLabel(caller.getAdminUser().getLogin())
                                     .actorRole(caller.getAdminUser().getRole())
                                     .branchId(rejected.getBranchId())
-                                    .details("Registration application rejected for " + rejected.getFirstName() + " " + rejected.getLastName() + ": " + request.getReason())
+                                    .detailsKey("REGISTRATION_REJECTED_DETAIL")
+                                    .detailsParam1(rejected.getFirstName() + " " + rejected.getLastName())
+                                    .detailsParam2(request.getReason())
                                     .build());
                             return rejected;
                         })

@@ -139,7 +139,9 @@ public class CollectionService {
                 .actorLabel(agentInfo.username())
                 .branchId(agentInfo.branchId())
                 .agentId(collection.getAgentId())
-                .details(collection.getAmountXaf() + " XAF collected from " + clientName)
+                .detailsKey("COLLECTION_RECORDED_DETAIL")
+                .detailsParam1(String.valueOf(collection.getAmountXaf()))
+                .detailsParam2(clientName)
                 .build());
     }
 
