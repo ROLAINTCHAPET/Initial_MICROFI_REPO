@@ -16,5 +16,7 @@ public class ClientActivationPendingResponse {
     private UUID clientId;
     private String mfiMemberNo;
     private String fullName;
+    /** The MFI this client just proved membership of — lets the client confirm they registered with the right institution. */
+    private String mfiName;
     private String message;
 }

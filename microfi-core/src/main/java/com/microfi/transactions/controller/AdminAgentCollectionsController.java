@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,29 @@ public class AdminAgentCollectionsController {
                 .flatMap(caller -> Mono.fromCallable(() -> {
                     AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(id));
                     return collectionService.findByAgentAndDay(id, date);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/collections/history")
+    @Operation(summary = "Agent Collection History", description = "This agent's most recent collections (last 50) across any day, newest first, with the client's name resolved — the same query the mobile app's own History screen uses, reused here for Back-Office oversight. Own branch only, unless ADMIN.")
+    public Mono<List<CollectionResponse>> history(@PathVariable UUID id, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(id));
+                    return collectionService.findRecentByAgent(id);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/collections/range")
+    @Operation(summary = "Agent Collections by Period", description = "Every collection this agent recorded within an arbitrary [from, to) window, newest first, with the client's name resolved — backs the Audit export's date-range picker. Own branch only, unless ADMIN.")
+    public Mono<List<CollectionResponse>> range(@PathVariable UUID id,
+                                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+                                                  Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(id));
+                    return collectionService.findByAgentAndRange(id, from, to);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 }

@@ -127,6 +127,13 @@ public class OfjService {
                 .toList();
     }
 
+    /** Same history screen, restricted to a chosen [from, to] business-date range — backs the Audit export's date-range picker. */
+    public List<OfjSummaryResponse> listHistory(UUID branchId, LocalDate from, LocalDate to) {
+        return ofjSessionRepository.findByBranchIdAndBusinessDateBetweenOrderByBusinessDateDesc(branchId, from, to).stream()
+                .map(this::toSummary)
+                .toList();
+    }
+
     /** For an admin viewing a single agent's outstanding shortages (e.g. from an agent detail screen). */
     public List<VarianceDebtResponse> listVarianceDebtsForAgent(UUID agentId, boolean openOnly) {
         List<VarianceDebt> debts = openOnly
@@ -148,10 +155,6 @@ public class OfjService {
     }
 
     public OfjAgentLineResponse reconcile(UUID branchId, ReconcileRequest request) {
-        if (!agentDirectoryService.isBranchPastCloseTime(branchId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Cannot reconcile before the branch's closing time — the day's cash isn't all collected yet");
-        }
         OfjSession session = getOrCreateSession(branchId);
         if (session.getStatus() == OfjSessionStatus.CLOSED) {
             // "Closed" only ever meant "every agent known at the time balanced" (maybeCloseSession)
@@ -160,7 +163,7 @@ public class OfjService {
             // and new cash belongs to whatever session covers it going forward.
             if (exportBatchRepository.findByOfjId(session.getId()).isPresent()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "OFJ session already exported for this branch/day — cash recorded afterward can't be added to it");
+                        "OFJ session already exported for this branch/day. Cash recorded afterward can't be added to it");
             }
             session.setStatus(OfjSessionStatus.OPEN);
             session.setClosedAt(null);
@@ -184,16 +187,22 @@ public class OfjService {
         OfjAgentLine line = ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), request.getAgentId())
                 .orElseGet(() -> OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(request.getAgentId())
                         .digitalTotalXaf(0L).collectionsTotalXaf(0L).activationsTotalXaf(0L).build());
-        // Accumulate, don't overwrite: nothing stops an agent reconciling twice in one session (they
-        // sync more after balancing once), and each newly-unreconciled sweep is additional cash on
-        // top of whatever this line already counted, not a replacement for it. physicalTotalXaf is
-        // the opposite — it's what the cashier just counted in hand right now, so it does overwrite.
-        long digitalTotal = nz(line.getCollectionsTotalXaf()) + nz(line.getActivationsTotalXaf()) + newCollections + newActivations;
+        // Both digitalTotalXaf and physicalTotalXaf accumulate across repeated reconciliations in
+        // the same session (nothing stops an agent syncing more cash after already balancing once)
+        // — each is the day's running total for that agent, so the branch-wide OFJ summary's "Total
+        // numérique"/"Total physique" (see ofj/page.tsx) only ever disagree by exactly the amount of
+        // an open shortage, never by cash that was already handed over and counted in an earlier,
+        // balanced sweep. deltaXaf, though, compares like with like for THIS sweep alone — this
+        // sweep's physical count against this sweep's own digital total (newCollections +
+        // newActivations) — so a repeat reconciliation isn't flagged as short by everything already
+        // settled earlier in the session even when each individual hand-over balanced perfectly.
+        long newDigitalTotal = newCollections + newActivations;
+        long digitalTotal = nz(line.getCollectionsTotalXaf()) + nz(line.getActivationsTotalXaf()) + newDigitalTotal;
         line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) + newCollections);
         line.setActivationsTotalXaf(nz(line.getActivationsTotalXaf()) + newActivations);
         line.setDigitalTotalXaf(digitalTotal);
-        line.setPhysicalTotalXaf(physicalTotal);
-        line.setDeltaXaf(physicalTotal - digitalTotal);
+        line.setPhysicalTotalXaf(nz(line.getPhysicalTotalXaf()) + physicalTotal);
+        line.setDeltaXaf(physicalTotal - newDigitalTotal);
         ofjAgentLineRepository.save(line);
 
         collectionRepository.markReconciled(request.getAgentId(), cutoff, line.getId());
@@ -237,6 +246,38 @@ public class OfjService {
         return toDebtResponse(debt);
     }
 
+    /**
+     * ADMIN-only write-off: clears an agent's shortage without the underlying record ever being
+     * edited or deleted (BR-Var-02) — {@code amountXaf}/{@code agentId}/{@code createdAt} on the
+     * original row are untouched; this only transitions {@code status} and records who cleared it,
+     * why, and the supporting proof document (VarianceDebtController#writeOff resolves and stores
+     * that file before calling in here, same split as EscrowController#topUp).
+     */
+    public VarianceDebtResponse writeOffVarianceDebt(UUID debtId, String reason, String proofPath, UUID writtenOffBy) {
+        VarianceDebt debt = varianceDebtRepository.findById(debtId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variance debt not found: " + debtId));
+        if (debt.getStatus() != VarianceDebtStatus.OPEN) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an OPEN variance debt can be written off (currently " + debt.getStatus() + ")");
+        }
+        debt.setStatus(VarianceDebtStatus.WRITTEN_OFF);
+        debt.setWrittenOffReason(reason);
+        debt.setWrittenOffProofPath(proofPath);
+        debt.setWrittenOffBy(writtenOffBy);
+        debt.setWrittenOffAt(Instant.now());
+        varianceDebtRepository.save(debt);
+        return toDebtResponse(debt);
+    }
+
+    /** The stored write-off proof's relative disk path — 404s if the debt was never written off. */
+    public String requireWriteOffProofPath(UUID debtId) {
+        VarianceDebt debt = varianceDebtRepository.findById(debtId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variance debt not found: " + debtId));
+        if (debt.getWrittenOffProofPath() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This variance debt has no write-off proof on file");
+        }
+        return debt.getWrittenOffProofPath();
+    }
+
     public ExportBatchResponse exportDaily(UUID branchId, ExportRequest request) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         OfjSession session = ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)
@@ -245,7 +286,7 @@ public class OfjService {
                         "No closed OFJ session for branch " + branchId + " on " + today + " (BR-Export-01)"));
         if (exportBatchRepository.findByOfjId(session.getId()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "This session was already exported — see the automatic export triggered when it closed");
+                    "This session was already exported. See the automatic export triggered when it closed");
         }
 
         String format = (request.getFormat() == null || request.getFormat().isBlank()) ? "CSV" : request.getFormat();
@@ -436,6 +477,9 @@ public class OfjService {
                 .amountXaf(debt.getAmountXaf())
                 .status(debt.getStatus().name())
                 .createdAt(debt.getCreatedAt())
+                .writtenOffReason(debt.getWrittenOffReason())
+                .writtenOffBy(debt.getWrittenOffBy())
+                .writtenOffAt(debt.getWrittenOffAt())
                 .build();
     }
 

@@ -17,17 +17,18 @@ class ClientActivationScreen extends StatefulWidget {
 
 class _ClientActivationScreenState extends State<ClientActivationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _activationIdController = TextEditingController();
+  final _mfiIdentifierController = TextEditingController();
   final _loginController = TextEditingController();
   final _pinController = TextEditingController();
   final _repository = ClientAuthRepository();
 
   bool _loading = false;
   String? _successMessage;
+  String? _mfiName;
 
   @override
   void dispose() {
-    _activationIdController.dispose();
+    _mfiIdentifierController.dispose();
     _loginController.dispose();
     _pinController.dispose();
     super.dispose();
@@ -37,13 +38,16 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      final message = await _repository.activate(
-        activationId: _activationIdController.text.trim(),
+      final result = await _repository.activate(
+        mfiIdentifier: _mfiIdentifierController.text.trim(),
         login: _loginController.text.trim(),
         pin: _pinController.text,
       );
       if (!mounted) return;
-      setState(() => _successMessage = message);
+      setState(() {
+        _successMessage = result.message;
+        _mfiName = result.mfiName;
+      });
     } catch (e) {
       if (!mounted) return;
       await showErrorDialog(context, e, title: AppLocalizations.of(context)!.caActivationFailedTitle);
@@ -84,6 +88,21 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
         ),
         const SizedBox(height: 14),
         Text(l10n.caCredentialsSetTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+        if (_mfiName != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: MicrofiColors.secondary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(MicrofiRadius.md),
+            ),
+            child: Text(
+              l10n.caRegisteredWithMfi(_mfiName!),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.secondary),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Text(_successMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
         const SizedBox(height: 18),
@@ -122,8 +141,8 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
-                controller: _activationIdController,
-                decoration: InputDecoration(labelText: l10n.caActivationIdLabel, prefixIcon: const Icon(Icons.qr_code)),
+                controller: _mfiIdentifierController,
+                decoration: InputDecoration(labelText: l10n.caMfiIdentifierLabel, prefixIcon: const Icon(Icons.badge_outlined)),
                 validator: (v) => (v == null || v.trim().isEmpty) ? l10n.commonRequiredField : null,
               ),
               const SizedBox(height: 12),

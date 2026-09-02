@@ -4,6 +4,10 @@ class ClientSelfProfile {
   final String fullName;
   final String phone;
   final String branchId;
+  /// Which MFI this client belongs to — shown on the home screen so the client can always
+  /// confirm they're using the right institution's session (MICROFI serves several MFIs, each
+  /// on its own deployment, so this is the client's own confirmation signal).
+  final String mfiName;
   final String tokenStatus; // NONE, ACTIVE, EXPIRED
   final DateTime? tokenExpiresAt;
 
@@ -13,6 +17,7 @@ class ClientSelfProfile {
     required this.fullName,
     required this.phone,
     required this.branchId,
+    required this.mfiName,
     required this.tokenStatus,
     required this.tokenExpiresAt,
   });
@@ -23,9 +28,19 @@ class ClientSelfProfile {
         fullName: json['fullName'] as String,
         phone: json['phone'] as String? ?? '',
         branchId: json['branchId'] as String,
+        mfiName: json['mfiName'] as String,
         tokenStatus: json['tokenStatus'] as String,
         tokenExpiresAt: json['tokenExpiresAt'] != null ? DateTime.parse(json['tokenExpiresAt'] as String) : null,
       );
+}
+
+/// Result of UC-19 step 1 self-activation (see ClientAuthRepository.activate) — the confirmation
+/// message plus which MFI the client just proved membership of.
+class ClientActivationResult {
+  final String message;
+  final String mfiName;
+
+  ClientActivationResult({required this.message, required this.mfiName});
 }
 
 /// Result of confirming the client's own half of UC-19's two-party activation gate — `status` is

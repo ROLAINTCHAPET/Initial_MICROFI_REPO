@@ -5,7 +5,6 @@ import { EmptyState } from "@/components/Table";
 import { Icon } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse } from "@/lib/types";
-import { isPastBranchCloseTime } from "@/lib/branchHours";
 import { CashierBranchSelector } from "./CashierBranchSelector";
 import { ReconcileWorkspace, type QueueLine, type ValidatedLine } from "./ReconcileWorkspace";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -51,11 +50,6 @@ export default async function CashierPortalPage({
     .filter((l) => l.resolved)
     .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), physicalTotalXaf: l.physicalTotalXaf, deltaXaf: l.deltaXaf }));
 
-  // POST /ofj/{branchId}/reconcile itself rejects this before the branch's closing time
-  // (OfjService#reconcile) — passed down so the workspace can disable "Verify & Post" instead of
-  // letting the cashier fill in a full denomination count only to have it rejected at submit.
-  const canReconcileNow = isPastBranchCloseTime(branch);
-
   return (
     <div className="flex flex-col gap-6">
       <AutoRefresh />
@@ -77,7 +71,7 @@ export default async function CashierPortalPage({
           </div>
         )}
       </div>
-      <ReconcileWorkspace branchId={branchId} queue={queue} validated={validated} canReconcileNow={canReconcileNow} closeTime={branch?.closeTime ?? null} />
+      <ReconcileWorkspace branchId={branchId} queue={queue} validated={validated} />
     </div>
   );
 }

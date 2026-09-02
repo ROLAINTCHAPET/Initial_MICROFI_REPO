@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { ActionCard } from "@/components/ActionCard";
 import { Icon } from "@/components/Icon";
 import { TimePicker } from "@/components/TimePicker";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
@@ -62,19 +64,18 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
 
   return (
     <>
-      <button
+      <ActionCard
+        icon="pencil"
+        title={dict.agents.waiver.temporaryWaiver}
+        description={dict.agents.waiver.cardDescription}
         onClick={() => setIsOpen(true)}
-        className="h-12 px-6 bg-primary text-on-primary font-semibold text-sm rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
-      >
-        <Icon name="pencil" className="size-5" />
-        {dict.agents.waiver.temporaryWaiver}
-      </button>
+      />
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div className="overlay-fade-in fixed inset-0 bg-primary/60 z-40 flex items-center justify-center p-4">
-          <div className="panel-scale-in bg-surface-container-lowest rounded-[var(--radius-md)] border border-outline-variant w-full max-w-lg overflow-hidden flex flex-col">
-            <form onSubmit={handleSubmit} className="flex flex-col">
-              <div className="p-6 border-b border-outline-variant flex justify-between items-center">
+          <div className="panel-scale-in bg-surface-container-lowest rounded-[var(--radius-md)] border border-outline-variant w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+            <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
                     <Icon name="pencil" className="size-5" />
@@ -94,7 +95,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                 </button>
               </div>
 
-              <div className="p-6 flex-1 space-y-6 text-left">
+              <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-6 text-left">
                 <div className="bg-primary-fixed/20 border border-primary-fixed p-4 rounded-[var(--radius-sm)] flex gap-3 items-start">
                   <Icon name="check-circle" className="size-5 text-primary-fixed-dim shrink-0" />
                   <div className="text-sm text-on-primary-fixed-variant">
@@ -147,7 +148,7 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
                 {error && <p role="alert" className="text-sm text-danger-red">{error}</p>}
               </div>
 
-              <div className="p-6 border-t border-outline-variant flex flex-col sm:flex-row gap-4 justify-end">
+              <div className="p-6 border-t border-outline-variant flex flex-col sm:flex-row gap-4 justify-end shrink-0">
                 <button
                   type="button"
                   onClick={close}
@@ -176,7 +177,8 @@ export function WaiverModal({ agentId, currentCeiling }: { agentId: string; curr
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,5 +1,6 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,6 +71,12 @@ class BranchControllerTest {
 
     @MockitoBean
     private NotificationService notificationService;
+
+    @MockitoBean
+    private com.microfi.transactions.service.GeofenceService geofenceService;
+
+    @MockitoBean
+    private AuditService auditService;
 
     private Authentication adminAuthentication(AdminRole role) {
         AdminUser adminUser = AdminUser.builder().id(UUID.randomUUID()).login("admin")
@@ -395,7 +403,8 @@ class BranchControllerTest {
                 .expectBody()
                 .jsonPath("$.closeTime").isEqualTo("19:00:00");
 
-        verify(notificationService).notifyBranchScheduleChange(eq(id), eq("Douala Central"), eq(LocalTime.of(19, 0)));
+        verify(notificationService).notifyBranchScheduleChange(
+                eq(id), eq("Douala Central"), eq(LocalTime.of(7, 0)), eq(LocalTime.of(19, 0)), eq(false), eq(true));
     }
 
     @Test
@@ -414,7 +423,29 @@ class BranchControllerTest {
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(notificationService, never()).notifyBranchScheduleChange(any(), any(), any());
+        verify(notificationService, never()).notifyBranchScheduleChange(any(), any(), any(), any(), anyBoolean(), anyBoolean());
+    }
+
+    @Test
+    void testPutScheduleNotifiesWhenOnlyOpenTimeChanged() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central")
+                .openTime(LocalTime.of(7, 0)).closeTime(LocalTime.of(18, 0)).timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agentDirectoryService.isBranchPastOpenTime(branch)).thenReturn(false);
+
+        // Same closeTime as already stored — only openTime actually changes.
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"openTime\":\"06:00:00\",\"closeTime\":\"18:00:00\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(notificationService).notifyBranchScheduleChange(
+                eq(id), eq("Douala Central"), eq(LocalTime.of(6, 0)), eq(LocalTime.of(18, 0)), eq(true), eq(false));
     }
 
     @Test
@@ -536,6 +567,32 @@ class BranchControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(LocalTime.of(10, 0), configured.getOpenTime());
         org.junit.jupiter.api.Assertions.assertEquals(LocalTime.of(15, 0), configured.getCloseTime());
         org.junit.jupiter.api.Assertions.assertEquals(LocalTime.of(10, 0), unconfigured.getOpenTime());
+
+        // Every branch actually touched by the bulk push notifies its own agents, same as the single-branch endpoint.
+        verify(notificationService).notifyBranchScheduleChange(
+                eq(configured.getId()), eq("Douala Central"), eq(LocalTime.of(10, 0)), eq(LocalTime.of(15, 0)), eq(true), eq(true));
+        verify(notificationService).notifyBranchScheduleChange(
+                eq(unconfigured.getId()), eq("Yaounde North"), eq(LocalTime.of(10, 0)), eq(LocalTime.of(15, 0)), eq(true), eq(true));
+    }
+
+    @Test
+    void testPutScheduleDefaultsDoesNotNotifyBranchAlreadyMatchingTheNewDefaults() {
+        Branch alreadyMatching = Branch.builder().id(UUID.randomUUID()).code("BR1").name("Douala Central")
+                .openTime(LocalTime.of(9, 0)).closeTime(LocalTime.of(16, 0)).build();
+        when(scheduleDefaultsRepository.findById(BranchScheduleDefaults.SINGLETON_ID)).thenReturn(Optional.empty());
+        when(scheduleDefaultsRepository.save(any(BranchScheduleDefaults.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(branchRepository.findAll()).thenReturn(List.of(alreadyMatching));
+        when(branchRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/schedule-defaults?overrideAll=true")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"openTime\":\"09:00:00\",\"closeTime\":\"16:00:00\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(notificationService, never()).notifyBranchScheduleChange(any(), any(), any(), any(), anyBoolean(), anyBoolean());
     }
 
     @Test
@@ -558,5 +615,52 @@ class BranchControllerTest {
                 .bodyValue("{\"openTime\":\"09:00:00\",\"closeTime\":\"16:00:00\"}")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testApplyGeofenceToBranchSuccess() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central").timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(geofenceService.applyGeofenceToBranch(eq(id), any())).thenReturn(4);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/geofence")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"vertices\":[{\"lat\":0,\"lon\":0},{\"lat\":0,\"lon\":10},{\"lat\":10,\"lon\":10}]}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("Applied to 4 agent(s)");
+    }
+
+    @Test
+    void testApplyGeofenceToBranchCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .put()
+                .uri("/api/v1/admin/branches/" + UUID.randomUUID() + "/geofence")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"vertices\":[{\"lat\":0,\"lon\":0},{\"lat\":0,\"lon\":10},{\"lat\":10,\"lon\":10}]}")
+                .exchange()
+                .expectStatus().isForbidden();
+
+        verify(geofenceService, never()).applyGeofenceToBranch(any(), any());
+    }
+
+    @Test
+    void testApplyGeofenceToBranchNotFound() {
+        UUID id = UUID.randomUUID();
+        when(branchRepository.findById(id)).thenReturn(Optional.empty());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .put()
+                .uri("/api/v1/admin/branches/" + id + "/geofence")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"vertices\":[{\"lat\":0,\"lon\":0},{\"lat\":0,\"lon\":10},{\"lat\":10,\"lon\":10}]}")
+                .exchange()
+                .expectStatus().isEqualTo(404);
+
+        verify(geofenceService, never()).applyGeofenceToBranch(any(), any());
     }
 }

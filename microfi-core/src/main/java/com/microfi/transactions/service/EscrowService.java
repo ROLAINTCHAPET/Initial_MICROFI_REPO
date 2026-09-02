@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -121,11 +120,10 @@ public class EscrowService {
                 .build();
     }
 
-    /** Same BR-03 window CollectionService.enforceEscrowCeiling checks against — cash-in-hand so far today. */
+    /** Same BR-03 cash-in-hand CollectionService.enforceEscrowCeiling checks against — not yet reconciled, regardless of calendar day (see that method's Javadoc). */
     private long cumulativeToday(UUID agentId) {
-        Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
-        return collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc)
-                + activationDirectoryService.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
+        Instant now = Instant.now();
+        return collectionRepository.sumUnreconciledByAgent(agentId, now)
+                + activationDirectoryService.sumUnreconciled(agentId, now);
     }
 }

@@ -1,7 +1,10 @@
 package com.microfi.registration.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
-import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.registration.domain.RegistrationApplication;
 import com.microfi.registration.domain.RegistrationApplicationStatus;
@@ -57,6 +60,7 @@ public class RegistrationApplicationController {
 
     private final RegistrationApplicationService registrationApplicationService;
     private final DocumentStorageService documentStorageService;
+    private final AuditService auditService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -138,7 +142,18 @@ public class RegistrationApplicationController {
                                                            Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
                 .flatMap(caller -> registrationApplicationService.approve(id, caller.getAdminUser().getId(),
-                        request != null ? request.getReplaceUserId() : null))
+                                request != null ? request.getReplaceUserId() : null)
+                        .doOnNext(result -> auditService.record(AuditLogEntry.builder()
+                                .category(AuditCategory.COMPLIANCE)
+                                .eventType("REGISTRATION_APPROVED")
+                                .actorType(AuditActorType.ADMIN)
+                                .actorId(caller.getAdminUser().getId())
+                                .actorLabel(caller.getAdminUser().getLogin())
+                                .actorRole(caller.getAdminUser().getRole())
+                                .branchId(result.application().getBranchId())
+                                .details("Registration application approved for " + result.application().getFirstName() + " " + result.application().getLastName()
+                                        + " (" + result.application().getTargetRole() + ")")
+                                .build())))
                 .map(result -> toResponse(result.application(), result.tempPassword(), result.tempPin()));
     }
 
@@ -147,7 +162,20 @@ public class RegistrationApplicationController {
     public Mono<RegistrationApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectRegistrationApplicationRequest request,
                                                           Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
-                .flatMap(caller -> Mono.fromCallable(() -> registrationApplicationService.reject(id, caller.getAdminUser().getId(), request.getReason()))
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                            RegistrationApplication rejected = registrationApplicationService.reject(id, caller.getAdminUser().getId(), request.getReason());
+                            auditService.record(AuditLogEntry.builder()
+                                    .category(AuditCategory.COMPLIANCE)
+                                    .eventType("REGISTRATION_REJECTED")
+                                    .actorType(AuditActorType.ADMIN)
+                                    .actorId(caller.getAdminUser().getId())
+                                    .actorLabel(caller.getAdminUser().getLogin())
+                                    .actorRole(caller.getAdminUser().getRole())
+                                    .branchId(rejected.getBranchId())
+                                    .details("Registration application rejected for " + rejected.getFirstName() + " " + rejected.getLastName() + ": " + request.getReason())
+                                    .build());
+                            return rejected;
+                        })
                         .subscribeOn(Schedulers.boundedElastic()))
                 .map(this::toResponse);
     }

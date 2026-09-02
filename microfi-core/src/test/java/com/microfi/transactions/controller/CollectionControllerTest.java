@@ -71,7 +71,7 @@ class CollectionControllerTest {
 
     private String requestBody() {
         return "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70," +
-                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\",\"pin\":\"1234\"," +
+                "\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-1\",\"terminalId\":\"TERM-1\",\"pin\":\"1234\"," +
                 "\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}";
     }
 
@@ -126,8 +126,8 @@ class CollectionControllerTest {
                 .thenReturn(Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling")));
 
         String batch = "[" +
-                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-OK\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}," +
-                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":9000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-FAIL\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":9000,\"quantity\":1}]}" +
+                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":5000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-OK\",\"terminalId\":\"TERM-1\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":5000,\"quantity\":1}]}," +
+                "{\"clientId\":\"" + clientId + "\",\"amountXaf\":9000,\"lat\":4.05,\"lon\":9.70,\"collectedAt\":\"" + Instant.now() + "\",\"deviceTxId\":\"DEV-FAIL\",\"terminalId\":\"TERM-1\",\"pin\":\"1234\",\"denominationLines\":[{\"faceValueXaf\":9000,\"quantity\":1}]}" +
                 "]";
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))

@@ -137,7 +137,7 @@ export function GlobalThresholds({
           <div className="flex gap-3 items-start bg-error-container/40 border-2 border-error/30 rounded-[var(--radius-sm)] p-4">
             <Icon name="warning" filled className="size-5 text-danger-red shrink-0 mt-0.5" />
             <p className="text-sm text-on-error-container">
-              {dict.branches.thresholds.confirmBodyPrefix} <span className="font-semibold">{dict.branches.thresholds.confirmEveryBranch}</span>{" "}
+              {dict.branches.thresholds.confirmBodyPrefix} <span className="font-semibold">{dict.branches.thresholds.confirmEveryBranch}</span>,{" "}
               {dict.branches.thresholds.confirmBodyMiddle}{" "}
               <span className="font-semibold tabular-nums">{openTime} – {closeTime}</span>
               {dict.branches.thresholds.confirmBodySuffix}

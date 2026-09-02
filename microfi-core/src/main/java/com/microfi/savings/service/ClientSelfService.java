@@ -5,6 +5,7 @@ import com.microfi.savings.domain.AccessTokenStatus;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.repository.AccessTokenRepository;
 import com.microfi.savings.repository.ClientProfileRepository;
+import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.shared.dto.ClientProfileSelfResponse;
 import com.microfi.shared.dto.ClientRecentCollectionResponse;
 import com.microfi.transactions.service.CollectionDirectoryService;
@@ -25,6 +26,7 @@ public class ClientSelfService {
     private final ClientProfileRepository clientProfileRepository;
     private final AccessTokenRepository accessTokenRepository;
     private final CollectionDirectoryService collectionDirectoryService;
+    private final MfiSettingsService mfiSettingsService;
 
     public ClientProfileSelfResponse getProfile(UUID clientId) {
         ClientProfile client = requireClient(clientId);
@@ -44,6 +46,7 @@ public class ClientSelfService {
                 .fullName(client.getFullName())
                 .phone(client.getPhone())
                 .branchId(client.getBranchId())
+                .mfiName(mfiSettingsService.getName())
                 .tokenStatus(tokenStatus)
                 .tokenExpiresAt(tokenExpiresAt)
                 .build();

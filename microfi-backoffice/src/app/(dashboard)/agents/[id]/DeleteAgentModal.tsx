@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { Icon } from "@/components/Icon";
+import { ActionCard } from "@/components/ActionCard";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 
@@ -44,10 +44,13 @@ export function DeleteAgentModal({ agentId }: { agentId: string }) {
 
   return (
     <>
-      <Button variant="danger" onClick={() => setOpen(true)}>
-        <Icon name="warning" className="size-5" />
-        {dict.agents.deleteAgent.button}
-      </Button>
+      <ActionCard
+        icon="trash"
+        title={dict.agents.deleteAgent.button}
+        description={dict.agents.deleteAgent.cardDescription}
+        danger
+        onClick={() => setOpen(true)}
+      />
       <Modal open={open} onClose={() => setOpen(false)} title={dict.agents.deleteAgent.modalTitle}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="text-sm text-on-surface-variant">{dict.agents.deleteAgent.warning}</p>

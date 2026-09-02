@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agent Actions - Microfi Back-office</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#00725f",
+                        "secondary-fixed-dim": "#27dfbc",
+                        "on-primary-fixed": "#001c37",
+                        "tertiary": "#170d00",
+                        "surface-variant": "#e0e3e6",
+                        "on-surface-variant": "#43474d",
+                        "primary": "#000f22",
+                        "tertiary-container": "#322100",
+                        "primary-fixed-dim": "#b0c8eb",
+                        "on-background": "#181c1e",
+                        "outline": "#74777e",
+                        "surface": "#f7fafd",
+                        "on-primary-container": "#768dad",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#eef1f4",
+                        "surface-dim": "#d7dadd",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "secondary-fixed": "#55fcd8",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#314865",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "inverse-primary": "#b0c8eb",
+                        "surface-container-high": "#e5e8eb",
+                        "on-error": "#ffffff",
+                        "on-surface": "#181c1e",
+                        "outline-variant": "#c4c6ce",
+                        "primary-container": "#0a2540",
+                        "on-tertiary-fixed": "#271900",
+                        "on-secondary-fixed-variant": "#005142",
+                        "surface-container": "#ebeef1",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "surface-container-highest": "#e0e3e6",
+                        "surface-bright": "#f7fafd",
+                        "secondary": "#006b59",
+                        "surface-container-low": "#f1f4f7",
+                        "on-tertiary-container": "#b68200",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#002019",
+                        "secondary-container": "#55fcd8",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdea8",
+                        "background": "#f7fafd",
+                        "primary-fixed": "#d2e4ff",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#49607e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "20px",
+                        "stack-lg": "24px",
+                        "gutter": "16px",
+                        "touch-target": "48px",
+                        "stack-sm": "8px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "h2": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body": ["Inter"],
+                        "display": ["Inter"],
+                        "caption": ["Inter"],
+                        "h1": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h2": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "label-bold": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body": ["15px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "display": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "h1": ["22px", { "lineHeight": "28px", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #f7fafd; }
+        .bg-watermark {
+            background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1VlAIEyZzsQYBB6hLtOdlX3H5FjmmRL0vMmtsmDOSLPfnhPNtdttJTY4hOG3NFs58fiOu28kvKP_kTK7guV24GmxgZg19c1C-Fl2r6tZdRxXkPsOl-Lc5CUQ0zCkM2JUaJIEhWXCUDdDf7EZ2BSqUkqhMlKQ5rMJiZkKLjiRq3PMZZ9N4Vgz3CZljomNuq7Zf0iU1VTqXPN2t6GP7EsjLca5RDs3u4oxi0FuETwEcGxBFEt7CgHUIoRgAY');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: 60%;
+            opacity: 0.03;
+            pointer-events: none;
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="bg-primary-container h-screen w-64 fixed left-0 top-0 border-r border-outline-variant flex flex-col h-full py-6 z-20 hidden md:flex">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-secondary-fixed flex items-center justify-center text-primary-container font-bold text-lg">M</div>
+<div>
+<h1 class="text-h2 font-h2 text-surface-container-lowest">Microfi Admin</h1>
+<p class="text-caption font-caption text-surface-container-lowest/70">Regional Operations</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body text-body">Dashboard</span>
+</a>
+</li>
+<li>
+<!-- Active State: Agents -->
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container-lowest/10 text-secondary-fixed border-l-4 border-secondary-fixed cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-body text-body font-bold">Agents</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="font-body text-body">Branches</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-body text-body">Reports</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="px-4 mt-auto">
+<button class="w-full bg-secondary-fixed text-primary-container font-label-bold text-label-bold py-3 rounded-DEFAULT mb-6 hover:opacity-90 transition-opacity">
+                Collect Cash
+            </button>
+<ul class="space-y-1 border-t border-outline-variant/30 pt-4">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container/70 hover:bg-surface-container-lowest/5 hover:text-secondary-fixed-dim transition-colors cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-body text-body">Support</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-64 min-h-screen relative overflow-hidden bg-surface">
+<div class="bg-watermark"></div>
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest/90 backdrop-blur-md fixed top-0 right-0 w-full md:w-[calc(100%-16rem)] h-16 border-b border-outline-variant flex justify-between items-center px-gutter h-full z-10 hidden md:flex">
+<div class="flex items-center">
+<span class="font-display text-h1 text-primary">Microfi Back-office</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full hover:bg-surface-variant transition-colors cursor-pointer transition-all">
+<img class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="User Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJwVxT_IG2EAvYbsl3DeRKHn04LJa_oPCCArR2TFmz7iJD25bLPOz5bSpnGlQQtsOqpoihnxo2HXPdz0HDub-T8PXaveZAPP2NU5tCUtCbIYL5wqekMi5RNEw1ZZDDXIlKyBcm3SPhfciPUVgYRk9kacKUPFJ5PYBUw-ZWzRnLQIpQXRPiHhlZI6Gz__weftctvZ0uJgLHB5QMr3aB8PZR-4d8B9P2O5M275ij4KRnWIPPKCXPS3KO"/>
+<span class="font-label-bold text-label-bold text-primary">Profile</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-4 md:p-8 md:pt-28 flex flex-col relative z-10 max-w-5xl mx-auto w-full">
+<!-- Header Panel -->
+<div class="bg-surface-container-lowest rounded-DEFAULT border border-outline-variant shadow-sm p-6 mb-8 flex items-center justify-between">
+<div class="flex items-center gap-5">
+<div class="w-16 h-16 rounded-full bg-primary-container text-primary-fixed flex items-center justify-center font-display text-2xl font-bold shadow-inner">
+                        JD
+                    </div>
+<div>
+<h2 class="font-display text-display text-primary mb-1">Jean Dupont</h2>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="flex items-center gap-1 font-body text-body"><span class="material-symbols-outlined text-[18px]">badge</span> AGT-8924</span>
+<span class="text-outline-variant">•</span>
+<span class="flex items-center gap-1 font-body text-body"><span class="material-symbols-outlined text-[18px]">location_on</span> Yaoundé Central</span>
+</div>
+</div>
+</div>
+<div class="px-4 py-2 bg-surface-container-low rounded-DEFAULT border border-outline-variant flex flex-col items-end">
+<span class="text-caption font-caption text-on-surface-variant">Statut</span>
+<span class="flex items-center gap-1.5 font-label-bold text-primary">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed"></span> Actif
+                    </span>
+</div>
+</div>
+<h3 class="font-h2 text-h2 text-on-surface mb-4">Actions de gestion</h3>
+<!-- Management Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+<!-- Recharger le séquestre -->
+<button class="flex items-start gap-4 p-5 bg-surface-container-lowest border border-outline-variant rounded-DEFAULT hover:border-primary hover:shadow-md transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-primary-fixed/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-primary transition-colors">Recharger le séquestre</h4>
+<p class="font-body text-caption text-on-surface-variant">Ajouter des fonds au compte de l'agent.</p>
+</div>
+</button>
+<!-- Dérogation temporaire -->
+<button class="flex items-start gap-4 p-5 bg-surface-container-lowest border border-outline-variant rounded-DEFAULT hover:border-primary hover:shadow-md transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-primary transition-colors">Dérogation temporaire</h4>
+<p class="font-body text-caption text-on-surface-variant">Modifier les limites de transaction temporairement.</p>
+</div>
+</button>
+<!-- Réinitialiser le mot de passe -->
+<button class="flex items-start gap-4 p-5 bg-surface-container-lowest border border-outline-variant rounded-DEFAULT hover:border-primary hover:shadow-md transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined" data-icon="lock_reset">lock_reset</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-primary transition-colors">Réinitialiser le mot de passe</h4>
+<p class="font-body text-caption text-on-surface-variant">Envoyer un lien de réinitialisation sécurisé.</p>
+</div>
+</button>
+<!-- Configurer la géofence -->
+<button class="flex items-start gap-4 p-5 bg-surface-container-lowest border border-outline-variant rounded-DEFAULT hover:border-primary hover:shadow-md transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined" data-icon="location_on">location_on</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-primary transition-colors">Configurer la géofence</h4>
+<p class="font-body text-caption text-on-surface-variant">Gérer les zones d'opération autorisées.</p>
+</div>
+</button>
+</div>
+<h3 class="font-h2 text-h2 text-error mb-4">Actions critiques</h3>
+<!-- Critical Actions Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Suspendre l'agent -->
+<button class="flex items-start gap-4 p-5 bg-error-container/20 border border-error/30 rounded-DEFAULT hover:bg-error-container/40 hover:border-error transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error group-hover:bg-error group-hover:text-on-error transition-colors">
+<span class="material-symbols-outlined" data-icon="warning">warning</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-error transition-colors">Suspendre l'agent</h4>
+<p class="font-body text-caption text-on-surface-variant">Bloquer temporairement l'accès au système.</p>
+</div>
+</button>
+<!-- Supprimer l'agent -->
+<button class="flex items-start gap-4 p-5 bg-error-container/20 border border-error/30 rounded-DEFAULT hover:bg-error-container/40 hover:border-error transition-all group text-left">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error group-hover:bg-error group-hover:text-on-error transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</div>
+<div class="flex-1">
+<h4 class="font-h2 text-h2 text-on-surface mb-1 group-hover:text-error transition-colors">Supprimer l'agent</h4>
+<p class="font-body text-caption text-on-surface-variant">Révocation permanente et clôture du compte.</p>
+</div>
+</button>
+</div>
+</main>
+</div>
+</body></html>

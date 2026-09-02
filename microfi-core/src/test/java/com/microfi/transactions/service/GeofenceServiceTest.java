@@ -1,5 +1,6 @@
 package com.microfi.transactions.service;
 
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.GeofenceRequest;
 import com.microfi.shared.dto.GeofenceResponse;
 import com.microfi.shared.dto.GeofenceVertexDto;
@@ -32,6 +33,8 @@ class GeofenceServiceTest {
     private GeofenceRepository geofenceRepository;
     @Mock
     private GeofenceAlertRepository geofenceAlertRepository;
+    @Mock
+    private AgentDirectoryService agentDirectoryService;
 
     private GeofenceService geofenceService;
 
@@ -45,7 +48,7 @@ class GeofenceServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        geofenceService = new GeofenceService(geofenceRepository, geofenceAlertRepository);
+        geofenceService = new GeofenceService(geofenceRepository, geofenceAlertRepository, agentDirectoryService);
         ReflectionTestUtils.setField(geofenceService, "gracePeriodSeconds", 120L);
         when(geofenceAlertRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -187,5 +190,34 @@ class GeofenceServiceTest {
 
         assertThat(response.getAgentId()).isEqualTo(agentId);
         assertThat(response.getVertices()).hasSize(3);
+    }
+
+    @Test
+    void applyGeofenceToBranchWritesSameVerticesToEveryActiveAgentAndReturnsCount() {
+        UUID branchId = UUID.randomUUID();
+        UUID agent1 = UUID.randomUUID();
+        UUID agent2 = UUID.randomUUID();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agent1, agent2));
+        when(geofenceRepository.findByAgentId(any())).thenReturn(Optional.empty());
+        when(geofenceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        GeofenceRequest request = new GeofenceRequest();
+        GeofenceVertexDto v1 = new GeofenceVertexDto();
+        v1.setLat(0.0);
+        v1.setLon(0.0);
+        GeofenceVertexDto v2 = new GeofenceVertexDto();
+        v2.setLat(0.0);
+        v2.setLon(10.0);
+        GeofenceVertexDto v3 = new GeofenceVertexDto();
+        v3.setLat(10.0);
+        v3.setLon(10.0);
+        request.setVertices(List.of(v1, v2, v3));
+
+        int count = geofenceService.applyGeofenceToBranch(branchId, request);
+
+        assertThat(count).isEqualTo(2);
+        ArgumentCaptor<Geofence> captor = ArgumentCaptor.forClass(Geofence.class);
+        verify(geofenceRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Geofence::getAgentId).containsExactlyInAnyOrder(agent1, agent2);
     }
 }

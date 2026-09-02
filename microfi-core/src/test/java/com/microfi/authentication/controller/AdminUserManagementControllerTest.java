@@ -1,5 +1,8 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -14,6 +17,7 @@ import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
@@ -29,8 +33,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = AdminUserManagementController.class)
@@ -42,6 +48,9 @@ class AdminUserManagementControllerTest {
 
     @MockitoBean
     private AdminUserRepository adminUserRepository;
+
+    @MockitoBean
+    private AuditService auditService;
 
     @MockitoBean
     private BranchRepository branchRepository;
@@ -351,6 +360,12 @@ class AdminUserManagementControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("SUSPENDED");
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.ADMIN);
+        assertThat(captor.getValue().getTargetAdminUserId()).isEqualTo(id);
+        assertThat(captor.getValue().getEventType()).isEqualTo("ADMIN_USER_SUSPENDED");
     }
 
     @Test

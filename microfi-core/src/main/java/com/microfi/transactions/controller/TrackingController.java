@@ -1,5 +1,9 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.AgentSyncStatusRequest;
@@ -43,6 +47,7 @@ public class TrackingController {
 
     private final TrackingService trackingService;
     private final AgentDirectoryService agentDirectoryService;
+    private final AuditService auditService;
 
     @PostMapping("/location")
     @Operation(summary = "GPS Ping", description = "Periodic location sample while an agent's session is open (UC-10, FR-10). Sampling cadence and the schedule-window stop are the mobile client's responsibility (NFR-09/10).")
@@ -55,9 +60,25 @@ public class TrackingController {
     @PostMapping("/sos")
     @Operation(summary = "Emergency SOS", description = "Discrete distress alert (UC-14, FR-14). Never gated on GPS availability — accepted best-effort even without a location fix.")
     public Mono<SosResponse> sos(@PathVariable("id") UUID agentId, @Valid @RequestBody SosRequest request, Mono<Authentication> authenticationMono) {
-        return requireSelf(agentId, authenticationMono)
-                .then(Mono.fromCallable(() -> trackingService.raiseSos(agentId, request))
-                        .subscribeOn(Schedulers.boundedElastic()));
+        return authenticationMono
+                .flatMap(authentication -> {
+                    var agent = ((AgentDetails) authentication.getPrincipal()).getAgent();
+                    if (!agent.getId().equals(agentId)) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot report location/SOS on behalf of another agent"));
+                    }
+                    return Mono.fromCallable(() -> trackingService.raiseSos(agentId, request))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .doOnNext(result -> auditService.record(AuditLogEntry.builder()
+                                    .category(AuditCategory.SECURITY)
+                                    .eventType("AGENT_SOS_TRIGGERED")
+                                    .actorType(AuditActorType.AGENT)
+                                    .actorId(agent.getId())
+                                    .actorLabel(agent.getUsername())
+                                    .branchId(agent.getBranchId())
+                                    .agentId(agent.getId())
+                                    .details("SOS raised" + (request.getLat() != null ? (" at " + request.getLat() + "," + request.getLon()) : " (no location fix)"))
+                                    .build()));
+                });
     }
 
     @PatchMapping("/sync-status")

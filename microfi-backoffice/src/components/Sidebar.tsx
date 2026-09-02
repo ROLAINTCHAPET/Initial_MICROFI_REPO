@@ -9,12 +9,15 @@ import { useDictionary } from "@/lib/i18n/I18nProvider";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { useMobileNav } from "./MobileNavContext";
 
-function navItems(dict: Dictionary): { href: string; label: string; icon: IconName }[] {
+function navItems(dict: Dictionary, role: AdminRole): { href: string; label: string; icon: IconName }[] {
   return [
     { href: "/", label: dict.sidebar.dashboard, icon: "dashboard" },
     { href: "/agents", label: dict.sidebar.agents, icon: "agents" },
+    { href: "/clients", label: dict.sidebar.clients, icon: "person" },
     { href: "/team", label: dict.sidebar.team, icon: "shield-check" },
-    { href: "/tracking", label: dict.sidebar.geolocation, icon: "location-on" },
+    // Live tracking is an oversight tool for ADMIN/BRANCH_MANAGER only (see tracking/page.tsx's
+    // own guard) — a cashier reconciles cash, not field movement.
+    ...(role === "BRANCH_CASHIER" ? [] : [{ href: "/tracking", label: dict.sidebar.geolocation, icon: "location-on" as IconName }]),
     { href: "/ofj", label: dict.sidebar.endOfDayOversight, icon: "reports" },
     { href: "/sos", label: dict.sidebar.sosConsole, icon: "bell" },
   ];
@@ -85,11 +88,12 @@ export function Sidebar({ role }: { role: AdminRole }) {
   const items =
     role === "ADMIN" || role === "BRANCH_MANAGER"
       ? [
-          ...navItems(dict),
+          ...navItems(dict, role),
           { href: "/registrations", label: dict.sidebar.registrations, icon: "edit-note" as IconName },
+          { href: "/audit", label: dict.sidebar.audit, icon: "history" as IconName },
           { href: "/settings", label: dict.sidebar.settings, icon: "settings" as IconName },
         ]
-      : navItems(dict);
+      : navItems(dict, role);
 
   // Closes the drawer whenever the route actually changes — a safety net alongside each link's
   // own onClick, so back/forward navigation or a link that doesn't fire onClick still closes it.

@@ -7,16 +7,21 @@ import { Icon } from "@/components/Icon";
 import { ceilingUtilizationPct } from "@/lib/format";
 import type { AgentResponse, BranchResponse, EscrowResponse } from "@/lib/types";
 import { AgentCollectionsPanel } from "./AgentCollectionsPanel";
-import { WaiverModal } from "./WaiverModal";
-import { DeleteAgentModal } from "./DeleteAgentModal";
-import { SuspendAgentButton } from "./SuspendAgentButton";
-import { ResetDeviceBindingModal } from "./ResetDeviceBindingModal";
-import { TopUpEscrowModal } from "./TopUpEscrowModal";
+import { AgentAdministrationPanel } from "./AgentAdministrationPanel";
+import { BackLink } from "@/components/BackLink";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 import { t } from "@/lib/i18n/format";
 
-export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+type Tab = "apercu" | "administration";
+
+export default async function AgentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const dict = getDictionary(await getLocale());
   const { id } = await params;
   const [session, agent] = await Promise.all([getSession(), api.get<AgentResponse>(`/admin/agents/${id}`)]);
@@ -28,6 +33,9 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   // Suspend/reactivate and ceiling overrides are ADMIN or BRANCH_MANAGER (own branch) only per
   // AgentManagementController — a BRANCH_CASHIER can view an agent's escrow but not act on it.
   const canManage = session?.role === "ADMIN" || (session?.role === "BRANCH_MANAGER" && session?.branchId === agent.branchId);
+  const showAdminTab = canManage && agent.status !== "DELETED";
+  const { tab: rawTab } = await searchParams;
+  const tab: Tab = showAdminTab && rawTab === "administration" ? "administration" : "apercu";
 
   const nearLimit = !!escrow && escrow.effectiveCeilingXaf > 0 && escrow.cumulativeTodayXaf / escrow.effectiveCeilingXaf >= 0.9;
   const utilization = escrow ? ceilingUtilizationPct(escrow.cumulativeTodayXaf, escrow.effectiveCeilingXaf) : 0;
@@ -36,30 +44,31 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
     <div className="max-w-4xl mx-auto w-full">
       <PageHeader title={dict.agents.overviewTitle} subtitle={dict.agents.overviewSubtitleAdmin} />
 
-      <div className="mb-6">
-        <div className="flex items-center text-xs text-on-surface-variant gap-2 mb-2">
-          <Link href="/agents" className="hover:text-primary transition-colors">{dict.agents.detail.breadcrumbAgents}</Link>
-          <Icon name="chevron-right" className="size-4" />
-          <span className="text-on-surface font-semibold">{agent.employeeCode}</span>
-        </div>
+      <BackLink href="/agents" label={dict.agents.backToAgents} />
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-display text-primary">{agent.fullName}</h1>
-              <Badge status={agent.status} />
-            </div>
-            <p className="text-sm text-on-surface-variant mt-1">{agent.employeeCode} &middot; {branch?.name ?? "—"}</p>
+      <div className="flex items-center text-xs text-on-surface-variant gap-2 mb-3">
+        <Link href="/agents" className="hover:text-primary transition-colors">{dict.agents.detail.breadcrumbAgents}</Link>
+        <Icon name="chevron-right" className="size-4" />
+        <span className="text-on-surface font-semibold">{agent.employeeCode}</span>
+      </div>
+
+      <div className="bg-surface-container-lowest rounded-[var(--radius-md)] border-2 border-outline-variant shadow-sm p-6 mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xl shrink-0">
+            {agent.fullName.slice(0, 2).toUpperCase()}
           </div>
-          {canManage && agent.status !== "DELETED" && (
-            <div className="flex flex-wrap gap-3">
-              <SuspendAgentButton agentId={agent.id} status={agent.status} hasCeiling={(escrow?.baseCeilingXaf ?? 0) > 0} />
-              <TopUpEscrowModal agentId={agent.id} isPendingCeiling={agent.status === "PENDING_CEILING"} />
-              <WaiverModal agentId={agent.id} currentCeiling={escrow?.effectiveCeilingXaf ?? 0} />
-              <ResetDeviceBindingModal agentId={agent.id} bound={agent.imei !== null} />
-              <DeleteAgentModal agentId={agent.id} />
+          <div>
+            <h1 className="text-display text-primary leading-tight">{agent.fullName}</h1>
+            <div className="flex items-center gap-3 text-on-surface-variant mt-1 flex-wrap">
+              <span className="flex items-center gap-1 text-sm"><Icon name="reports" className="size-4" /> {agent.employeeCode}</span>
+              <span className="text-outline-variant">&middot;</span>
+              <span className="flex items-center gap-1 text-sm"><Icon name="location-on" className="size-4" /> {branch?.name ?? "N/A"}</span>
             </div>
-          )}
+          </div>
+        </div>
+        <div className="px-4 py-2 bg-surface-container-low rounded-[var(--radius-sm)] border-2 border-outline-variant flex flex-col items-end">
+          <span className="text-xs text-on-surface-variant">{dict.agents.detail.status}</span>
+          <Badge status={agent.status} />
         </div>
       </div>
 
@@ -74,6 +83,33 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
+      {showAdminTab && (
+        <div className="flex gap-1 border-b-2 border-outline-variant mb-6">
+          <Link
+            href={`/agents/${agent.id}?tab=apercu`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-0.5 transition-colors ${
+              tab === "apercu" ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
+            }`}
+          >
+            <Icon name="eye" className="size-4" />
+            {dict.agents.detail.tabs.overview}
+          </Link>
+          <Link
+            href={`/agents/${agent.id}?tab=administration`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-0.5 transition-colors ${
+              tab === "administration" ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
+            }`}
+          >
+            <Icon name="shield-check" className="size-4" />
+            {dict.agents.detail.tabs.administration}
+          </Link>
+        </div>
+      )}
+
+      {tab === "administration" ? (
+        <AgentAdministrationPanel agent={agent} escrow={escrow} />
+      ) : (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
         <div className="md:col-span-8 flex flex-col gap-4 md:gap-6">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
@@ -144,14 +180,11 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               <InfoField label={dict.agents.detail.username} value={agent.username} mono />
               <InfoField label={dict.agents.detail.phone} value={agent.phone} />
               <InfoField label={dict.agents.detail.deviceBinding} value={agent.imei !== null ? dict.agents.detail.bound : dict.agents.detail.notBound} mono />
-              <InfoField label={dict.agents.detail.branch} value={branch?.name ?? "—"} />
+              <InfoField label={dict.agents.detail.branch} value={branch?.name ?? "N/A"} />
               <InfoField label={dict.agents.detail.employeeCode} value={agent.employeeCode} mono />
               <InfoField label={dict.agents.detail.transactionPin} value={agent.pinMustChange ? dict.agents.detail.pinNotSet : dict.agents.detail.pinSet} />
-              {agent.deviceResetReason && (
-                <InfoField
-                  label={dict.agents.detail.lastDeviceReset}
-                  value={`${agent.deviceResetReason}${agent.deviceResetAt ? ` — ${new Date(agent.deviceResetAt).toLocaleString()}` : ""}`}
-                />
+              {agent.deviceResetAt && (
+                <InfoField label={dict.agents.detail.lastDeviceReset} value={new Date(agent.deviceResetAt).toLocaleString()} />
               )}
             </div>
           </div>
@@ -159,8 +192,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="mt-4 md:mt-6">
-        <AgentCollectionsPanel agentId={agent.id} />
+        <AgentCollectionsPanel agentId={agent.id} agentLabel={`${agent.fullName} (${agent.employeeCode})`} generatedBy={session?.sub ?? ""} />
       </div>
+      </>
+      )}
     </div>
   );
 }

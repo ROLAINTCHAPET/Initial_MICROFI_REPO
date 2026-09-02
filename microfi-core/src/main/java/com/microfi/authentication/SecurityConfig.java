@@ -29,6 +29,10 @@ public class SecurityConfig {
                         // were permitAll, i.e. wide open to anyone.
                         .pathMatchers("/api/v1/auth/**").permitAll()
                         .pathMatchers("/favicon.ico", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/swagger-ui/**").permitAll()
+                        // Scraped by Prometheus over the internal Docker network only (see
+                        // docker-compose.yml) — never routed through Kong, so this doesn't widen
+                        // what's reachable from outside the host.
+                        .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated()
                 )
                 .addFilterAt(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)

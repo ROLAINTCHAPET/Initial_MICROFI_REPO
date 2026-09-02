@@ -33,7 +33,7 @@ export default async function AgentsPage() {
       id: agent.id,
       fullName: agent.fullName,
       employeeCode: agent.employeeCode,
-      branchName: branchById.get(agent.branchId)?.name ?? "—",
+      branchName: branchById.get(agent.branchId)?.name ?? "N/A",
       status: agent.status,
       collectedTodayXaf: escrow?.cumulativeTodayXaf ?? null,
       ceilingXaf: escrow?.effectiveCeilingXaf ?? null,
@@ -55,7 +55,7 @@ export default async function AgentsPage() {
         actions={
           canCreate ? (
             <Link
-              href="/registrations/new"
+              href="/registrations/new?from=/agents"
               className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
             >
               <Icon name="plus" className="size-5" />

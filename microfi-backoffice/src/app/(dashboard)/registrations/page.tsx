@@ -5,11 +5,19 @@ import { PageHeader } from "@/components/PageHeaderContext";
 import { Badge, type BadgeStatus } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
 import type { BranchResponse, RegistrationApplicationResponse, RegistrationApplicationStatus } from "@/lib/types";
+import { RegistrationsExportButtons, type RegistrationExportRow } from "./RegistrationsExportButtons";
 import { ApproveButton } from "./ApproveButton";
 import { RejectApplicationModal } from "./RejectApplicationModal";
+import { DateRangeFilter } from "./DateRangeFilter";
 import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 import { t } from "@/lib/i18n/format";
+
+function isoDaysAgo(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
 
 const STATUS_BADGE: Record<RegistrationApplicationStatus, BadgeStatus> = {
   SUBMITTED: "PENDING",
@@ -28,12 +36,14 @@ function roleLabel(dict: Dictionary): Record<string, string> {
 export default async function RegistrationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
 }) {
   const dict = getDictionary(await getLocale());
   const ROLE_LABEL = roleLabel(dict);
   const params = await searchParams;
   const statusFilter = params.status === "APPROVED" || params.status === "REJECTED" ? params.status : "SUBMITTED";
+  const from = params.from ?? isoDaysAgo(30);
+  const to = params.to ?? isoDaysAgo(0);
 
   const [session, applications, allApplications, branches] = await Promise.all([
     getSession(),
@@ -44,9 +54,27 @@ export default async function RegistrationsPage({
   const branchById = new Map(branches.map((b) => [b.id, b]));
   const canReview = session?.role === "ADMIN";
   const canSubmit = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
+  const canExport = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
   const submittedCount = allApplications.filter((a) => a.status === "SUBMITTED").length;
   const approvedCount = allApplications.filter((a) => a.status === "APPROVED").length;
   const rejectedCount = allApplications.filter((a) => a.status === "REJECTED").length;
+
+  // Export honors the chosen period regardless of which status tab is currently browsed —
+  // the visible list stays tab-filtered, only the export additionally bounds by submittedAt.
+  const fromInstant = new Date(`${from}T00:00:00Z`).getTime();
+  const toInstant = new Date(`${to}T23:59:59Z`).getTime();
+  const exportApplications = applications.filter((a) => {
+    const submitted = new Date(a.submittedAt).getTime();
+    return submitted >= fromInstant && submitted <= toInstant;
+  });
+  const exportRows: RegistrationExportRow[] = exportApplications.map((a) => ({
+    name: `${a.firstName} ${a.lastName}`,
+    role: ROLE_LABEL[a.targetRole] ?? a.targetRole,
+    branch: branchById.get(a.branchId)?.name ?? a.branchId,
+    status: dict.registrations.applicationStatus[a.status],
+    submittedAt: new Date(a.submittedAt).toLocaleString(),
+    reason: a.rejectionReason ?? "",
+  }));
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
@@ -69,11 +97,27 @@ export default async function RegistrationsPage({
         )}
       </div>
 
+      {canExport && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <DateRangeFilter status={statusFilter} from={from} to={to} />
+          <RegistrationsExportButtons
+            filenameBase={`microfi-registrations_${statusFilter}_${from}_${to}`}
+            meta={{
+              scope: session?.role === "ADMIN" ? dict.export.scopeAllBranches : (branches.find((b) => b.id === session?.branchId)?.name ?? dict.export.scopeAllBranches),
+              from,
+              to,
+              generatedBy: session?.sub ?? "",
+            }}
+            rows={exportRows}
+          />
+        </div>
+      )}
+
       <div className="flex gap-1 border-b-2 border-outline-variant">
         {(["SUBMITTED", "APPROVED", "REJECTED"] as const).map((s) => (
           <Link
             key={s}
-            href={`/registrations?status=${s}`}
+            href={`/registrations?status=${s}&from=${from}&to=${to}`}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-0.5 transition-colors ${
               statusFilter === s ? "border-primary text-primary" : "border-transparent text-text-slate hover:text-primary"
             }`}

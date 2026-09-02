@@ -88,9 +88,6 @@ class OfjServiceTest {
         when(ofjSessionRepository.save(any(OfjSession.class))).thenAnswer(inv -> inv.getArgument(0));
         when(ofjAgentLineRepository.save(any(OfjAgentLine.class))).thenAnswer(inv -> inv.getArgument(0));
         when(varianceDebtRepository.save(any(VarianceDebt.class))).thenAnswer(inv -> inv.getArgument(0));
-        // Default: branch is past its closing time, so existing reconcile tests aren't affected
-        // by the new EOD gate — tests exercising that gate specifically override this.
-        when(agentDirectoryService.isBranchPastCloseTime(branchId)).thenReturn(true);
     }
 
     private OfjSession openSession() {
@@ -116,17 +113,6 @@ class OfjServiceTest {
 
         assertThat(summary.getStatus()).isEqualTo("OPEN");
         assertThat(summary.getAgentLines()).isEmpty();
-    }
-
-    @Test
-    void reconcileRejectsBeforeBranchClosingTime() {
-        when(agentDirectoryService.isBranchPastCloseTime(branchId)).thenReturn(false);
-
-        assertThatThrownBy(() -> ofjService.reconcile(branchId, reconcileRequest(5000, 1)))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("409");
-
-        org.mockito.Mockito.verifyNoInteractions(ofjSessionRepository);
     }
 
     @Test
@@ -179,9 +165,11 @@ class OfjServiceTest {
     /**
      * Nothing stops an agent from reconciling twice in one session (they sync more cash after
      * already balancing once) — the second call must ADD the newly-unreconciled amount to the
-     * existing line's digitalTotalXaf, not overwrite it and silently lose the first amount. The
-     * mock simulates this directly: the first sweep's collections are gone (already marked
-     * reconciled), so a second call to sumUnreconciledByAgent only sees what's newly arrived.
+     * existing line's digitalTotalXaf (for the day's running total/audit trail), not overwrite it
+     * and silently lose the first amount. The mock simulates this directly: the first sweep's
+     * collections are gone (already marked reconciled), so a second call to sumUnreconciledByAgent
+     * only sees what's newly arrived — and per ReconcileWorkspace.tsx, the cashier only ever counts
+     * and submits that same newly-arrived amount, not a full recount of cash already handed over.
      */
     @Test
     void reconcileAccumulatesDigitalTotalAcrossRepeatedCallsInSameSession() {
@@ -194,11 +182,40 @@ class OfjServiceTest {
         // counted was marked reconciled and no longer shows up here.
         when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(1500L);
 
-        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5500, 1));
+        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(1500, 1));
 
         assertThat(response.getDigitalTotalXaf()).isEqualTo(5500);
         assertThat(response.getPhysicalTotalXaf()).isEqualTo(5500);
         assertThat(response.getDeltaXaf()).isEqualTo(0);
+    }
+
+    /**
+     * Regression test for a bug caught by live testing: reconciling a balanced first batch, then a
+     * balanced second batch, was flagging a shortage equal to the ENTIRE first batch — because delta
+     * was computed as this sweep's physical count against the cumulative digitalTotalXaf (which
+     * includes the first, already-settled batch), instead of against this sweep's own digital total.
+     * A cashier who only ever counts the newly-arrived cash (matching what ReconcileWorkspace.tsx
+     * asks for) must not see a false shortage — and must not have BR-Var-01 create a debt — just
+     * because an earlier, already-balanced reconciliation happened first in the same session.
+     */
+    @Test
+    void reconcileDoesNotFlagShortageFromAlreadySettledEarlierBatch() {
+        OfjSession session = openSession();
+        OfjAgentLine existingLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId)
+                .collectionsTotalXaf(155_000L).activationsTotalXaf(0L).digitalTotalXaf(155_000L).physicalTotalXaf(155_000L).deltaXaf(0L).build();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.of(existingLine));
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+
+        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
+
+        assertThat(response.getDigitalTotalXaf()).isEqualTo(160_000);
+        // physicalTotalXaf must also accumulate — otherwise the branch-wide OFJ summary's "Total
+        // numérique"/"Total physique" (ofj/page.tsx) would permanently diverge by the amount of
+        // every earlier, already-balanced batch even though nothing is actually owed.
+        assertThat(response.getPhysicalTotalXaf()).isEqualTo(160_000);
+        assertThat(response.getDeltaXaf()).isEqualTo(0);
+        assertThat(response.isResolved()).isTrue();
     }
 
     /**

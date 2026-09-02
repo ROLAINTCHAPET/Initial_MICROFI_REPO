@@ -1,10 +1,15 @@
 package com.microfi.savings.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.ClientDetails;
+import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.service.ClientActivationService;
 import com.microfi.shared.dto.CancelActivationRequestRequest;
 import com.microfi.shared.dto.ClientActivationResponse;
@@ -53,13 +58,15 @@ public class ClientActivationController {
 
     private final ClientActivationService clientActivationService;
     private final AgentDirectoryService agentDirectoryService;
+    private final AuditService auditService;
 
     @PostMapping("/api/v1/clients/activation")
     @Operation(summary = "Register Client Activation Cash Payment", description = "The authenticated agent identifies the client by their login and registers the activation fee received in cash — checked against the agent's escrow ceiling (BR-03), same as a regular collection. Only finalizes (fee split + token issuance) once the client has also confirmed the payment.")
     public Mono<ClientActivationResponse> sponsor(@Valid @RequestBody SponsorActivationRequest request, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
                 .flatMap(agentId -> Mono.fromCallable(() -> clientActivationService.sponsorActivation(request.getLogin(), agentId))
-                        .subscribeOn(Schedulers.boundedElastic()));
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .doOnNext(result -> auditActivationSponsored(agentId, result)));
     }
 
     @GetMapping("/api/v1/clients/pending-activation")
@@ -82,15 +89,44 @@ public class ClientActivationController {
     public Mono<ClientActivationResponse> sponsorById(@PathVariable UUID clientId, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
                 .flatMap(agentId -> Mono.fromCallable(() -> clientActivationService.sponsorActivationById(clientId, agentId))
-                        .subscribeOn(Schedulers.boundedElastic()));
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .doOnNext(result -> auditActivationSponsored(agentId, result)));
     }
 
     @PostMapping("/api/v1/clients/me/activation/pay")
     @Operation(summary = "Confirm Activation Payment", description = "The authenticated client re-enters their PIN to confirm the agent's cash-receipt record is correct (BR-04). Only finalizes (fee split + token issuance) once an agent has also registered the payment.")
     public Mono<ClientActivationResponse> confirmPayment(@Valid @RequestBody ClientPaymentConfirmationRequest request, Mono<Authentication> authenticationMono) {
-        return resolveClientId(authenticationMono)
-                .flatMap(clientId -> Mono.fromCallable(() -> clientActivationService.confirmPayment(clientId, request))
-                        .subscribeOn(Schedulers.boundedElastic()));
+        return authenticationMono
+                .map(authentication -> ((ClientDetails) authentication.getPrincipal()).getClient())
+                .flatMap(client -> Mono.fromCallable(() -> clientActivationService.confirmPayment(client.getId(), request))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .doOnNext(result -> auditActivationPaymentConfirmed(client, result)));
+    }
+
+    private void auditActivationSponsored(UUID agentId, ClientActivationResponse result) {
+        var agentInfo = agentDirectoryService.findAuditInfo(agentId);
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.FINANCIAL)
+                .eventType("CLIENT_ACTIVATION_SPONSORED")
+                .actorType(AuditActorType.AGENT)
+                .actorId(agentId)
+                .actorLabel(agentInfo.username())
+                .branchId(agentInfo.branchId())
+                .agentId(agentId)
+                .details("Activation cash payment registered for client, status=" + result.getStatus() + ", reference=" + result.getPaymentReference())
+                .build());
+    }
+
+    private void auditActivationPaymentConfirmed(ClientProfile client, ClientActivationResponse result) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.COMPLIANCE)
+                .eventType("CLIENT_ACTIVATION_PAYMENT_CONFIRMED")
+                .actorType(AuditActorType.CLIENT)
+                .actorId(client.getId())
+                .actorLabel(client.getLogin())
+                .branchId(client.getBranchId())
+                .details("Activation payment confirmed, status=" + result.getStatus() + ", reference=" + result.getPaymentReference())
+                .build());
     }
 
     @GetMapping("/api/v1/admin/agents/{id}/activation-requests/pending")
@@ -121,7 +157,4 @@ public class ClientActivationController {
         return authenticationMono.map(authentication -> ((AgentDetails) authentication.getPrincipal()).getAgent().getId());
     }
 
-    private Mono<UUID> resolveClientId(Mono<Authentication> authenticationMono) {
-        return authenticationMono.map(authentication -> ((ClientDetails) authentication.getPrincipal()).getClient().getId());
-    }
 }

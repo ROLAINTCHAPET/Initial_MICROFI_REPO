@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
@@ -59,6 +60,23 @@ export default async function BranchSettingsPage({
           requireImei={branch.requireImei}
           defaultCeilingPct={branch.defaultCeilingPct}
         />
+      </div>
+
+      <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] p-6 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Icon name="location-on" className="size-5 text-primary" />
+          <h2 className="text-h2 text-primary">{dict.branches.geofenceBulk.sectionTitle}</h2>
+        </div>
+        <p className="text-sm text-on-surface-variant">{dict.branches.geofenceBulk.sectionHint}</p>
+        <div>
+          <Link
+            href={`/settings/geofence?branchId=${branch.id}`}
+            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold cursor-pointer whitespace-nowrap border-2 border-outline-variant text-primary hover:bg-surface-container-low transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+          >
+            <Icon name="pencil" className="size-5" />
+            {dict.branches.geofenceBulk.openButton}
+          </Link>
+        </div>
       </div>
     </div>
   );

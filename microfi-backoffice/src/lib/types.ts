@@ -5,7 +5,7 @@ export type AdminRole = "ADMIN" | "BRANCH_MANAGER" | "BRANCH_CASHIER";
 export type AgentStatus = "PENDING_CEILING" | "ACTIVE" | "SUSPENDED" | "DELETED";
 export type AdminUserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 export type ClientStatus = "ACTIVE" | "INACTIVE";
-export type VarianceDebtStatus = "OPEN" | "RESOLVED";
+export type VarianceDebtStatus = "OPEN" | "RESOLVED" | "WRITTEN_OFF";
 export type OfjSessionStatus = "OPEN" | "CLOSED";
 
 export interface AuthResponse {
@@ -108,6 +108,9 @@ export interface VarianceDebtResponse {
   amountXaf: number;
   status: VarianceDebtStatus;
   createdAt: string;
+  writtenOffReason: string | null;
+  writtenOffBy: string | null;
+  writtenOffAt: string | null;
 }
 
 export interface SosResponse {
@@ -129,6 +132,16 @@ export interface CollectionResponse {
   locationName: string | null;
   collectedAt: string;
   reconciledAt: string | null;
+  terminalId: string | null;
+}
+
+export interface ClientResponse {
+  id: string;
+  mfiMemberNo: string;
+  fullName: string;
+  phone: string;
+  branchId: string;
+  status: ClientStatus;
 }
 
 export interface RoutePointResponse {
@@ -204,6 +217,26 @@ export interface RegistrationApplicationResponse {
   // Set once, only in the direct response to PATCH /{id}/approve — never persisted or retrievable again.
   tempPassword: string | null;
   tempPin: string | null;
+}
+
+export type AuditCategory = "SECURITY" | "COMPLIANCE" | "FINANCIAL";
+export type AuditActorType = "ADMIN" | "AGENT" | "CLIENT" | "SYSTEM";
+export type AuditStatus = "SUCCESS" | "FAILED";
+
+export interface AuditLogResponse {
+  id: string;
+  occurredAt: string;
+  category: AuditCategory;
+  eventType: string;
+  actorType: AuditActorType;
+  actorLabel: string;
+  actorRole: AdminRole | null;
+  branchId: string | null;
+  branchLabel: string | null;
+  agentId: string | null;
+  agentLabel: string | null;
+  details: string;
+  status: AuditStatus;
 }
 
 export interface ApiError {

@@ -15,6 +15,8 @@ public interface ClientProfileRepository extends JpaRepository<ClientProfile, UU
 
     boolean existsByMfiMemberNo(String mfiMemberNo);
 
+    Optional<ClientProfile> findByMfiMemberNo(String mfiMemberNo);
+
     Optional<ClientProfile> findByCbsRef(String cbsRef);
 
     Optional<ClientProfile> findByLogin(String login);

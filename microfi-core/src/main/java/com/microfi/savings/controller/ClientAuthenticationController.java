@@ -1,6 +1,12 @@
 package com.microfi.savings.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.domain.AuditStatus;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.savings.ClientDetails;
+import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.service.ClientActivationService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.JwtService;
@@ -39,6 +45,7 @@ public class ClientAuthenticationController {
     private final ClientDetailsService clientDetailsService;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     @PostMapping("/activate")
     @Operation(summary = "Self-Activation Step 1", description = "Client enters their CBS Activation ID and sets their own login/PIN. Awaits agent sponsorship for the fee split and token issuance (UC-19).")
@@ -54,15 +61,51 @@ public class ClientAuthenticationController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .cast(ClientDetails.class)
                 .flatMap(clientDetails -> {
+                    ClientProfile client = clientDetails.getClient();
                     if (!passwordEncoder.matches(request.getPin(), clientDetails.getPassword())) {
+                        auditClientLogin(client, request.getLogin(), AuditStatus.FAILED, "Login failed: invalid credentials");
                         return Mono.error(new InvalidCredentialsException("Invalid credentials"));
                     }
                     Map<String, Object> extraClaims = new HashMap<>();
                     extraClaims.put(JwtService.PRINCIPAL_TYPE_CLAIM, JwtService.PRINCIPAL_TYPE_CLIENT);
                     String token = jwtService.generateToken(extraClaims, clientDetails);
+                    auditClientLogin(client, request.getLogin(), AuditStatus.SUCCESS, "Login succeeded");
                     return Mono.just(AuthResponse.builder().token(token).build());
                 })
-                .onErrorResume(InvalidCredentialsException.class, Mono::error)
-                .onErrorResume(e -> Mono.error(new InvalidCredentialsException("Authentication failed: " + e.getMessage())));
+                .onErrorResume(e -> {
+                    // A single conditional handler — InvalidCredentialsException from the flatMap
+                    // above is already audited there; re-auditing it here (via a second, unconditional
+                    // onErrorResume catching what the first one re-throws) would double-write the entry.
+                    if (e instanceof InvalidCredentialsException) {
+                        return Mono.error(e);
+                    }
+                    auditFailedClientLogin(request.getLogin(), e.getMessage());
+                    return Mono.error(new InvalidCredentialsException("Authentication failed: " + e.getMessage()));
+                });
+    }
+
+    private void auditClientLogin(ClientProfile client, String attemptedLogin, AuditStatus status, String details) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("CLIENT_LOGIN")
+                .actorType(AuditActorType.CLIENT)
+                .actorId(client.getId())
+                .actorLabel(attemptedLogin)
+                .branchId(client.getBranchId())
+                .details(details)
+                .status(status)
+                .build());
+    }
+
+    /** No client resolved — an unrecognized login never reaches a ClientProfile, only the attempted login is known. */
+    private void auditFailedClientLogin(String attemptedLogin, String reason) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("CLIENT_LOGIN")
+                .actorType(AuditActorType.CLIENT)
+                .actorLabel(attemptedLogin)
+                .details("Login failed: " + reason)
+                .status(AuditStatus.FAILED)
+                .build());
     }
 }

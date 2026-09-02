@@ -35,6 +35,7 @@ void main() {
     int amountXaf = 15000,
     String? collectedAtIso,
     String pin = '4821',
+    String terminalId = 'it-terminal-1',
   }) =>
       PendingCollection(
         deviceTxId: deviceTxId,
@@ -47,6 +48,7 @@ void main() {
         collectedAtIso: collectedAtIso ?? DateTime.now().toUtc().toIso8601String(),
         denominationLines: [DenominationLine(faceValueXaf: 5000, quantity: amountXaf ~/ 5000)],
         pin: pin,
+        terminalId: terminalId,
       );
 
   group('OfflineQueueRepository (real SQLCipher)', () {

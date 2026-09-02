@@ -15,4 +15,7 @@ public class VarianceDebtResponse {
     private long amountXaf;
     private String status;
     private Instant createdAt;
+    private String writtenOffReason;
+    private UUID writtenOffBy;
+    private Instant writtenOffAt;
 }

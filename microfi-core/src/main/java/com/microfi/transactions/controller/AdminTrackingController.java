@@ -1,5 +1,9 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.GeofenceAlertResponse;
@@ -45,6 +49,7 @@ public class AdminTrackingController {
     private final TrackingService trackingService;
     private final GeofenceService geofenceService;
     private final AgentDirectoryService agentDirectoryService;
+    private final AuditService auditService;
 
     @GetMapping("/route")
     @Operation(summary = "Historical Route", description = "An agent's ordered GPS trail plus that day's collection markers (UC-11, FR-11). BR-Route-01: own branch only, unless ADMIN.")
@@ -73,8 +78,21 @@ public class AdminTrackingController {
                                                Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono)
                 .flatMap(caller -> Mono.fromCallable(() -> {
-                    AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(id));
-                    return geofenceService.setGeofence(id, request);
+                    UUID branchId = agentDirectoryService.requireBranchIdForAgent(id);
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    GeofenceResponse result = geofenceService.setGeofence(id, request);
+                    auditService.record(AuditLogEntry.builder()
+                            .category(AuditCategory.SECURITY)
+                            .eventType("AGENT_GEOFENCE_SET")
+                            .actorType(AuditActorType.ADMIN)
+                            .actorId(caller.getAdminUser().getId())
+                            .actorLabel(caller.getAdminUser().getLogin())
+                            .actorRole(caller.getAdminUser().getRole())
+                            .branchId(branchId)
+                            .agentId(id)
+                            .details("Geofence perimeter set/updated (" + request.getVertices().size() + " vertices)")
+                            .build());
+                    return result;
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 

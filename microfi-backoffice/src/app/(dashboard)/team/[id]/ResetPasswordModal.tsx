@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
+import { ActionCard } from "@/components/ActionCard";
 import { Icon } from "@/components/Icon";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 
@@ -50,10 +51,12 @@ export function ResetPasswordModal({ userId, login }: { userId: string; login: s
 
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>
-        <Icon name="lock" className="size-5" />
-        {dict.team.resetPassword.button}
-      </Button>
+      <ActionCard
+        icon="lock"
+        title={dict.team.resetPassword.button}
+        description={dict.team.resetPassword.cardDescription}
+        onClick={() => setOpen(true)}
+      />
       <Modal open={open} onClose={close} title={dict.team.resetPassword.title}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="text-sm text-on-surface-variant">

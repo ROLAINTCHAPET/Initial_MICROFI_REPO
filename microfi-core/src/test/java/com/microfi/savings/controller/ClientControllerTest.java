@@ -15,6 +15,7 @@ import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.domain.ClientStatus;
 import com.microfi.savings.repository.ClientProfileRepository;
 import com.microfi.savings.service.ClientDetailsService;
+import com.microfi.transactions.service.CollectionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
@@ -42,6 +43,9 @@ class ClientControllerTest {
 
     @MockitoBean
     private ClientProfileRepository clientProfileRepository;
+
+    @MockitoBean
+    private CollectionService collectionService;
 
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.

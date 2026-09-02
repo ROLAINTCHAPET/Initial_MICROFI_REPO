@@ -1,5 +1,6 @@
 package com.microfi.savings.controller;
 
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
@@ -37,6 +38,9 @@ class ClientAuthenticationControllerTest {
     private ClientActivationService clientActivationService;
 
     @MockitoBean
+    private AuditService auditService;
+
+    @MockitoBean
     private ClientDetailsService clientDetailsService;
 
     @MockitoBean
@@ -62,7 +66,7 @@ class ClientAuthenticationControllerTest {
         webTestClient.post()
                 .uri("/api/v1/auth/client/activate")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"activationId\":\"ACT-1\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
+                .bodyValue("{\"mfiIdentifier\":\"M001\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -70,14 +74,14 @@ class ClientAuthenticationControllerTest {
     }
 
     @Test
-    void testActivateUnverifiedRejected() {
+    void testActivateUnknownMfiIdentifierRejected() {
         when(clientActivationService.selfActivate(any()))
-                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Activation ID not recognised"));
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "'BAD' isn't a recognised MICROFI account number"));
 
         webTestClient.post()
                 .uri("/api/v1/auth/client/activate")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"activationId\":\"BAD\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
+                .bodyValue("{\"mfiIdentifier\":\"BAD\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
                 .exchange()
                 .expectStatus().isNotFound();
     }
@@ -87,7 +91,7 @@ class ClientAuthenticationControllerTest {
         webTestClient.post()
                 .uri("/api/v1/auth/client/activate")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"activationId\":\"ACT-1\",\"login\":\"jean.client\",\"pin\":\"abc\"}")
+                .bodyValue("{\"mfiIdentifier\":\"M001\",\"login\":\"jean.client\",\"pin\":\"abc\"}")
                 .exchange()
                 .expectStatus().isBadRequest();
     }

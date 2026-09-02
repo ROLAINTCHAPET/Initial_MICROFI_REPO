@@ -86,6 +86,8 @@ services:
       - REGISTRATION_DOCUMENTS_STORAGE_PATH=/data/registration-documents
       # Escrow top-up deposit proof — same mounted volume, sibling subfolder, no new volume needed.
       - ESCROW_DEPOSIT_PROOFS_STORAGE_PATH=/data/registration-documents/escrow-deposit-proofs
+      # Variance-debt write-off proof — same pattern, same shared volume.
+      - VARIANCE_WRITE_OFF_PROOFS_STORAGE_PATH=/data/registration-documents/variance-write-off-proofs
     volumes:
       - registration_documents:/data/registration-documents
     ports:
@@ -147,8 +149,95 @@ services:
       - microfi-core
       - redis
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: microfi_prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      # Host port 9091, not 9090 — this machine already has an unrelated project's own Prometheus
+      # bound to 9090 (xcsm-v2-back); scraping itself happens over the internal Docker network
+      # regardless of this host mapping.
+      - "9091:9090"
+    restart: unless-stopped
+    depends_on:
+      - microfi-core
+      - microfi-middleware
+
+  loki:
+    image: grafana/loki:latest
+    container_name: microfi_loki
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    ports:
+      # Host port 3101, not 3100 — this machine already has an unrelated project's own Loki bound
+      # to 3100 (~/Downloads/template); log ingestion itself happens over the internal Docker
+      # network regardless of this host mapping.
+      - "3101:3100"
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: microfi_promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      # Docker log-shipping agent's standard pattern: reads the host's container log files
+      # directly, and the socket to discover which containers exist and their compose labels
+      # (read-only — never issues any control commands to the daemon).
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  tempo:
+    # Pinned, not :latest — v3.0 restructured the config schema in a breaking way; 2.6.1 matches
+    # the well-documented monolithic-mode config this repo uses (tempo/tempo.yml).
+    image: grafana/tempo:2.6.1
+    container_name: microfi_tempo
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo query API — used by Grafana's Tempo datasource
+      - "4318:4318"   # OTLP HTTP receiver — microfi-core/microfi-middleware export spans here
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: microfi_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # First-run only — doesn't reset the password on every restart once an admin has changed it.
+      - GF_SECURITY_ADMIN_PASSWORD_RESET=false
+      # Trace-to-logs correlation (Tempo datasource -> Loki) is a beta panel feature.
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      # Host port 3300 — this machine's Next.js dev server already occupies 3001 (after 3000 was
+      # taken by that same unrelated xcsm-v2-back Grafana instance), so this stays clearly distinct.
+      - "3300:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
   registration_documents:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  tempo_data:

@@ -1,5 +1,8 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -20,6 +23,7 @@ import com.microfi.transactions.service.OfjService;
 import com.microfi.shared.dto.EscrowResponse;
 import com.microfi.shared.dto.VarianceDebtResponse;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
@@ -36,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -52,6 +57,9 @@ class AgentManagementControllerTest {
 
     @MockitoBean
     private AgentRepository agentRepository;
+
+    @MockitoBean
+    private AuditService auditService;
 
     @MockitoBean
     private BranchRepository branchRepository;
@@ -299,6 +307,12 @@ class AgentManagementControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("SUSPENDED");
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.ADMIN);
+        assertThat(captor.getValue().getAgentId()).isEqualTo(id);
+        assertThat(captor.getValue().getEventType()).isEqualTo("AGENT_SUSPENDED");
     }
 
     @Test

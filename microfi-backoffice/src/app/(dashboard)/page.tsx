@@ -120,15 +120,18 @@ export default async function RegionalDashboardPage() {
         subtitle={homeBranch ? t(dict.dashboard.branchSubtitle, { name: homeBranch.name, code: homeBranch.code }) : dict.dashboard.regionSubtitle}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${session?.role === "BRANCH_CASHIER" ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         <StatCard icon="agents" label={dict.dashboard.totalAgents} value={agents.length.toLocaleString()} />
         <StatCard icon="check-circle" label={dict.dashboard.activeAgents} value={activeCount.toLocaleString()} />
-        <StatCard icon="lock" label={dict.dashboard.totalEscrow} value={formatCompactXaf(totalEscrow)} />
+        {/* A cashier reconciles cash, they don't oversee escrow funding — same restriction as /tracking. */}
+        {session?.role !== "BRANCH_CASHIER" && (
+          <StatCard icon="lock" label={dict.dashboard.totalEscrow} value={formatCompactXaf(totalEscrow)} />
+        )}
         <StatCard icon="bell" label={dict.dashboard.unresolvedSos} value={unresolvedSos.length.toLocaleString()} alert={unresolvedSos.length > 0} href="/sos" />
       </div>
 
       {homeBranch && (
-        <div className={`grid grid-cols-1 gap-4 ${session?.role === "BRANCH_CASHIER" ? "md:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-4 ${session?.role === "BRANCH_CASHIER" || session?.role === "BRANCH_MANAGER" ? "md:grid-cols-2" : ""}`}>
           <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] p-5 flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-3">
@@ -173,7 +176,8 @@ export default async function RegionalDashboardPage() {
             )}
           </div>
 
-          {session?.role === "BRANCH_CASHIER" && (
+          {/* A manager oversees everything a cashier at their branch does, including reconciliation — same shortcut, not cashier-exclusive. */}
+          {(session?.role === "BRANCH_CASHIER" || session?.role === "BRANCH_MANAGER") && (
             <div
               className={`border-2 rounded-[var(--radius-md)] p-5 flex items-center justify-between gap-4 flex-wrap ${
                 pendingReconciliation > 0 ? "bg-tertiary-fixed/20 border-tertiary-fixed-dim/60" : "bg-surface-container-lowest border-outline-variant"
@@ -324,12 +328,18 @@ export default async function RegionalDashboardPage() {
       </div>
 
       {session?.role === "ADMIN" && (
-        <BranchesWorkspace
-          scheduleDefaults={scheduleDefaults}
-          editable
-          branches={branchRows}
-          actions={<CreateBranchModal />}
-        />
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 pt-2 border-t-2 border-outline-variant">
+            <Icon name="shield-check" className="size-5 text-primary" />
+            <h2 className="text-h1 text-primary">{dict.dashboard.administrationSectionTitle}</h2>
+          </div>
+          <BranchesWorkspace
+            scheduleDefaults={scheduleDefaults}
+            editable
+            branches={branchRows}
+            actions={<CreateBranchModal />}
+          />
+        </div>
       )}
     </div>
   );

@@ -17,16 +17,14 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
 
     Optional<Collection> findByAgentIdAndDeviceTxId(UUID agentId, String deviceTxId);
 
-    @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
-            + "WHERE c.agentId = :agentId AND c.collectedAt >= :start AND c.collectedAt < :end")
-    long sumAmountByAgentAndWindow(@Param("agentId") UUID agentId, @Param("start") Instant start, @Param("end") Instant end);
-
     /**
-     * UC-16: what OfjService#reconcile actually sums as an agent's digital total — every
-     * collection not yet swept into a reconciliation, regardless of which calendar day it was
-     * collected on. This is what makes a multi-day-offline agent's backlog reconcilable at all
-     * once it finally syncs; {@link #sumAmountByAgentAndWindow} alone would silently never count
-     * a collection whose collectedAt has already rolled past "today" by the time it arrives.
+     * UC-16 / BR-03: every collection not yet swept into a reconciliation, regardless of which
+     * calendar day it was collected on — both what OfjService#reconcile sums as an agent's
+     * digital total, and (via CollectionService#enforceEscrowCeiling) their current cash-in-hand
+     * against the escrow ceiling. A day-window sum alone would silently never count a collection
+     * whose collectedAt has already rolled past "today" by the time a multi-day-offline agent's
+     * backlog finally syncs, and would keep counting cash the agent no longer holds once it's
+     * been reconciled.
      */
     @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
             + "WHERE c.agentId = :agentId AND c.reconciledAt IS NULL AND c.collectedAt < :cutoff")
@@ -49,4 +47,7 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
 
     /** UC-09-adjacent: a client's own recent collections, newest first — see CollectionDirectoryService#findRecentByClient. */
     List<Collection> findTop50ByClientIdOrderByCollectedAtDesc(UUID clientId);
+
+    /** Back-Office client transactions export — every collection recorded against this client within an arbitrary [from, to) window. */
+    List<Collection> findByClientIdAndCollectedAtBetween(UUID clientId, Instant start, Instant end);
 }

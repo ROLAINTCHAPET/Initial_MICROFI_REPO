@@ -38,7 +38,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   return (
     <div>
       <p className="text-xs text-on-surface-variant uppercase tracking-widest font-semibold">{label}</p>
-      <p className="text-sm text-on-surface">{value || "—"}</p>
+      <p className="text-sm text-on-surface">{value || "N/A"}</p>
     </div>
   );
 }
@@ -69,15 +69,23 @@ export default async function RegistrationApplicationDetailPage({ params }: { pa
         subtitle={`${ROLE_LABEL[application.targetRole]} · ${branch ? `${branch.name} (${branch.code})` : application.branchId}`}
       />
 
-      <div className="flex items-center justify-between">
-        <Badge status={badgeStatus} label={badgeLabel} />
-        {application.status === "SUBMITTED" && canReview && (
+      {application.status === "SUBMITTED" && canReview ? (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-[var(--radius-md)] border-2 border-primary/40 bg-primary-container/10">
+          <div className="flex items-center gap-3">
+            <Icon name="shield-check" className="size-5 text-primary" />
+            <div>
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider">{dict.registrations.detail.pendingReviewLabel}</p>
+              <Badge status={badgeStatus} label={badgeLabel} />
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <ApproveButton applicationId={application.id} login={application.login} targetRole={application.targetRole} />
             <RejectApplicationModal applicationId={application.id} />
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <Badge status={badgeStatus} label={badgeLabel} />
+      )}
 
       {application.status === "REJECTED" && (
         <div className="p-4 rounded-[var(--radius-sm)] border-2 border-danger-red/40 bg-error-container/10">

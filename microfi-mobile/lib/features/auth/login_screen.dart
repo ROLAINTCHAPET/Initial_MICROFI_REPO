@@ -6,6 +6,7 @@ import '../../core/location.dart';
 import '../../core/session_entry.dart';
 import '../../core/session_storage.dart';
 import 'auth_repository.dart';
+import 'forgot_password_screen.dart';
 import '../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -168,6 +169,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
                                 : Text(l10n.clSignInButton),
+                          ),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton(
+                              onPressed: _loading
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                        MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                                      ),
+                              child: Text(l10n.lgForgotPasswordLink),
+                            ),
                           ),
                         ],
                       ),

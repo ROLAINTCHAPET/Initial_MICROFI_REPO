@@ -88,7 +88,7 @@ function BranchRowItem({ branch }: { branch: BranchRow }) {
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-text-slate">{t(dict.branches.directory.idLabel, { code: branch.code })}</span>
             <span className="text-xs text-outline-variant">&middot;</span>
-            <span className="text-xs text-text-slate">{branch.timezone ?? "—"}</span>
+            <span className="text-xs text-text-slate">{branch.timezone ?? "N/A"}</span>
           </div>
         </div>
       </div>

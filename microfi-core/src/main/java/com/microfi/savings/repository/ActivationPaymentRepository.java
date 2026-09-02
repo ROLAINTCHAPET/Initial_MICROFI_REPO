@@ -17,11 +17,7 @@ public interface ActivationPaymentRepository extends JpaRepository<ActivationPay
 
     List<ActivationPayment> findByTag(PaymentTag tag);
 
-    @Query("SELECT COALESCE(SUM(p.amountXaf), 0) FROM ActivationPayment p "
-            + "WHERE p.agentId = :agentId AND p.paidAt >= :start AND p.paidAt < :end")
-    long sumAmountByAgentAndWindow(@Param("agentId") UUID agentId, @Param("start") Instant start, @Param("end") Instant end);
-
-    /** UC-16: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
+    /** UC-16 / BR-03: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
     @Query("SELECT COALESCE(SUM(p.amountXaf), 0) FROM ActivationPayment p "
             + "WHERE p.agentId = :agentId AND p.reconciledAt IS NULL AND p.paidAt < :cutoff")
     long sumUnreconciledByAgent(@Param("agentId") UUID agentId, @Param("cutoff") Instant cutoff);

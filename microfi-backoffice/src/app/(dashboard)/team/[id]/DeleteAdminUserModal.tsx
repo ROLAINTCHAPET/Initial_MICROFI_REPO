@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { Icon } from "@/components/Icon";
+import { ActionCard } from "@/components/ActionCard";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 
@@ -44,10 +44,13 @@ export function DeleteAdminUserModal({ userId }: { userId: string }) {
 
   return (
     <>
-      <Button variant="danger" onClick={() => setOpen(true)}>
-        <Icon name="warning" className="size-5" />
-        {dict.team.deleteAccount.button}
-      </Button>
+      <ActionCard
+        icon="warning"
+        title={dict.team.deleteAccount.button}
+        description={dict.team.deleteAccount.cardDescription}
+        danger
+        onClick={() => setOpen(true)}
+      />
       <Modal open={open} onClose={() => setOpen(false)} title={dict.team.deleteAccount.modalTitle}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="text-sm text-on-surface-variant">{dict.team.deleteAccount.warning}</p>

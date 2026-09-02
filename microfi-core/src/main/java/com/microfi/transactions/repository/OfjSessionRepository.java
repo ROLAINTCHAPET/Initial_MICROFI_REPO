@@ -16,4 +16,7 @@ public interface OfjSessionRepository extends JpaRepository<OfjSession, UUID> {
 
     /** For the Back-Office reports/history screen — past sessions, most recent business date first. */
     List<OfjSession> findByBranchIdOrderByBusinessDateDesc(UUID branchId);
+
+    /** Same history screen, scoped to a chosen period (BR: every export honors the period the user picked). */
+    List<OfjSession> findByBranchIdAndBusinessDateBetweenOrderByBusinessDateDesc(UUID branchId, LocalDate from, LocalDate to);
 }

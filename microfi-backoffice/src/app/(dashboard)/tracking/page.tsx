@@ -2,6 +2,7 @@ import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { EmptyState } from "@/components/Table";
 import type { AgentResponse, BranchResponse, EscrowResponse, GeofenceAlertResponse, RouteResponse } from "@/lib/types";
 import { TrackingWorkspace, type TrackingAgent } from "./TrackingWorkspace";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -9,8 +10,15 @@ import { getLocale } from "@/lib/i18n/locale";
 
 export default async function TrackingPage() {
   const dict = getDictionary(await getLocale());
-  const [session, allAgents, branches] = await Promise.all([
-    getSession(),
+  const session = await getSession();
+
+  // A cashier reconciles cash, not field movement — live tracking is an oversight tool for
+  // ADMIN/BRANCH_MANAGER only, same restriction as Settings and Registrations.
+  if (session?.role === "BRANCH_CASHIER") {
+    return <EmptyState>{dict.tracking.page.accessDenied}</EmptyState>;
+  }
+
+  const [allAgents, branches] = await Promise.all([
     api.get<AgentResponse[]>("/admin/agents"),
     api.get<BranchResponse[]>("/admin/branches"),
   ]);
@@ -42,7 +50,7 @@ export default async function TrackingPage() {
         fullName: agent.fullName,
         employeeCode: agent.employeeCode,
         phone: agent.phone,
-        branchName: branchById.get(agent.branchId)?.name ?? "—",
+        branchName: branchById.get(agent.branchId)?.name ?? "N/A",
         status: agent.status,
         balanceXaf: escrows[i]?.balanceXaf ?? null,
         lastPingAt: points.length > 0 ? points[points.length - 1].recordedAt : null,
@@ -58,13 +66,11 @@ export default async function TrackingPage() {
       return 0;
     });
 
-  const canEditGeofence = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
-
   return (
     <div className="max-w-7xl mx-auto w-full h-full flex flex-col gap-6">
       <AutoRefresh />
       <PageHeader title={dict.sidebar.geolocation} subtitle={dict.tracking.page.subtitle} />
-      <TrackingWorkspace agents={trackingAgents} canEditGeofence={canEditGeofence} />
+      <TrackingWorkspace agents={trackingAgents} />
     </div>
   );
 }

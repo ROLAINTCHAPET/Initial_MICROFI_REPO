@@ -46,10 +46,11 @@
       "OPEN": "Open",
       "CLOSED": "Closed",
       "RESOLVED": "Resolved",
-      "ACKNOWLEDGED": "Acknowledged"
+      "ACKNOWLEDGED": "Acknowledged",
+      "WRITTEN_OFF": "Written Off"
     },
     "gauge": {
-      "ceilingReached": "Ceiling reached — new collections blocked",
+      "ceilingReached": "Ceiling reached: new collections blocked",
       "ceilingReachedAria": "Ceiling reached, collections blocked"
     },
     "timePicker": {
@@ -60,17 +61,27 @@
       "ampm": "AM or PM"
     }
   },
+  "export": {
+    "pdf": "Export PDF",
+    "excel": "Export Excel",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "scopeAllBranches": "All branches"
+  },
   "sidebar": {
     "brandName": "Microfi Admin",
     "brandSubtitle": "Regional Operations",
     "collectCash": "Collect Cash",
     "dashboard": "Dashboard",
     "agents": "Agents",
+    "clients": "Clients",
     "team": "Team",
     "geolocation": "Geolocation",
     "endOfDayOversight": "End of Day Oversight",
     "sosConsole": "SOS Console",
     "registrations": "Registrations",
+    "audit": "Audit",
     "settings": "Settings"
   },
   "login": {
@@ -119,9 +130,11 @@
     "colPhysicalTotal": "Physical Total",
     "colDelta": "Delta",
     "colStatus": "Status",
-    "noReconciliations": "No reconciliations recorded in the last 48 hours."
+    "noReconciliations": "No reconciliations recorded in the last 48 hours.",
+    "administrationSectionTitle": "Network Administration"
   },
   "agents": {
+    "backToAgents": "Back to Agents",
     "overviewTitle": "Agents Overview",
     "overviewSubtitleAdmin": "Manage field agents and monitor escrow levels.",
     "overviewSubtitleBranch": "Manage your branch's field agents and monitor escrow levels.",
@@ -144,10 +157,16 @@
     "viewProfile": "View Profile",
     "noAgentsYet": "No agents enrolled yet.",
     "noAgentsMatch": "No agents match your search.",
+    "unassignedBranch": "Unassigned",
+    "allBranches": "All branches",
+    "viewThisBranchOnly": "View only this branch",
+    "branchGroupCountSingular": "{count} agent",
+    "branchGroupCountPlural": "{count} agents",
     "agentLabel": "Agent: {id}",
     "fieldAgentLabel": "Field Agent",
     "detail": {
       "breadcrumbAgents": "Agents",
+      "backToAgent": "Back to agent",
       "escrowBalance": "Escrow Balance",
       "nearLimit": "Near Limit",
       "collectedTodayXaf": "Collected Today (XAF)",
@@ -155,9 +174,9 @@
       "utilization": "{pct}% Utilization",
       "escrowUnavailable": "Escrow data unavailable.",
       "fundedCeilingBase": "Funded ceiling (base):",
-      "neverFunded": "Never funded — use Fund Escrow",
+      "neverFunded": "Never funded: use Fund Escrow",
       "activeWaiver": "Active waiver:",
-      "validUntilSuffix": " — valid until {date}",
+      "validUntilSuffix": ", valid until {date}",
       "status": "Status",
       "username": "Username",
       "phone": "Phone",
@@ -169,32 +188,51 @@
       "transactionPin": "Transaction PIN",
       "pinNotSet": "Not yet set by agent",
       "pinSet": "Set",
-      "lastDeviceReset": "Last Device Reset"
+      "lastDeviceReset": "Last Device Reset",
+      "tabs": {
+        "overview": "Overview",
+        "administration": "Administration"
+      },
+      "managementActions": "Management Actions",
+      "criticalActions": "Critical Actions"
     },
     "collections": {
       "title": "Collections Ledger",
-      "dateLabel": "Date",
       "loading": "Loading collections…",
       "error": "Unable to load collections.",
-      "empty": "No collections recorded on this day.",
+      "empty": "No collections recorded in this period.",
+      "emptyHistory": "No collections recorded yet.",
       "unknownClient": "Unknown client",
       "reconciled": "Reconciled",
       "notReconciled": "Not yet reconciled",
       "totalLabel": "Total collected: {value} XAF",
       "colClient": "Client",
       "colAmount": "Amount",
-      "colTime": "Time",
-      "colStatus": "Status"
+      "colDate": "Date & Time",
+      "colStatus": "Status",
+      "colTerminal": "Terminal"
     },
     "resetDeviceBinding": {
       "button": "Reset Device Binding",
       "title": "Reset Device Binding",
-      "warning": "This clears the agent's bound device. They will not be able to log in until their next successful login — from whichever phone they use — binds it automatically. No code or secret needs to be handed to them.",
+      "warning": "This clears the agent's bound device. They will not be able to log in until their next successful login, from whichever phone they use, binds it automatically. No code or secret needs to be handed to them.",
       "reasonLabel": "Reason (lost/replaced device, etc.)",
       "reasonPlaceholder": "Provide a mandatory reason for this device reset...",
       "resetting": "Resetting…",
       "resetDone": "Device Binding Reset",
-      "failedToReset": "Failed to reset device binding"
+      "failedToReset": "Failed to reset device binding",
+      "cardDescription": "Clear the bound device so a new one can bind on next login."
+    },
+    "resetPassword": {
+      "failedToReset": "Failed to reset password",
+      "button": "Reset Password",
+      "title": "Reset Password",
+      "descriptionPrefix": "Set a new login password for",
+      "descriptionSuffix": ". This also clears any active login lockout. They will need to sign in with it next time. No confirmation from their current password is required, and this does not touch their transaction PIN.",
+      "newPasswordLabel": "New Password (min. 8 characters)",
+      "resetDone": "Reset",
+      "setNewPassword": "Set New Password",
+      "cardDescription": "Set a new login password for the agent."
     },
     "suspend": {
       "confirmSuspend": "Suspend this agent? This immediately invalidates their active session.",
@@ -202,7 +240,9 @@
       "done": "Done",
       "suspendAgent": "Suspend Agent",
       "reactivateAgent": "Reactivate Agent",
-      "fundBeforeReactivate": "Fund this agent's escrow account before reactivating."
+      "fundBeforeReactivate": "Fund this agent's escrow account before reactivating.",
+      "suspendDescription": "Temporarily block system access.",
+      "reactivateDescription": "Restore the agent's access to the system."
     },
     "deleteAgent": {
       "button": "Delete Agent",
@@ -212,7 +252,8 @@
       "reasonPlaceholder": "e.g. No longer employed by the MFI",
       "confirm": "Delete Agent",
       "failedToDelete": "Failed to delete agent",
-      "deletionFailedTitle": "Deletion Failed"
+      "deletionFailedTitle": "Deletion Failed",
+      "cardDescription": "Permanent revocation and account closure."
     },
     "deletedBanner": {
       "title": "This agent has been deleted",
@@ -223,42 +264,82 @@
       "failedToFund": "Failed to fund escrow account",
       "fundEscrow": "Fund Escrow",
       "fundEscrowAccount": "Fund Escrow Account",
-      "infoCredit": "This credits the agent's wallet and permanently raises their escrow ceiling by the same amount — this is different from a temporary waiver.",
+      "infoCredit": "This credits the agent's wallet and permanently raises their escrow ceiling by the same amount. This is different from a temporary waiver.",
       "infoPendingCeiling": " This agent is PENDING_CEILING: funding their escrow for the first time activates them automatically.",
       "topUpAmount": "Top-Up Amount (XAF)",
       "paymentReference": "Payment Reference",
       "paymentReferencePlaceholder": "e.g. cashier receipt number",
       "proofOfDeposit": "Proof of Deposit",
       "proofAriaLabel": "Proof of cash deposit",
-      "proofHelp": "Receipt, deposit slip, or counted-cash acknowledgment — required for every top-up.",
+      "proofHelp": "Receipt, deposit slip, or counted-cash acknowledgment, required for every top-up.",
       "funding": "Funding…",
-      "funded": "Funded"
+      "funded": "Funded",
+      "cardDescription": "Add funds to the agent's account."
     },
     "waiver": {
       "temporaryWaiver": "Temporary Waiver",
       "temporaryCeilingWaiver": "Temporary Ceiling Waiver",
       "failedToApply": "Failed to apply waiver",
-      "infoCurrent": "Current effective ceiling is {value} XAF. A waiver temporarily overrides this limit to prevent collection blocking — it does not credit the agent's wallet and cannot activate a PENDING_CEILING agent. To actually fund the account, use \"Fund Escrow\" instead.",
+      "infoCurrent": "Current effective ceiling is {value} XAF. A waiver temporarily overrides this limit to prevent collection blocking. It does not credit the agent's wallet and cannot activate a PENDING_CEILING agent. To actually fund the account, use \"Fund Escrow\" instead.",
       "tempCeilingAmount": "Temporary Ceiling Amount (XAF)",
       "validUntilLabel": "Valid Until",
       "reasonLabel": "Reason for Waiver",
       "reasonPlaceholder": "Provide a mandatory business justification for this temporary increase...",
       "applying": "Applying…",
       "approveWaiver": "Approve Waiver",
-      "waiverApplied": "Waiver Applied"
+      "waiverApplied": "Waiver Applied",
+      "cardDescription": "Temporarily override the transaction limit."
+    }
+  },
+  "clients": {
+    "pageTitle": "Clients",
+    "pageSubtitle": "Look up a client to review and export their transaction history.",
+    "searchPlaceholder": "Search by name, phone, or member number…",
+    "noBranches": "No branches exist yet.",
+    "viewingBranch": "Viewing branch",
+    "branchFallback": "Branch",
+    "colName": "Name",
+    "colMemberNo": "Member No.",
+    "colPhone": "Phone",
+    "colStatus": "Status",
+    "noClients": "No clients found for this branch.",
+    "noMatches": "No clients match this search.",
+    "backToClients": "Back to Clients",
+    "detail": {
+      "memberNo": "Member No.",
+      "phone": "Phone",
+      "branch": "Branch",
+      "status": "Status",
+      "transactionsTitle": "Transactions"
+    },
+    "transactions": {
+      "loading": "Loading transactions…",
+      "error": "Unable to load transactions.",
+      "empty": "No transactions recorded in this period.",
+      "colAgent": "Agent",
+      "colAmount": "Amount",
+      "colDate": "Date & Time",
+      "colStatus": "Status",
+      "colTerminal": "Terminal",
+      "totalLabel": "Total collected: {value} XAF",
+      "reconciled": "Reconciled",
+      "notReconciled": "Not yet reconciled",
+      "unknownAgent": "Unknown agent",
+      "exportTitle": "Client Transactions"
     }
   },
   "settings": {
     "pageTitle": "Branch Settings",
     "accessDenied": "Branch settings are only available to an Administrator or a branch's own manager.",
-    "noBranchesYet": "No branches exist yet — create one first.",
+    "noBranchesYet": "No branches exist yet. Create one first.",
     "branchNotFound": "Your branch could not be found.",
-    "viewingBranch": "Viewing branch"
+    "viewingBranch": "Viewing branch",
+    "backToSettings": "Back to Settings"
   },
   "cashier": {
     "title": "Cashier Portal",
     "subtitle": "Physical cash count & end-of-day reconciliation.",
-    "noBranchesYet": "No branches exist yet — create one first.",
+    "noBranchesYet": "No branches exist yet. Create one first.",
     "viewingBranch": "Viewing branch",
     "branchFallback": "Branch",
     "reconcile": {
@@ -272,8 +353,8 @@
       "posted": "Posted",
       "posting": "Posting…",
       "verifyAndPost": "Verify & Post",
-      "opensAfterClosingTime": "Opens after closing time{time} — the day's cash isn't all in yet.",
-      "reconciliationOpensAfterClosing": "Reconciliation opens after the branch's closing time{time} — the day's cash isn't all in yet.",
+      "opensAfterClosingTime": "Opens after closing time{time}. The day's cash isn't all in yet.",
+      "reconciliationOpensAfterClosing": "Reconciliation opens after the branch's closing time{time}. The day's cash isn't all in yet.",
       "failedToReconcile": "Failed to reconcile",
       "shortageUnresolvedNotice": "A shortage will remain unresolved until a manager records it as a variance debt from End of Day Oversight.",
       "selectAgentPrompt": "Select an agent from the queue to begin reconciliation.",
@@ -304,11 +385,11 @@
   "ofj": {
     "pageTitle": "End of Day Oversight",
     "pageSubtitle": "Digital cash-desk reconciliation, read-only from the Back-Office.",
-    "noBranches": "No branches exist yet — create one first.",
+    "noBranches": "No branches exist yet. Create one first.",
     "viewingBranch": "Viewing branch",
     "branchFallback": "Branch",
     "reconcileCash": "Reconcile Cash",
-    "reconcileTooltip": "Reconciliation opens after closing time{closeTimeSuffix} — the day's cash isn't all in yet.",
+    "reconcileTooltip": "Reconciliation opens after closing time{closeTimeSuffix}. The day's cash isn't all in yet.",
     "businessDate": "Business date: {date}",
     "tabs": {
       "summary": "Today's Summary",
@@ -324,6 +405,7 @@
     },
     "history": {
       "colResolved": "Resolved",
+      "colBusinessDate": "Business Date",
       "noSessions": "No past End of Day sessions for this branch yet."
     },
     "variance": {
@@ -334,7 +416,28 @@
       "showOpenOnly": "Show open debts only",
       "colAmount": "Amount",
       "colRecorded": "Recorded",
-      "noDebts": "No variance debts recorded."
+      "colActions": "Actions",
+      "colWrittenOffReason": "Written-Off Reason",
+      "noDebts": "No variance debts recorded.",
+      "writtenOffNote": "Written off: {reason}",
+      "exportTitle": "Variance Debts"
+    },
+    "writeOff": {
+      "buttonLabel": "Write Off",
+      "modalTitle": "Write Off Variance Debt",
+      "warningPrefix": "This clears the ",
+      "warningMiddle": " shortage recorded against ",
+      "warningSuffix": " without altering the original record. Only ADMIN can do this, and it cannot be undone.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Why this shortage is being cleared (e.g. cash located, agent reimbursed in person, recording error confirmed)…",
+      "proofLabel": "Supporting Document",
+      "proofHelp": "PDF or JPEG, max 10 MB: the memo, sign-off, or evidence backing this decision.",
+      "proofAriaLabel": "Write-off supporting document",
+      "uploadProofRequired": "A supporting document is required to write off a variance debt",
+      "failedToWriteOff": "Failed to write off this debt",
+      "writingOff": "Writing off…",
+      "writtenOff": "Written Off",
+      "confirmButton": "Write Off Debt"
     },
     "recordVariance": {
       "buttonLabel": "Record Variance",
@@ -352,13 +455,15 @@
     }
   },
   "team": {
-    "noBranchesYet": "No branches exist yet — create one first.",
+    "backToTeam": "Back to Team",
+    "noBranchesYet": "No branches exist yet. Create one first.",
     "subtitleCashier": "Field agents in your branch.",
     "subtitleManager": "Your branch's cashiers and field agents.",
     "subtitleAdmin": "Back-office accounts and field agents for the selected branch.",
     "viewingBranch": "Viewing branch",
     "branchNameCode": "{name} ({code})",
     "branchFallback": "Branch",
+    "newUser": "New User",
     "directory": {
       "fieldAgent": "Field Agent",
       "searchPlaceholder": "Search by name, role, or branch…",
@@ -372,24 +477,30 @@
     "detail": {
       "login": "Login",
       "allBranchesGlobal": "All branches (global)",
-      "accountId": "Account ID"
+      "tabs": {
+        "overview": "Overview",
+        "administration": "Administration"
+      }
     },
     "statusButton": {
       "confirmSuspend": "Suspend this account? This immediately blocks sign-in.",
       "failedToUpdateStatus": "Failed to update status",
       "done": "Done",
       "suspendAccount": "Suspend Account",
-      "reactivateAccount": "Reactivate Account"
+      "reactivateAccount": "Reactivate Account",
+      "suspendDescription": "Temporarily block system access.",
+      "reactivateDescription": "Restore this account's access to the system."
     },
     "resetPassword": {
       "failedToReset": "Failed to reset password",
       "button": "Reset Password",
       "title": "Reset Password",
       "descriptionPrefix": "Set a new password for",
-      "descriptionSuffix": ". They will need to sign in with it next time — no confirmation from their current password is required.",
+      "descriptionSuffix": ". They will need to sign in with it next time. No confirmation from their current password is required.",
       "newPasswordLabel": "New Password (min. 8 characters)",
       "resetDone": "Reset",
-      "setNewPassword": "Set New Password"
+      "setNewPassword": "Set New Password",
+      "cardDescription": "Set a new login password for this account."
     },
     "deleteAccount": {
       "button": "Delete Account",
@@ -399,7 +510,8 @@
       "reasonPlaceholder": "e.g. No longer employed by the MFI",
       "confirm": "Delete Account",
       "failedToDelete": "Failed to delete account",
-      "deletionFailedTitle": "Deletion Failed"
+      "deletionFailedTitle": "Deletion Failed",
+      "cardDescription": "Permanent revocation and account closure."
     },
     "deletedBanner": {
       "title": "This account has been deleted",
@@ -408,7 +520,8 @@
   },
   "tracking": {
     "page": {
-      "subtitle": "Live field units, historical routes, and geofence boundaries."
+      "subtitle": "Live field units, historical routes, and geofence boundaries.",
+      "accessDenied": "Live tracking is only available to an Administrator or a branch's own manager."
     },
     "workspace": {
       "loadingMap": "Loading map…",
@@ -421,11 +534,13 @@
       "dateLabel": "Date",
       "editGeofence": "Edit Geofence",
       "setGeofence": "Set Geofence",
+      "configureGeofence": "Configure Geofence",
+      "configureGeofenceDescription": "Manage the agent's authorized operating zone.",
       "placeVertices": "Click the map to place vertices ({count} placed, min. 3)",
       "undoPoint": "Undo point",
       "saveGeofence": "Save Geofence",
       "savingGeofence": "Saving…",
-      "geofenceMinPoints": "A geofence needs at least 3 points — click the map to add more.",
+      "geofenceMinPoints": "A geofence needs at least 3 points. Click the map to add more.",
       "geofenceSaveFailed": "Failed to save geofence",
       "geofenceBreach": "Geofence Breach",
       "outsideZoneSince": "has been outside their assigned zone since {time}.",
@@ -446,6 +561,15 @@
     "reasonPrefix": "Reason: {reason}",
     "noApplications": "No {status} applications.",
     "backToRegistrations": "Back to Registrations",
+    "export": {
+      "title": "Registrations",
+      "colName": "Name",
+      "colRole": "Target Role",
+      "colBranch": "Branch",
+      "colStatus": "Status",
+      "colSubmittedAt": "Submitted At",
+      "colReason": "Rejection Reason"
+    },
     "applicationStatus": {
       "SUBMITTED": "Pending Review",
       "APPROVED": "Approved",
@@ -476,17 +600,18 @@
       "criminalRecordIssued": "Criminal Record Issued",
       "reviewed": "Reviewed",
       "activationSms": "Activation SMS",
-      "submittedDocumentsHeader": "Submitted Documents"
+      "submittedDocumentsHeader": "Submitted Documents",
+      "pendingReviewLabel": "Pending review"
     },
     "approve": {
       "button": "Approve",
       "failedToApprove": "Failed to approve",
       "modalTitle": "Account Provisioned",
-      "provisionedIntro": "The {role} was provisioned and an activation SMS was sent (best-effort — local environments without real carrier credentials won't actually deliver it). This is the ",
+      "provisionedIntro": "The {role} was provisioned and an activation SMS was sent (best-effort: local environments without real carrier credentials won't actually deliver it). This is the ",
       "roleAgent": "agent",
       "roleAccount": "account",
       "onlyTime": "only time",
-      "provisionedOutro": " the temporary credential is shown — it is never stored or retrievable again.",
+      "provisionedOutro": " the temporary credential is shown. It is never stored or retrievable again.",
       "usernameLabel": "Username:",
       "tempPasswordLabel": "Temporary password:",
       "tempPinLabel": "Temporary PIN:",
@@ -503,7 +628,7 @@
     "newForm": {
       "restrictedMessage": "Submitting a registration application is only available to an Administrator or Branch Manager.",
       "pageTitle": "New Registration Application",
-      "pageSubtitle": "Compliance-gated enrollment — no account is created until an ADMIN approves it.",
+      "pageSubtitle": "Compliance-gated enrollment. No account is created until an ADMIN approves it.",
       "stepIndicator": "Step {current} of {total}: {label}",
       "roleLabel": "Role",
       "branchLabel": "Branch",
@@ -540,9 +665,50 @@
         "username": "Username:",
         "email": "Email:",
         "documentsAttached": "Documents attached:",
-        "complianceNotice": "Submitting sends this to compliance review — no account is created until an ADMIN approves it."
+        "complianceNotice": "Submitting sends this to compliance review. No account is created until an ADMIN approves it."
       }
     }
+  },
+  "audit": {
+    "pageTitle": "Audit Log",
+    "pageSubtitle": "Security and administrative trail across every actor: admins, managers, cashiers, agents, and clients.",
+    "accessDenied": "The audit log is only available to an Administrator or a branch's own manager.",
+    "filters": {
+      "branch": "Branch",
+      "allBranches": "All branches",
+      "category": "Category",
+      "allCategories": "All categories",
+      "actorType": "Actor type",
+      "allActorTypes": "All actor types",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply"
+    },
+    "category": {
+      "SECURITY": "Security & Administrative",
+      "COMPLIANCE": "Regulatory Compliance",
+      "FINANCIAL": "Financial & Transactional"
+    },
+    "actorType": {
+      "ADMIN": "Admin / Manager / Cashier",
+      "AGENT": "Agent",
+      "CLIENT": "Client",
+      "SYSTEM": "System"
+    },
+    "table": {
+      "colTime": "Timestamp",
+      "colEvent": "Event",
+      "colCategory": "Category",
+      "colActor": "Actor",
+      "colActorRole": "Actor Role",
+      "colBranch": "Branch",
+      "colDetails": "Details",
+      "colStatus": "Status"
+    },
+    "noResults": "No matching audit events in this period.",
+    "loading": "Loading audit log…",
+    "error": "Unable to load the audit log.",
+    "exportTitle": "Security & Administrative Trail"
   },
   "branches": {
     "directory": {
@@ -562,22 +728,32 @@
     "settingsForm": {
       "failedToSave": "Failed to save branch settings",
       "openTimeLabel": "Open Time",
-      "openTimeLockedNote": "Already passed today — locked until tomorrow.",
+      "openTimeLockedNote": "Already passed today, locked until tomorrow.",
       "closeTimeLabel": "Close Time",
       "closeTimeHint": "Changing the closing time notifies every agent at this branch by SMS and in the app.",
       "contactHint": "Reached by field agents via \"Contact Branch\" in the mobile app.",
       "cashierCapLabel": "Cashier Cap",
       "cashierCapHint": "Maximum active branch cashiers at once. Registering beyond this requires replacing an existing cashier.",
       "defaultCeilingLabel": "Default Ceiling %",
-      "defaultCeilingHint": "Escrow ceiling granted per XAF of security deposit when an agent's escrow is funded — 100% grants a ceiling equal to the deposit, 150% grants 1.5x. Applies to every future top-up for agents at this branch; a manual waiver or an individual top-up can still be used to adjust any one agent regardless of this default.",
+      "defaultCeilingHint": "Escrow ceiling granted per XAF of security deposit when an agent's escrow is funded: 100% grants a ceiling equal to the deposit, 150% grants 1.5x. Applies to every future top-up for agents at this branch; a manual waiver or an individual top-up can still be used to adjust any one agent regardless of this default.",
       "requireImeiLabel": "Require a bound device for new agents",
-      "requireImeiHint": "Disable if agents at this branch use their own phone to collect — new agents can be enrolled without a bound device. Already-enrolled agents are unaffected.",
+      "requireImeiHint": "Disable if agents at this branch use their own phone to collect. New agents can be enrolled without a bound device. Already-enrolled agents are unaffected.",
       "saved": "Saved",
       "saveSettings": "Save Settings"
     },
     "settingsModal": {
       "editTooltip": "Edit branch settings",
-      "modalTitle": "{name} — Branch Settings"
+      "modalTitle": "{name} · Branch Settings"
+    },
+    "geofenceBulk": {
+      "sectionTitle": "Bulk-Apply Geofence",
+      "sectionHint": "Draw one perimeter and apply it as every currently-active agent's own geofence at this branch: a shortcut over drawing the same shape one agent at a time. There is no shared branch geofence: an agent added later still needs their own, and any agent's geofence can still be edited individually afterward.",
+      "openButton": "Draw Geofence",
+      "confirmLabel": "I understand this overwrites the geofence for every active agent at this branch right now.",
+      "applyButton": "Apply to Branch",
+      "applying": "Applying…",
+      "failedToApply": "Failed to apply geofence",
+      "appliedPrefix": "Result: "
     },
     "createModal": {
       "title": "Create Branch",
@@ -591,7 +767,7 @@
     "thresholds": {
       "title": "Global Thresholds",
       "overrideHint": "Will overwrite every branch's hours, including ones already configured",
-      "defaultHint": "Applied to every branch that hasn't set its own hours — per-branch overrides always win",
+      "defaultHint": "Applied to every branch that hasn't set its own hours. Per-branch overrides always win",
       "lastUpdated": "last updated {date}",
       "openTimeLabel": "Default Open Time",
       "closeTimeLabel": "Default Close Time",
@@ -607,7 +783,7 @@
       "confirmTitle": "Overwrite every branch's hours?",
       "confirmBodyPrefix": "This sets",
       "confirmEveryBranch": "every branch",
-      "confirmBodyMiddle": "— including branches that already have their own working hours — to",
+      "confirmBodyMiddle": "including branches that already have their own working hours, to",
       "confirmBodySuffix": ". Any custom hours a branch manager configured will be lost.",
       "confirmButton": "Yes, overwrite all branches"
     }
@@ -615,7 +791,7 @@
   "errors": {
     "rootTitle": "Something went wrong",
     "dashboardTitle": "Couldn't load this page",
-    "description": "We couldn't reach the server. Check your connection and try again — if this keeps happening, the backend may be temporarily down.",
+    "description": "We couldn't reach the server. Check your connection and try again. If this keeps happening, the backend may be temporarily down.",
     "reference": "Reference: {digest}",
     "tryAgain": "Try Again"
   }

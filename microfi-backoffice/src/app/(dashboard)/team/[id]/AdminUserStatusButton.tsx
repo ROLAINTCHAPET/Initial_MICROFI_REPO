@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/Button";
-import { Icon } from "@/components/Icon";
+import { ActionCard } from "@/components/ActionCard";
 import type { AdminUserStatus } from "@/lib/types";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 
@@ -43,20 +42,18 @@ export function AdminUserStatusButton({ userId, status }: { userId: string; stat
     }
   }
 
+  const isSuspendAction = nextStatus === "SUSPENDED";
+
   return (
-    <div className="flex flex-col gap-2 items-start">
-      <Button variant={succeeded ? "success" : nextStatus === "SUSPENDED" ? "danger" : "success"} loading={loading} disabled={succeeded} onClick={handleClick}>
-        {succeeded ? (
-          <>
-            <Icon name="check-circle" className="size-5" />
-            {dict.team.statusButton.done}
-          </>
-        ) : nextStatus === "SUSPENDED" ? (
-          dict.team.statusButton.suspendAccount
-        ) : (
-          dict.team.statusButton.reactivateAccount
-        )}
-      </Button>
+    <div className="flex flex-col gap-2">
+      <ActionCard
+        icon={succeeded ? "check-circle" : isSuspendAction ? "warning" : "check-circle"}
+        title={succeeded ? dict.team.statusButton.done : isSuspendAction ? dict.team.statusButton.suspendAccount : dict.team.statusButton.reactivateAccount}
+        description={isSuspendAction ? dict.team.statusButton.suspendDescription : dict.team.statusButton.reactivateDescription}
+        danger={isSuspendAction}
+        disabled={succeeded || loading}
+        onClick={handleClick}
+      />
       {error && <p role="alert" className="text-sm text-danger-red">{error}</p>}
     </div>
   );

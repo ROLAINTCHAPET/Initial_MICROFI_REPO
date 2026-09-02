@@ -53,8 +53,8 @@ class EscrowServiceTest {
         when(escrowLedgerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(escrowAccountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(ceilingOverrideRepository.findFirstByAgentIdAndValidUntilAfterOrderByValidUntilDesc(any(), any())).thenReturn(Optional.empty());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
-        when(activationDirectoryService.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+        when(activationDirectoryService.sumUnreconciled(any(), any())).thenReturn(0L);
         // Default branch policy is 100% (1:1) unless a test overrides it.
         when(agentDirectoryService.effectiveCeilingPctForAgent(agentId)).thenReturn(100);
     }

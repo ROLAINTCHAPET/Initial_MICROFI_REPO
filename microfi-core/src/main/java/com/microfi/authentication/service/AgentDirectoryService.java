@@ -63,6 +63,16 @@ public class AgentDirectoryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
     }
 
+    /** For an audit-log entry naming the agent as actor — one query for both fields other modules need. */
+    public AgentAuditInfo findAuditInfo(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        return new AgentAuditInfo(agent.getBranchId(), agent.getUsername());
+    }
+
+    public record AgentAuditInfo(UUID branchId, String username) {
+    }
+
     /**
      * How much escrow ceiling a top-up grants per XAF of security deposit for this agent's
      * branch (Branch#effectiveDefaultCeilingPct) — 100 means 1:1 (today's default), used by
@@ -75,22 +85,6 @@ public class AgentDirectoryService {
         return branchRepository.findById(agent.getBranchId())
                 .map(Branch::effectiveDefaultCeilingPct)
                 .orElse(Branch.DEFAULT_CEILING_PCT);
-    }
-
-    /**
-     * UC-16 EOD gate: a branch can't be reconciled before its own configured closing time has
-     * passed today, in the branch's own timezone — the day's cash isn't all in yet before then.
-     * A branch with no schedule configured (no closeTime/timezone) has no such restriction.
-     */
-    public boolean isBranchPastCloseTime(UUID branchId) {
-        Branch branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found: " + branchId));
-        ZoneId zone = zoneIdOrNull(branch.getTimezone());
-        if (branch.getCloseTime() == null || zone == null) {
-            return true;
-        }
-        LocalTime now = LocalTime.now(zone);
-        return !now.isBefore(branch.getCloseTime());
     }
 
     /**
@@ -107,6 +101,39 @@ public class AgentDirectoryService {
         }
         LocalTime now = LocalTime.now(zone);
         return !now.isBefore(branch.getOpenTime());
+    }
+
+    /**
+     * FR-15/UC-01: a collection can only be recorded for a moment that falls within the agent's
+     * branch's configured schedule window. Previously enforced at login instead (blocking the
+     * whole session once closing time passed); moved here so an agent can still log in and use
+     * the app after hours — they just can't record a new collection outside the window.
+     * <p>
+     * Checked against {@code collectedAt} — the moment the cash actually changed hands — not the
+     * moment this method runs. An offline collection is legitimately gathered during business
+     * hours but only reaches the server whenever connectivity returns (FR-07), which can be well
+     * after closing time; checking wall-clock "now" here would reject that sync outright and
+     * strand a real, already-collected deposit that can never be recorded. An online collection's
+     * {@code collectedAt} is for all practical purposes "now" anyway, so this is a no-op behavior
+     * change for that path. A branch with no (or partially configured) schedule imposes no
+     * restriction.
+     */
+    public void requireWithinScheduleWindow(UUID agentId, Instant collectedAt) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        Branch branch = branchRepository.findById(agent.getBranchId()).orElse(null);
+        if (branch == null || branch.getOpenTime() == null || branch.getCloseTime() == null) {
+            return;
+        }
+        ZoneId zone = zoneIdOrNull(branch.getTimezone());
+        if (zone == null) {
+            return;
+        }
+        LocalTime collectedLocalTime = collectedAt.atZone(zone).toLocalTime();
+        if (collectedLocalTime.isBefore(branch.getOpenTime()) || !collectedLocalTime.isBefore(branch.getCloseTime())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Outside authorized collection hours (" + branch.getOpenTime() + "-" + branch.getCloseTime() + " " + branch.getTimezone() + ")");
+        }
     }
 
     /**
@@ -140,7 +167,7 @@ public class AgentDirectoryService {
     public AgentReceiptInfo findReceiptInfo(UUID agentId) {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
-        String branchName = branchRepository.findById(agent.getBranchId()).map(Branch::getName).orElse("—");
+        String branchName = branchRepository.findById(agent.getBranchId()).map(Branch::getName).orElse("N/A");
         return new AgentReceiptInfo(agent.getEmployeeCode(), agent.getFullName(), branchName);
     }
 
@@ -185,7 +212,7 @@ public class AgentDirectoryService {
         // confusing "exceeds ceiling" message on an agent who was never meant to transact yet.
         if (agent.getStatus() != AgentStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Your account is awaiting setup — ask your branch to fund your escrow account before you can collect");
+                    "Your account is awaiting setup. Ask your branch to fund your escrow account before you can collect");
         }
         if (Boolean.TRUE.equals(agent.getPinMustChange())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

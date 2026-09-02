@@ -1,5 +1,8 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
@@ -13,6 +16,7 @@ import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.DenominationLineRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,6 +35,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CollectionServiceTest {
@@ -51,6 +57,8 @@ class CollectionServiceTest {
     private GeofenceService geofenceService;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private AuditService auditService;
 
     private CollectionService collectionService;
 
@@ -60,10 +68,12 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, applicationEventPublisher);
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, applicationEventPublisher, auditService);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
         when(geofenceService.isWithinAssignedGeofence(any(), anyDouble(), anyDouble())).thenReturn(true);
+        when(agentDirectoryService.findAuditInfo(any())).thenReturn(new AgentDirectoryService.AgentAuditInfo(UUID.randomUUID(), "agent1"));
+        when(clientDirectoryService.findReceiptInfo(any())).thenReturn(new ClientDirectoryService.ClientReceiptInfo("M001", "Client One"));
     }
 
     private CollectionRequest validRequest(long amountXaf, List<DenominationLineDto> lines) {
@@ -91,13 +101,19 @@ class CollectionServiceTest {
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
         assertThat(response.getAmountXaf()).isEqualTo(5000);
         assertThat(response.getAgentId()).isEqualTo(agentId);
         assertThat(response.isDuplicate()).isFalse();
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo("COLLECTION_RECORDED");
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.AGENT);
+        assertThat(captor.getValue().getAgentId()).isEqualTo(agentId);
     }
 
     @Test
@@ -110,6 +126,7 @@ class CollectionServiceTest {
 
         assertThat(response.isDuplicate()).isTrue();
         assertThat(response.getId()).isEqualTo(existing.getId());
+        verify(auditService, never()).record(any());
     }
 
     @Test
@@ -117,7 +134,7 @@ class CollectionServiceTest {
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         collectionService.recordCollection(agentId, request);
 
@@ -133,6 +150,32 @@ class CollectionServiceTest {
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("401");
+    }
+
+    @Test
+    void checksScheduleWindowBeforeRecording() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request);
+
+        org.mockito.Mockito.verify(agentDirectoryService).requireWithinScheduleWindow(agentId, request.getCollectedAt());
+    }
+
+    @Test
+    void rejectsCollectionOutsideBranchScheduleWindow() {
+        // Login is no longer schedule-gated (AuthenticationControllerTest#testLoginSucceedsRegardlessOfBranchSchedule)
+        // — the branch's open/close window is enforced here instead, checked against when the cash
+        // was actually collected (collectedAt), not when this request happens to be processed.
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Outside authorized collection hours"))
+                .when(agentDirectoryService).requireWithinScheduleWindow(any(), any());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
     }
 
     @Test
@@ -164,7 +207,7 @@ class CollectionServiceTest {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(geofenceService.isWithinAssignedGeofence(agentId, 4.05, 9.70)).thenReturn(true);
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
@@ -179,7 +222,7 @@ class CollectionServiceTest {
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
@@ -195,7 +238,7 @@ class CollectionServiceTest {
         CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         CollectionResponse response = collectionService.recordCollection(agentId, request);
 
@@ -268,7 +311,7 @@ class CollectionServiceTest {
     void rejectsCollectionExceedingEscrowCeiling() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(3000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
                 .isInstanceOf(ResponseStatusException.class)
@@ -276,11 +319,28 @@ class CollectionServiceTest {
     }
 
     @Test
+    void escrowCeilingIgnoresAlreadyReconciledCash() {
+        // The actual fix: BR-03 must check cash-in-hand (unreconciled), not "collected today" —
+        // an agent whose earlier collections were already reconciled (cash handed over) must be
+        // able to keep collecting up to their ceiling again, even on the same calendar day.
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(10_000).build());
+        // Reconciled collections aren't summed at all here — sumUnreconciledByAgent reports 0
+        // even though the agent may have collected far more than the ceiling earlier today.
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+        when(activationDirectoryService.sumUnreconciled(any(), any())).thenReturn(0L);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1))));
+
+        assertThat(response.getAmountXaf()).isEqualTo(5000);
+    }
+
+    @Test
     void allowsDenominationOptionalBelowThreshold() {
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 1000L);
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
         when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
-        when(collectionRepository.sumAmountByAgentAndWindow(any(), any(), any())).thenReturn(0L);
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
 
         CollectionResponse response = collectionService.recordCollection(agentId, validRequest(500, null));
 

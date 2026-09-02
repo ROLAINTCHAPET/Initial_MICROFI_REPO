@@ -1163,14 +1163,20 @@ abstract class AppLocalizations {
   /// Client activation screen — explanatory intro text above the form.
   ///
   /// In en, this message translates to:
-  /// **'Enter the Activation ID your branch gave you and choose a login and PIN. Afterwards, ask your agent to sponsor your activation, then confirm the payment yourself to receive your booklet.'**
+  /// **'Enter your MFI account number (the same number your branch already gave you) and choose a login and PIN. Afterwards, ask your agent to sponsor your activation, then confirm the payment yourself to receive your booklet.'**
   String get caIntroMessage;
 
-  /// Client activation screen — activation ID field label.
+  /// Client activation screen — MFI account number field label (the account number the client's own MFI already assigned them).
   ///
   /// In en, this message translates to:
-  /// **'Activation ID'**
-  String get caActivationIdLabel;
+  /// **'Your MFI Account Number'**
+  String get caMfiIdentifierLabel;
+
+  /// Client activation screen — success message confirming which MFI the client just proved membership of.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re now registered with {mfiName}.'**
+  String caRegisteredWithMfi(String mfiName);
 
   /// Client activation screen — login field label.
   ///
@@ -1393,6 +1399,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Secure field-agent access only.'**
   String get lgSecureAccessOnly;
+
+  /// Login screen — link to the forgot-password flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get lgForgotPasswordLink;
+
+  /// Forgot-password screen — app bar title.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot Password'**
+  String get fpTitle;
+
+  /// Forgot-password screen — step 1 (request code) subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your username. We\'ll send a verification code by SMS to your registered phone.'**
+  String get fpRequestSubtitle;
+
+  /// Forgot-password screen — username field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get fpUsernameLabel;
+
+  /// Forgot-password screen — step 1 submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Code'**
+  String get fpSendCodeButton;
+
+  /// Forgot-password screen — generic acknowledgement shown after requesting a code, whether or not the username exists.
+  ///
+  /// In en, this message translates to:
+  /// **'If that username exists, a code has been sent by SMS.'**
+  String get fpCodeSentMessage;
+
+  /// Forgot-password screen — step 2 (confirm code + new password) subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code you received and choose a new password.'**
+  String get fpConfirmSubtitle;
+
+  /// Forgot-password screen — OTP field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification Code'**
+  String get fpOtpLabel;
+
+  /// Forgot-password screen — new password field label.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get fpNewPasswordLabel;
+
+  /// Forgot-password screen — confirm new password field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm New Password'**
+  String get fpConfirmPasswordLabel;
+
+  /// Forgot-password screen — new password field validator error.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters'**
+  String get fpPasswordTooShort;
+
+  /// Forgot-password screen — confirm password field validator error.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get fpPasswordMismatch;
+
+  /// Forgot-password screen — step 2 submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Password'**
+  String get fpResetButton;
+
+  /// Forgot-password screen — shown after a successful reset, before returning to login.
+  ///
+  /// In en, this message translates to:
+  /// **'Password updated. You can now log in.'**
+  String get fpSuccessMessage;
+
+  /// Forgot-password screen — link on step 2 to go back and request a new code.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get fpResendCode;
+
+  /// Forgot-password screen — link back to the login screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Login'**
+  String get fpBackToLogin;
 
   /// Session entry screen — generic (non-LocationUnavailable) location-check failure.
   ///

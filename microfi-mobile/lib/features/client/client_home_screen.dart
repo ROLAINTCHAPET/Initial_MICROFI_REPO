@@ -50,8 +50,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       if (!mounted) return;
       setState(() {
         _profile = results[0] as ClientSelfProfile;
-        _recent = (results[1] as List<ClientHistoryEntry>).take(5).toList();
-        _recentCollections = (results[2] as List<ClientRecentCollection>).take(3).toList();
+        _recent = (results[1] as List<ClientHistoryEntry>).take(10).toList();
+        _recentCollections = (results[2] as List<ClientRecentCollection>).take(10).toList();
       });
     } catch (e) {
       if (!mounted) return;
@@ -138,6 +138,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     Text(profile.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
                     const SizedBox(height: 1),
                     Text(profile.mfiMemberNo, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
+                    const SizedBox(height: 2),
+                    // Confirms which MFI this session belongs to — MICROFI serves several MFIs,
+                    // each its own separate deployment, so this is the client's own signal that
+                    // they're using the right institution's app.
+                    Text(profile.mfiName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
                   ],
                 ),
               ),

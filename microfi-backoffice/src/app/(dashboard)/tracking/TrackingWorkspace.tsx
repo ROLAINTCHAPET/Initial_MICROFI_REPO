@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { Badge } from "@/components/Badge";
-import type { AgentStatus, GeofenceAlertResponse, GeofenceResponse, GeofenceVertex, RouteResponse } from "@/lib/types";
+import type { AgentStatus, GeofenceAlertResponse, GeofenceResponse, RouteResponse } from "@/lib/types";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/format";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -60,7 +60,7 @@ function formatDuration(fromIso: string, nowMs: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function TrackingWorkspace({ agents, canEditGeofence }: { agents: TrackingAgent[]; canEditGeofence: boolean }) {
+export function TrackingWorkspace({ agents }: { agents: TrackingAgent[] }) {
   const dict = useDictionary();
   const [selectedId, setSelectedId] = useState<string | null>(agents.find((a) => a.hasActiveAlert)?.id ?? agents[0]?.id ?? null);
   const [date, setDate] = useState(todayIso());
@@ -69,30 +69,11 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
   const [alerts, setAlerts] = useState<GeofenceAlertResponse[]>([]);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
-  const [editing, setEditing] = useState(false);
-  const [draftVertices, setDraftVertices] = useState<GeofenceVertex[]>([]);
-  const [savingGeofence, setSavingGeofence] = useState(false);
-  const [geofenceError, setGeofenceError] = useState<string | null>(null);
-
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const selectedAgent = agents.find((a) => a.id === selectedId) ?? null;
   const requestKey = selectedId ? `${selectedId}:${date}` : null;
   const loading = requestKey !== null && loadedKey !== requestKey;
-
-  // Resetting editing/draftVertices/geofenceError when the selected agent or date changes is
-  // "adjusting state during render" (React's own documented exception to not-calling-setState-
-  // during-render), not an effect — it must happen before this render paints, not after, or the
-  // old agent's geofence-edit state flashes for one frame under the new agent's map. Calling these
-  // setStates from inside a useEffect body instead (as this used to) triggers a needless second
-  // render on every agent/date switch, which react-hooks/set-state-in-effect flags.
-  const [resetForKey, setResetForKey] = useState(requestKey);
-  if (requestKey !== resetForKey) {
-    setResetForKey(requestKey);
-    setEditing(false);
-    setDraftVertices([]);
-    setGeofenceError(null);
-  }
 
   useEffect(() => {
     if (!selectedId) return;
@@ -102,8 +83,7 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
     // Polled, not one-shot: a geofence breach can start or resolve while an admin is already
     // looking at this agent, and the bottom-right banner is driven entirely by `alerts` here —
     // the page-level AutoRefresh only refreshes the sidebar list's `hasActiveAlert` flags via new
-    // server props, it doesn't touch this component's own client-side fetches. `editing`/
-    // `draftVertices` are untouched by each tick so an in-progress geofence edit survives.
+    // server props, it doesn't touch this component's own client-side fetches.
     function load() {
       Promise.all([
         fetch(`/api/agents/${selectedId}/route?date=${date}`).then((r) => (r.ok ? r.json() : null)),
@@ -132,57 +112,6 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
 
   const activeAlert = alerts.find((a) => a.active) ?? null;
 
-  function handleMapClick(lat: number, lon: number) {
-    if (!editing) return;
-    setDraftVertices((v) => [...v, { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5 }]);
-  }
-
-  function startEditing() {
-    // Starts from a clean slate rather than the existing polygon's vertices — there's no
-    // vertex-dragging support, so pre-filling would let new clicks silently mix in with the old
-    // points into one malformed shape. The old geofence stays visible underneath (teal) as a
-    // reference while the new one (red, dashed) is drawn on top; Save replaces it outright.
-    setEditing(true);
-    setDraftVertices([]);
-    setGeofenceError(null);
-  }
-
-  function cancelEditing() {
-    setEditing(false);
-    setDraftVertices([]);
-    setGeofenceError(null);
-  }
-
-  async function saveGeofence() {
-    if (!selectedId) return;
-    if (draftVertices.length < 3) {
-      setGeofenceError(dict.tracking.workspace.geofenceMinPoints);
-      return;
-    }
-    setSavingGeofence(true);
-    setGeofenceError(null);
-    try {
-      const res = await fetch(`/api/agents/${selectedId}/geofence`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vertices: draftVertices }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setGeofenceError(body?.message ?? dict.tracking.workspace.geofenceSaveFailed);
-        return;
-      }
-      const saved = await res.json();
-      setGeofence(saved);
-      setEditing(false);
-      setDraftVertices([]);
-    } catch {
-      setGeofenceError(dict.common.unableToReachServer);
-    } finally {
-      setSavingGeofence(false);
-    }
-  }
-
   if (agents.length === 0) {
     return (
       <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] p-10 flex flex-col items-center gap-2 text-center text-sm text-text-slate">
@@ -199,8 +128,7 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
           points={route?.points ?? []}
           transactions={route?.transactions ?? []}
           geofence={geofence?.vertices ?? null}
-          editingVertices={editing ? draftVertices : null}
-          onMapClick={editing ? handleMapClick : undefined}
+          editingVertices={null}
         />
 
         {/* Floating over the map, matching the design reference — not a layout column, so it never
@@ -265,7 +193,7 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
           <div className="flex items-center justify-between text-sm">
             <span className="text-on-error-container/80">{dict.tracking.workspace.liabilityAtRisk}</span>
             <span className="font-bold tabular-nums text-on-error-container">
-              {selectedAgent.balanceXaf !== null ? `${selectedAgent.balanceXaf.toLocaleString()} XAF` : "—"}
+              {selectedAgent.balanceXaf !== null ? `${selectedAgent.balanceXaf.toLocaleString()} XAF` : "N/A"}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -302,49 +230,6 @@ export function TrackingWorkspace({ agents, canEditGeofence }: { agents: Trackin
           </label>
           {loading && <span className="h-4 w-4 rounded-full border-2 border-outline-variant border-t-primary animate-spin" aria-label={dict.common.loading} />}
         </div>
-
-        {canEditGeofence && selectedAgent && (
-          <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-1)] px-4 py-3 flex flex-col gap-2">
-            {!editing ? (
-              <button
-                onClick={startEditing}
-                className="h-9 px-4 rounded-[var(--radius-sm)] bg-primary text-on-primary text-sm font-semibold cursor-pointer flex items-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95"
-              >
-                <Icon name="edit-note" className="size-4" />
-                {geofence ? dict.tracking.workspace.editGeofence : dict.tracking.workspace.setGeofence}
-              </button>
-            ) : (
-              <>
-                <p className="text-xs text-on-surface-variant">
-                  {t(dict.tracking.workspace.placeVertices, { count: draftVertices.length })}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setDraftVertices((v) => v.slice(0, -1))}
-                    disabled={draftVertices.length === 0}
-                    className="h-9 px-3 rounded-[var(--radius-sm)] border-2 border-outline-variant text-primary text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container-low transition-colors"
-                  >
-                    {dict.tracking.workspace.undoPoint}
-                  </button>
-                  <button
-                    onClick={cancelEditing}
-                    className="h-9 px-3 rounded-[var(--radius-sm)] border-2 border-outline-variant text-primary text-xs font-semibold cursor-pointer hover:bg-surface-container-low transition-colors"
-                  >
-                    {dict.common.cancel}
-                  </button>
-                  <button
-                    onClick={saveGeofence}
-                    disabled={savingGeofence}
-                    className="h-9 px-3 rounded-[var(--radius-sm)] bg-primary text-on-primary text-xs font-semibold cursor-pointer disabled:opacity-60 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95"
-                  >
-                    {savingGeofence ? dict.tracking.workspace.savingGeofence : dict.tracking.workspace.saveGeofence}
-                  </button>
-                </div>
-                {geofenceError && <p role="alert" className="text-xs text-danger-red">{geofenceError}</p>}
-              </>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

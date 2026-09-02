@@ -94,12 +94,14 @@ export function TeamDirectory({ rows, actions }: { rows: TeamRow[]; actions?: Re
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-full)] text-xs font-bold ${meta.chipClass}`}>
+                  <span className={`inline-flex items-center justify-center gap-1.5 w-[190px] px-3 py-1.5 rounded-[var(--radius-full)] text-xs font-bold ${meta.chipClass}`}>
                     <Icon name={meta.icon} className="size-4" />
                     {meta.label}
                   </span>
-                  <Badge status={row.status} />
-                  <Icon name="chevron-right" className="size-5 text-outline" />
+                  <div className="w-[170px] flex">
+                    <Badge status={row.status} />
+                  </div>
+                  <Icon name="chevron-right" className="size-5 text-outline shrink-0" />
                 </div>
               </Link>
             );

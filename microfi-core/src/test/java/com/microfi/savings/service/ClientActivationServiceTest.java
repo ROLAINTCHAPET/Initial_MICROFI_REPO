@@ -16,7 +16,7 @@ import com.microfi.shared.dto.ClientActivationPendingResponse;
 import com.microfi.shared.dto.ClientActivationResponse;
 import com.microfi.shared.dto.ClientPaymentConfirmationRequest;
 import com.microfi.shared.dto.MiddlewareFeeSplit;
-import com.microfi.shared.dto.MiddlewareMemberVerification;
+import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.transactions.service.CollectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +57,8 @@ class ClientActivationServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private CollectionService collectionService;
+    @Mock
+    private MfiSettingsService mfiSettingsService;
 
     private ClientActivationService service;
 
@@ -68,8 +70,10 @@ class ClientActivationServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ClientActivationService(clientProfileRepository, accessTokenRepository,
-                activationPaymentRepository, activationRequestRepository, cbsClientService, passwordEncoder, collectionService);
+                activationPaymentRepository, activationRequestRepository, cbsClientService, passwordEncoder, collectionService,
+                mfiSettingsService);
         ReflectionTestUtils.setField(service, "activationFeeXaf", 1000L);
+        when(mfiSettingsService.getName()).thenReturn("MICROFI");
         when(activationPaymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(accessTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(activationRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -89,7 +93,7 @@ class ClientActivationServiceTest {
 
     private ClientActivateRequest activateRequest() {
         ClientActivateRequest request = new ClientActivateRequest();
-        request.setActivationId("ACT-1");
+        request.setMfiIdentifier("M001");
         request.setLogin(LOGIN);
         request.setPin("1234");
         return request;
@@ -104,10 +108,8 @@ class ClientActivationServiceTest {
     // --- selfActivate ---
 
     @Test
-    void selfActivateSetsCredentialsWhenVerifiedAndLocalRecordExists() {
-        when(cbsClientService.verifyMember("ACT-1")).thenReturn(Mono.just(
-                MiddlewareMemberVerification.builder().verified(true).memberId("CBS-1").fullName("Jean Client").status("ACTIVE").build()));
-        when(clientProfileRepository.findByCbsRef("CBS-1")).thenReturn(Optional.of(clientWithoutCredentials()));
+    void selfActivateSetsCredentialsWhenMfiIdentifierMatchesLocalRecord() {
+        when(clientProfileRepository.findByMfiMemberNo("M001")).thenReturn(Optional.of(clientWithoutCredentials()));
         when(clientProfileRepository.findByLogin(LOGIN)).thenReturn(Optional.empty());
         when(passwordEncoder.encode("1234")).thenReturn("hashed-pin");
         when(clientProfileRepository.save(any(ClientProfile.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -116,23 +118,12 @@ class ClientActivationServiceTest {
 
         assertThat(response.getClientId()).isEqualTo(clientId);
         assertThat(response.getMfiMemberNo()).isEqualTo("M001");
+        assertThat(response.getMfiName()).isEqualTo("MICROFI");
     }
 
     @Test
-    void selfActivateRejectsUnverifiedActivationId() {
-        when(cbsClientService.verifyMember("ACT-1")).thenReturn(Mono.just(
-                MiddlewareMemberVerification.builder().verified(false).status("NOT_FOUND").build()));
-
-        assertThatThrownBy(() -> service.selfActivate(activateRequest()))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
-    }
-
-    @Test
-    void selfActivateRejectsWhenNoLocalMirrorForVerifiedMember() {
-        when(cbsClientService.verifyMember("ACT-1")).thenReturn(Mono.just(
-                MiddlewareMemberVerification.builder().verified(true).memberId("CBS-1").build()));
-        when(clientProfileRepository.findByCbsRef("CBS-1")).thenReturn(Optional.empty());
+    void selfActivateRejectsUnknownMfiIdentifier() {
+        when(clientProfileRepository.findByMfiMemberNo("M001")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.selfActivate(activateRequest()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -141,9 +132,7 @@ class ClientActivationServiceTest {
 
     @Test
     void selfActivateRejectsLoginAlreadyTakenByAnotherClient() {
-        when(cbsClientService.verifyMember("ACT-1")).thenReturn(Mono.just(
-                MiddlewareMemberVerification.builder().verified(true).memberId("CBS-1").build()));
-        when(clientProfileRepository.findByCbsRef("CBS-1")).thenReturn(Optional.of(clientWithoutCredentials()));
+        when(clientProfileRepository.findByMfiMemberNo("M001")).thenReturn(Optional.of(clientWithoutCredentials()));
         ClientProfile someoneElse = ClientProfile.builder().id(UUID.randomUUID()).login(LOGIN).build();
         when(clientProfileRepository.findByLogin(LOGIN)).thenReturn(Optional.of(someoneElse));
 

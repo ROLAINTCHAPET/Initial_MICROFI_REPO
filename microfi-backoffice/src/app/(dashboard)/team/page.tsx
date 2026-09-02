@@ -49,7 +49,7 @@ export default async function TeamPage({
       href: `/team/${u.id}`,
       login: u.login,
       role: u.role,
-      branchName: u.branchId ? (branchById.get(u.branchId)?.name ?? "—") : null,
+      branchName: u.branchId ? (branchById.get(u.branchId)?.name ?? "N/A") : null,
       status: u.status,
     }));
 
@@ -62,7 +62,7 @@ export default async function TeamPage({
       href: `/agents/${a.id}`,
       login: `${a.fullName} (${a.employeeCode})`,
       role: "AGENT" as const,
-      branchName: branchById.get(a.branchId)?.name ?? "—",
+      branchName: branchById.get(a.branchId)?.name ?? "N/A",
       status: a.status,
     }));
 
@@ -101,11 +101,11 @@ export default async function TeamPage({
         actions={
           canCreate ? (
             <Link
-              href="/registrations/new"
+              href="/registrations/new?from=/team"
               className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
             >
               <Icon name="plus" className="size-5" />
-              {dict.registrations.newApplication}
+              {dict.team.newUser}
             </Link>
           ) : undefined
         }

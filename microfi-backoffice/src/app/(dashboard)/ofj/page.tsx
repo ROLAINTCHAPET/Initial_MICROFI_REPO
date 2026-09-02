@@ -8,19 +8,28 @@ import { Icon, type IconName } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import type { ReactNode } from "react";
 import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
-import { isPastBranchCloseTime } from "@/lib/branchHours";
+import { OfjExportButtons, type OfjExportRow } from "./OfjExportButtons";
+import { VarianceExportButtons, type VarianceExportRow } from "./VarianceExportButtons";
 import { BranchSelector } from "./BranchSelector";
 import { RecordVarianceModal } from "./RecordVarianceModal";
+import { WriteOffVarianceDebtModal } from "./WriteOffVarianceDebtModal";
+import { HistoryDateRangeFilter } from "./HistoryDateRangeFilter";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 import { t } from "@/lib/i18n/format";
 
 type Tab = "summary" | "history" | "variance";
 
+function isoDaysAgo(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function OfjOversightPage({
   searchParams,
 }: {
-  searchParams: Promise<{ branchId?: string; tab?: string; openOnly?: string }>;
+  searchParams: Promise<{ branchId?: string; tab?: string; openOnly?: string; from?: string; to?: string }>;
 }) {
   const dict = getDictionary(await getLocale());
   const TABS: { key: Tab; label: string; icon: IconName }[] = [
@@ -32,6 +41,9 @@ export default async function OfjOversightPage({
   const params = await searchParams;
   const tab: Tab = params.tab === "history" || params.tab === "variance" ? params.tab : "summary";
   const openOnly = params.openOnly === "true";
+  const from = params.from ?? isoDaysAgo(30);
+  const to = params.to ?? isoDaysAgo(0);
+  const generatedBy = session?.sub ?? "";
 
   const branchId = session?.role === "ADMIN" ? params.branchId ?? branches[0]?.id : session?.branchId ?? branches[0]?.id;
 
@@ -44,10 +56,6 @@ export default async function OfjOversightPage({
   const agentById = new Map(agents.map((a) => [a.id, a]));
   // UC-17 actor: Branch Manager / Administrator, own branch only (POST /ofj/{branch}/variance).
   const canRecordVariance = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
-  // POST /ofj/{branchId}/reconcile itself rejects this before the branch's closing time
-  // (OfjService#reconcile) — reflected here so the button reads as unavailable instead of
-  // sending someone to /cashier only to hit a rejected request.
-  const canReconcileNow = isPastBranchCloseTime(branch);
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
@@ -71,26 +79,17 @@ export default async function OfjOversightPage({
         )}
         {/* This page is read-only oversight (see subtitle) — the actual physical-count
             reconciliation workspace lives at /cashier. Without this link, every role including
-            ADMIN lands here (the page UC-16 names) with no path at all into reconciling. */}
-        {canReconcileNow ? (
-          <Link
-            href={`/cashier?branchId=${branchId}`}
-            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
-          >
-            <Icon name="check-circle" className="size-5" />
-            {dict.ofj.reconcileCash}
-          </Link>
-        ) : (
-          <span
-            title={t(dict.ofj.reconcileTooltip, {
-              closeTimeSuffix: branch?.closeTime ? ` (${branch.closeTime.slice(0, 5)} ${branch.timezone ?? ""})` : "",
-            })}
-            className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed select-none"
-          >
-            <Icon name="check-circle" className="size-5" />
-            {dict.ofj.reconcileCash}
-          </span>
-        )}
+            ADMIN lands here (the page UC-16 names) with no path at all into reconciling.
+            Available any time now — reconciliation is no longer gated on the branch's closing
+            time (an agent can hand in cash and get reconciled the moment they're done, rather
+            than everyone waiting until end of day). */}
+        <Link
+          href={`/cashier?branchId=${branchId}`}
+          className="inline-flex items-center justify-center gap-2 min-h-12 px-4 rounded-[var(--radius-md)] text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98]"
+        >
+          <Icon name="check-circle" className="size-5" />
+          {dict.ofj.reconcileCash}
+        </Link>
       </div>
 
       <div className="flex gap-1 border-b-2 border-outline-variant">
@@ -108,9 +107,24 @@ export default async function OfjOversightPage({
         ))}
       </div>
 
-      {tab === "summary" && <SummaryView branchId={branchId} agentById={agentById} canRecordVariance={canRecordVariance} />}
-      {tab === "history" && <HistoryView branchId={branchId} agentById={agentById} canRecordVariance={canRecordVariance} />}
-      {tab === "variance" && <VarianceView branchId={branchId} agentById={agentById} openOnly={openOnly} />}
+      {tab === "summary" && (
+        <SummaryView branchId={branchId} branchLabel={branch ? `${branch.name} (${branch.code})` : branchId} agentById={agentById} canRecordVariance={canRecordVariance} generatedBy={generatedBy} />
+      )}
+      {tab === "history" && (
+        <HistoryView branchId={branchId} branchLabel={branch ? `${branch.name} (${branch.code})` : branchId} agentById={agentById} canRecordVariance={canRecordVariance} from={from} to={to} generatedBy={generatedBy} />
+      )}
+      {tab === "variance" && (
+        <VarianceView
+          branchId={branchId}
+          branchLabel={branch ? `${branch.name} (${branch.code})` : branchId}
+          agentById={agentById}
+          openOnly={openOnly}
+          isAdmin={session?.role === "ADMIN"}
+          from={from}
+          to={to}
+          generatedBy={generatedBy}
+        />
+      )}
     </div>
   );
 }
@@ -151,12 +165,16 @@ function StatCard({ icon, label, value, alert = false }: { icon: IconName; label
 
 async function SummaryView({
   branchId,
+  branchLabel,
   agentById,
   canRecordVariance,
+  generatedBy,
 }: {
   branchId: string;
+  branchLabel: string;
   agentById: Map<string, AgentResponse>;
   canRecordVariance: boolean;
+  generatedBy: string;
 }) {
   // Reconciled lines only exist once a cashier has physically counted an agent's cash — before
   // that, an agent who's actively collecting today was invisible on this page even though the
@@ -176,8 +194,35 @@ async function SummaryView({
   const agentsReporting = summary.agentLines.length + pending.length;
 
   const dict = getDictionary(await getLocale());
+
+  const exportRows: OfjExportRow[] = [
+    ...pending.map((p) => ({
+      agentLabel: agentLabel(agentById, p.agentId),
+      digitalTotalXaf: p.digitalTotalXaf,
+      physicalTotalXaf: 0,
+      deltaXaf: null,
+      status: dict.common.status.PENDING,
+    })),
+    ...summary.agentLines.map((line) => ({
+      agentLabel: agentLabel(agentById, line.agentId),
+      digitalTotalXaf: line.digitalTotalXaf,
+      physicalTotalXaf: line.physicalTotalXaf,
+      deltaXaf: line.deltaXaf,
+      status: line.resolved ? dict.common.status.RESOLVED : dict.common.status.OPEN,
+    })),
+  ];
+
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-end">
+        <OfjExportButtons
+          filenameBase={`microfi-ofj-summary_${branchId}_${summary.businessDate}`}
+          sheetName={dict.ofj.tabs.summary}
+          pdfTitle={dict.ofj.tabs.summary}
+          meta={{ scope: branchLabel, from: summary.businessDate, to: summary.businessDate, generatedBy }}
+          rows={exportRows}
+        />
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon="agents" label={dict.ofj.summary.agentsReporting} value={agentsReporting.toLocaleString()} />
         <StatCard icon="account-balance-wallet" label={dict.ofj.summary.totalDigital} value={`${totalDigital.toLocaleString()} XAF`} />
@@ -200,8 +245,8 @@ async function SummaryView({
               <Tr key={`pending-${p.agentId}`}>
                 <Td className="font-medium text-on-surface">{agentLabel(agentById, p.agentId)}</Td>
                 <Td>{p.digitalTotalXaf.toLocaleString()} XAF</Td>
-                <Td className="text-on-surface-variant">—</Td>
-                <Td className="text-on-surface-variant">—</Td>
+                <Td className="text-on-surface-variant">N/A</Td>
+                <Td className="text-on-surface-variant">N/A</Td>
                 <Td><Badge status="PENDING" /></Td>
                 {canRecordVariance && <Td>{null}</Td>}
               </Tr>
@@ -242,17 +287,48 @@ async function SummaryView({
 
 async function HistoryView({
   branchId,
+  branchLabel,
   agentById,
   canRecordVariance,
+  from,
+  to,
+  generatedBy,
 }: {
   branchId: string;
+  branchLabel: string;
   agentById: Map<string, AgentResponse>;
   canRecordVariance: boolean;
+  from: string;
+  to: string;
+  generatedBy: string;
 }) {
   const dict = getDictionary(await getLocale());
-  const history = await api.get<OfjSummaryResponse[]>(`/ofj/${branchId}/history`);
+  const history = await api.get<OfjSummaryResponse[]>(`/ofj/${branchId}/history?from=${from}&to=${to}`);
+
+  const exportRows: OfjExportRow[] = history.flatMap((pastSession) =>
+    pastSession.agentLines.map((line) => ({
+      businessDate: pastSession.businessDate,
+      agentLabel: agentLabel(agentById, line.agentId),
+      digitalTotalXaf: line.digitalTotalXaf,
+      physicalTotalXaf: line.physicalTotalXaf,
+      deltaXaf: line.deltaXaf,
+      status: line.resolved ? dict.common.status.RESOLVED : dict.common.status.OPEN,
+    }))
+  );
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <HistoryDateRangeFilter branchId={branchId} tab="history" from={from} to={to} />
+        <OfjExportButtons
+          filenameBase={`microfi-ofj-history_${branchId}_${from}_${to}`}
+          sheetName={dict.ofj.tabs.history}
+          pdfTitle={dict.ofj.tabs.history}
+          meta={{ scope: branchLabel, from, to, generatedBy }}
+          rows={exportRows}
+          includeBusinessDate
+        />
+      </div>
       {history.map((pastSession) => (
         <SectionCard key={pastSession.sessionId} icon="reports" title={pastSession.businessDate} right={<Badge status={pastSession.status} />}>
           <Table>
@@ -302,20 +378,55 @@ async function HistoryView({
 
 async function VarianceView({
   branchId,
+  branchLabel,
   agentById,
   openOnly,
+  isAdmin,
+  from,
+  to,
+  generatedBy,
 }: {
   branchId: string;
+  branchLabel: string;
   agentById: Map<string, AgentResponse>;
   openOnly: boolean;
+  isAdmin: boolean;
+  from: string;
+  to: string;
+  generatedBy: string;
 }) {
   const dict = getDictionary(await getLocale());
   const debts = await api.get<VarianceDebtResponse[]>(`/ofj/${branchId}/variance-debts?openOnly=${openOnly}`);
   const openCount = debts.filter((d) => d.status === "OPEN").length;
   const totalAmount = debts.reduce((sum, d) => sum + d.amountXaf, 0);
 
+  // Export honors the chosen period regardless of the open/all toggle currently browsed — the
+  // visible list stays toggle-filtered, only the export additionally bounds by createdAt.
+  const fromInstant = new Date(`${from}T00:00:00Z`).getTime();
+  const toInstant = new Date(`${to}T23:59:59Z`).getTime();
+  const exportRows: VarianceExportRow[] = debts
+    .filter((d) => {
+      const created = new Date(d.createdAt).getTime();
+      return created >= fromInstant && created <= toInstant;
+    })
+    .map((d) => ({
+      agentLabel: agentLabel(agentById, d.agentId),
+      amountXaf: d.amountXaf,
+      status: dict.common.status[d.status],
+      recordedAt: new Date(d.createdAt).toLocaleString(),
+      writtenOffReason: d.writtenOffReason ?? "",
+    }));
+
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <HistoryDateRangeFilter branchId={branchId} tab="variance" from={from} to={to} extraQuery={`&openOnly=${openOnly}`} />
+        <VarianceExportButtons
+          filenameBase={`microfi-variance-debts_${branchId}_${from}_${to}`}
+          meta={{ scope: branchLabel, from, to, generatedBy }}
+          rows={exportRows}
+        />
+      </div>
       <div className="grid grid-cols-2 sm:max-w-md gap-4">
         <StatCard icon="warning" label={dict.ofj.variance.openDebts} value={openCount.toLocaleString()} alert={openCount > 0} />
         <StatCard icon="account-balance-wallet" label={dict.ofj.variance.totalAmount} value={`${totalAmount.toLocaleString()} XAF`} />
@@ -325,7 +436,7 @@ async function VarianceView({
         icon="warning"
         title={dict.ofj.variance.title}
         right={
-          <Link href={`/ofj?branchId=${branchId}&tab=variance&openOnly=${!openOnly}`} className="text-sm text-primary hover:underline underline-offset-2 font-medium">
+          <Link href={`/ofj?branchId=${branchId}&tab=variance&openOnly=${!openOnly}&from=${from}&to=${to}`} className="text-sm text-primary hover:underline underline-offset-2 font-medium">
             {openOnly ? dict.ofj.variance.showAllDebts : dict.ofj.variance.showOpenOnly}
           </Link>
         }
@@ -336,6 +447,7 @@ async function VarianceView({
             <Th>{dict.ofj.variance.colAmount}</Th>
             <Th>{dict.dashboard.colStatus}</Th>
             <Th>{dict.ofj.variance.colRecorded}</Th>
+            {isAdmin && <Th>{dict.ofj.variance.colActions}</Th>}
           </Thead>
           <Tbody>
             {debts.map((debt) => (
@@ -344,8 +456,20 @@ async function VarianceView({
                 <Td>{debt.amountXaf.toLocaleString()} XAF</Td>
                 <Td>
                   <Badge status={debt.status} />
+                  {debt.status === "WRITTEN_OFF" && debt.writtenOffReason && (
+                    <p className="text-xs text-on-surface-variant mt-1 max-w-[240px]">
+                      {t(dict.ofj.variance.writtenOffNote, { reason: debt.writtenOffReason })}
+                    </p>
+                  )}
                 </Td>
                 <Td>{new Date(debt.createdAt).toLocaleString()}</Td>
+                {isAdmin && (
+                  <Td>
+                    {debt.status === "OPEN" && (
+                      <WriteOffVarianceDebtModal debtId={debt.id} agentLabel={agentLabel(agentById, debt.agentId)} amountXaf={debt.amountXaf} />
+                    )}
+                  </Td>
+                )}
               </Tr>
             ))}
           </Tbody>

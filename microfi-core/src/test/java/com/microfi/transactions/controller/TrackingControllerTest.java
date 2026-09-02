@@ -1,5 +1,8 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.Agent;
@@ -13,6 +16,7 @@ import com.microfi.shared.dto.LocationPingResponse;
 import com.microfi.shared.dto.SosResponse;
 import com.microfi.transactions.service.TrackingService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
@@ -26,8 +30,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = TrackingController.class)
@@ -39,6 +45,9 @@ class TrackingControllerTest {
 
     @MockitoBean
     private TrackingService trackingService;
+
+    @MockitoBean
+    private AuditService auditService;
 
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.
@@ -128,6 +137,12 @@ class TrackingControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.agentId").isEqualTo(agentId.toString());
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.AGENT);
+        assertThat(captor.getValue().getAgentId()).isEqualTo(agentId);
+        assertThat(captor.getValue().getEventType()).isEqualTo("AGENT_SOS_TRIGGERED");
     }
 
     @Test

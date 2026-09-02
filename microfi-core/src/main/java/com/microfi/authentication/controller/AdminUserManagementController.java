@@ -1,5 +1,9 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.AdminRole;
@@ -53,6 +57,7 @@ public class AdminUserManagementController {
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminUserEnrollmentService adminUserEnrollmentService;
+    private final AuditService auditService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -119,7 +124,10 @@ public class AdminUserManagementController {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has been deleted and can no longer be suspended or reactivated");
                     }
                     target.setStatus(request.getStatus());
-                    return toResponse(adminUserRepository.save(target));
+                    AdminUser saved = adminUserRepository.save(target);
+                    auditTarget(caller, request.getStatus() == AdminUserStatus.SUSPENDED ? "ADMIN_USER_SUSPENDED" : "ADMIN_USER_REACTIVATED",
+                            target, request.getStatus() == AdminUserStatus.SUSPENDED ? "Account suspended" : "Account reactivated");
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -141,7 +149,9 @@ public class AdminUserManagementController {
                     target.setDeletionReason(request.getReason());
                     target.setDeletedBy(callerUser.getId());
                     target.setDeletedAt(Instant.now());
-                    return toResponse(adminUserRepository.save(target));
+                    AdminUser saved = adminUserRepository.save(target);
+                    auditTarget(caller, "ADMIN_USER_DELETED", target, "Account deleted: " + request.getReason());
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -166,8 +176,28 @@ public class AdminUserManagementController {
                     AdminUser target = findOrThrow(id);
                     AdminAccess.requireBranchScope(caller, target.getBranchId());
                     target.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-                    return toResponse(adminUserRepository.save(target));
+                    target.setMustChangePassword(true);
+                    AdminUser saved = adminUserRepository.save(target);
+                    auditTarget(caller, "ADMIN_USER_PASSWORD_RESET", target, "Password reset by Back-Office");
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private void auditTarget(AdminUserDetails caller, String eventType, AdminUser target, String details) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType(eventType)
+                .actorType(AuditActorType.ADMIN)
+                .actorId(caller.getAdminUser().getId())
+                .actorLabel(caller.getAdminUser().getLogin())
+                .actorRole(caller.getAdminUser().getRole())
+                .branchId(target.getBranchId())
+                .targetAdminUserId(target.getId())
+                // The target's own role is spelled out here (not just "ADMIN_USER_...") since the
+                // event type alone doesn't say whether the affected account was a Branch Manager
+                // or a Branch Cashier — same precision gap the actor's own actorRole fixes.
+                .details(details + " (" + target.getLogin() + ", " + target.getRole() + ")")
+                .build());
     }
 
     private void requireConsistentRoleAndBranch(AdminRole role, UUID branchId) {

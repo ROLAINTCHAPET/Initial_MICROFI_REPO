@@ -1,5 +1,9 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditStatus;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUser;
@@ -10,6 +14,7 @@ import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.AdminLoginRequest;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
@@ -23,8 +28,10 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = AdminAuthenticationController.class)
@@ -52,6 +59,9 @@ class AdminAuthenticationControllerTest {
     @MockitoBean
     private AgentDetailsService agentDetailsService;
 
+    @MockitoBean
+    private AuditService auditService;
+
     private AdminUser adminUser(AdminUserStatus status) {
         return AdminUser.builder().id(UUID.randomUUID()).login("admin").passwordHash("hashed")
                 .role(AdminRole.ADMIN).status(status).build();
@@ -76,6 +86,11 @@ class AdminAuthenticationControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.token").isEqualTo("mock-admin-jwt");
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.ADMIN);
+        assertThat(captor.getValue().getStatus()).isEqualTo(AuditStatus.SUCCESS);
     }
 
     @Test
@@ -94,6 +109,11 @@ class AdminAuthenticationControllerTest {
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isUnauthorized();
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.ADMIN);
+        assertThat(captor.getValue().getStatus()).isEqualTo(AuditStatus.FAILED);
     }
 
     @Test

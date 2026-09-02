@@ -624,10 +624,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get caIntroMessage =>
-      'Enter the Activation ID your branch gave you and choose a login and PIN. Afterwards, ask your agent to sponsor your activation, then confirm the payment yourself to receive your booklet.';
+      'Enter your MFI account number (the same number your branch already gave you) and choose a login and PIN. Afterwards, ask your agent to sponsor your activation, then confirm the payment yourself to receive your booklet.';
 
   @override
-  String get caActivationIdLabel => 'Activation ID';
+  String get caMfiIdentifierLabel => 'Your MFI Account Number';
+
+  @override
+  String caRegisteredWithMfi(String mfiName) {
+    return 'You\'re now registered with $mfiName.';
+  }
 
   @override
   String get caChooseLoginLabel => 'Choose a Login';
@@ -745,6 +750,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lgSecureAccessOnly => 'Secure field-agent access only.';
+
+  @override
+  String get lgForgotPasswordLink => 'Forgot password?';
+
+  @override
+  String get fpTitle => 'Forgot Password';
+
+  @override
+  String get fpRequestSubtitle =>
+      'Enter your username. We\'ll send a verification code by SMS to your registered phone.';
+
+  @override
+  String get fpUsernameLabel => 'Username';
+
+  @override
+  String get fpSendCodeButton => 'Send Code';
+
+  @override
+  String get fpCodeSentMessage =>
+      'If that username exists, a code has been sent by SMS.';
+
+  @override
+  String get fpConfirmSubtitle =>
+      'Enter the code you received and choose a new password.';
+
+  @override
+  String get fpOtpLabel => 'Verification Code';
+
+  @override
+  String get fpNewPasswordLabel => 'New Password';
+
+  @override
+  String get fpConfirmPasswordLabel => 'Confirm New Password';
+
+  @override
+  String get fpPasswordTooShort => 'Password must be at least 8 characters';
+
+  @override
+  String get fpPasswordMismatch => 'Passwords do not match';
+
+  @override
+  String get fpResetButton => 'Reset Password';
+
+  @override
+  String get fpSuccessMessage => 'Password updated. You can now log in.';
+
+  @override
+  String get fpResendCode => 'Resend code';
+
+  @override
+  String get fpBackToLogin => 'Back to Login';
 
   @override
   String get seUnableToCheckLocation => 'Unable to check location.';

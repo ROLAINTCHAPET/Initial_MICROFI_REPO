@@ -58,6 +58,9 @@ public class Collection {
     @Column(nullable = false)
     private String deviceTxId;
 
+    /** Which physical terminal recorded this collection (see Terminal) — distinct from deviceTxId, which is only an idempotency key. Boxed/nullable, same reasoning as failedPinAttempts, so ddl-auto=update doesn't need to backfill an already-populated table. */
+    private String terminalId;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 

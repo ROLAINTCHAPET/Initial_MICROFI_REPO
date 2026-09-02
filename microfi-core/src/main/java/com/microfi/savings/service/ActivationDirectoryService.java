@@ -25,11 +25,7 @@ public class ActivationDirectoryService {
     private final ActivationPaymentRepository activationPaymentRepository;
     private final ActivationRequestRepository activationRequestRepository;
 
-    public long sumAmountByAgentAndWindow(UUID agentId, Instant start, Instant end) {
-        return activationPaymentRepository.sumAmountByAgentAndWindow(agentId, start, end);
-    }
-
-    /** UC-16: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
+    /** UC-16 / BR-03: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
     public long sumUnreconciled(UUID agentId, Instant cutoff) {
         return activationPaymentRepository.sumUnreconciledByAgent(agentId, cutoff);
     }

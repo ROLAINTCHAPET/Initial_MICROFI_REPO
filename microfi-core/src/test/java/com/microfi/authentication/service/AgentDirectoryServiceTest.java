@@ -185,44 +185,6 @@ class AgentDirectoryServiceTest {
     }
 
     @Test
-    void isBranchPastCloseTimeTrueWhenNoScheduleConfigured() {
-        UUID branchId = UUID.randomUUID();
-        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).build()));
-
-        assertThat(agentDirectoryService.isBranchPastCloseTime(branchId)).isTrue();
-    }
-
-    @Test
-    void isBranchPastCloseTimeFalseBeforeConfiguredCloseTime() {
-        UUID branchId = UUID.randomUUID();
-        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.systemDefault());
-        Branch branch = Branch.builder().id(branchId).closeTime(now.plusHours(2)).timezone(java.time.ZoneId.systemDefault().getId()).build();
-        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
-
-        assertThat(agentDirectoryService.isBranchPastCloseTime(branchId)).isFalse();
-    }
-
-    @Test
-    void isBranchPastCloseTimeTrueAfterConfiguredCloseTime() {
-        UUID branchId = UUID.randomUUID();
-        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.systemDefault());
-        Branch branch = Branch.builder().id(branchId).closeTime(now.minusHours(2)).timezone(java.time.ZoneId.systemDefault().getId()).build();
-        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
-
-        assertThat(agentDirectoryService.isBranchPastCloseTime(branchId)).isTrue();
-    }
-
-    @Test
-    void isBranchPastCloseTimeThrows404WhenBranchMissing() {
-        UUID branchId = UUID.randomUUID();
-        when(branchRepository.findById(branchId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> agentDirectoryService.isBranchPastCloseTime(branchId))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
-    }
-
-    @Test
     void effectiveCeilingPctForAgentUnknownAgentThrows404() {
         when(agentRepository.findById(agentId)).thenReturn(Optional.empty());
 
@@ -239,5 +201,83 @@ class AgentDirectoryServiceTest {
         assertThatThrownBy(() -> agentDirectoryService.verifyTransactionPin(agentId, "1234"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+    }
+
+    @Test
+    void requireWithinScheduleWindowAllowsCollectionInsideWindow() {
+        UUID branchId = UUID.randomUUID();
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.LocalTime collectedLocalTime = java.time.LocalTime.now(zone);
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).code("BR1").name("Branch 1")
+                .openTime(collectedLocalTime.minusHours(2)).closeTime(collectedLocalTime.plusHours(2)).timezone(zone.getId()).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        agentDirectoryService.requireWithinScheduleWindow(agentId, collectedLocalTime.atDate(java.time.LocalDate.now(zone)).atZone(zone).toInstant());
+    }
+
+    @Test
+    void requireWithinScheduleWindowRejectsWhenCollectedAfterClosingTime() {
+        UUID branchId = UUID.randomUUID();
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.LocalTime collectedLocalTime = java.time.LocalTime.now(zone);
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).code("BR1").name("Branch 1")
+                .openTime(collectedLocalTime.minusHours(3)).closeTime(collectedLocalTime.minusHours(1)).timezone(zone.getId()).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        java.time.Instant collectedAt = collectedLocalTime.atDate(java.time.LocalDate.now(zone)).atZone(zone).toInstant();
+        assertThatThrownBy(() -> agentDirectoryService.requireWithinScheduleWindow(agentId, collectedAt))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void requireWithinScheduleWindowRejectsWhenCollectedBeforeOpeningTime() {
+        UUID branchId = UUID.randomUUID();
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.LocalTime collectedLocalTime = java.time.LocalTime.now(zone);
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).code("BR1").name("Branch 1")
+                .openTime(collectedLocalTime.plusHours(1)).closeTime(collectedLocalTime.plusHours(3)).timezone(zone.getId()).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        java.time.Instant collectedAt = collectedLocalTime.atDate(java.time.LocalDate.now(zone)).atZone(zone).toInstant();
+        assertThatThrownBy(() -> agentDirectoryService.requireWithinScheduleWindow(agentId, collectedAt))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void requireWithinScheduleWindowAllowsWhenBranchHasNoScheduleConfigured() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).code("BR1").name("Branch 1").build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        agentDirectoryService.requireWithinScheduleWindow(agentId, java.time.Instant.now());
+    }
+
+    @Test
+    void requireWithinScheduleWindowAllowsLateSyncOfACollectionMadeDuringHours() {
+        // The real scenario this method exists for: an offline collection gathered during business
+        // hours (collectedAt inside the window) only reaches the server well after closing time —
+        // that late arrival must not retroactively reject a deposit that was legitimately made.
+        UUID branchId = UUID.randomUUID();
+        java.time.ZoneId zone = java.time.ZoneId.of("Africa/Douala");
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).code("BR1").name("Branch 1")
+                .openTime(java.time.LocalTime.of(8, 0)).closeTime(java.time.LocalTime.of(17, 0)).timezone(zone.getId()).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        // Collected at 13:00 (well inside the window) but "now" — irrelevant to this call — could
+        // be any time at all, including hours after close; only collectedAt is what's checked.
+        java.time.Instant collectedAt = java.time.LocalDate.now(zone).atTime(13, 0).atZone(zone).toInstant();
+        agentDirectoryService.requireWithinScheduleWindow(agentId, collectedAt);
     }
 }

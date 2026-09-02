@@ -32,6 +32,12 @@ public class Agent {
 
     private String phone;
 
+    /**
+     * The device this agent last logged in from. Devices are recognized system-wide (see
+     * {@code Terminal}), not exclusively owned by one agent — so this field is really just a
+     * marker of whether this agent has ever completed a login before (null = never), which
+     * governs whether their next login may register a brand-new, never-before-seen terminal.
+     */
     private String imei;
 
     /**

@@ -11,15 +11,20 @@ class ClientAuthRepository {
     return response['token'] as String;
   }
 
-  /// Step 1 of 2: sets the client's own login/PIN. Returns the confirmation message — the booklet
-  /// token isn't issued until an agent also sponsors it and the client confirms payment.
-  Future<String> activate({required String activationId, required String login, required String pin}) async {
+  /// Step 1 of 2: proves membership with the account number the client's own MFI already gave
+  /// them (the same number their branch used when registering them), then sets their own
+  /// login/PIN. Returns the confirmation message plus which MFI they just registered with — the
+  /// booklet token isn't issued until an agent also sponsors it and the client confirms payment.
+  Future<ClientActivationResult> activate({required String mfiIdentifier, required String login, required String pin}) async {
     final response = await _client.post('/auth/client/activate', {
-      'activationId': activationId,
+      'mfiIdentifier': mfiIdentifier,
       'login': login,
       'pin': pin,
     });
-    return response['message'] as String;
+    return ClientActivationResult(
+      message: response['message'] as String,
+      mfiName: response['mfiName'] as String,
+    );
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/api_client.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
+import '../../core/device_id_service.dart';
 import '../../core/local_ceiling_cache.dart';
 import '../../core/local_pin_verifier.dart';
 import '../../core/locale_preference.dart';
@@ -233,6 +234,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     }
 
     final deviceTxId = const Uuid().v4();
+    final terminalId = await DeviceIdService().getDeviceId();
     final lines = _denominations
         .where((d) => (_counts[d] ?? 0) > 0)
         .map((d) => DenominationLine(faceValueXaf: d, quantity: _counts[d]!))
@@ -288,6 +290,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         collectedAtIso: collectedAt.toIso8601String(),
         denominationLines: lines,
         pin: _pinController.text,
+        terminalId: terminalId,
       ));
       await _refreshQueuedTodayTotal();
       await _composeOfflineReceipt(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
@@ -308,6 +311,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         lon: _position!.longitude,
         accuracyM: _position!.accuracy,
         deviceTxId: deviceTxId,
+        terminalId: terminalId,
         denominationLines: lines,
         pin: _pinController.text,
       );

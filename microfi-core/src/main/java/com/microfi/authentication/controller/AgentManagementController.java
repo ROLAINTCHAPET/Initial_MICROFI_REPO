@@ -1,6 +1,11 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
+import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AgentStatus;
@@ -11,6 +16,7 @@ import com.microfi.shared.dto.AgentResponse;
 import com.microfi.shared.dto.DeleteAgentRequest;
 import com.microfi.shared.dto.RegisterRequest;
 import com.microfi.shared.dto.ResetAgentDeviceRequest;
+import com.microfi.shared.dto.ResetAgentPasswordRequest;
 import com.microfi.shared.dto.UpdateAgentStatusRequest;
 import com.microfi.shared.dto.VarianceDebtResponse;
 import com.microfi.transactions.service.EscrowService;
@@ -58,6 +64,7 @@ public class AgentManagementController {
     private final EscrowService escrowService;
     private final OfjService ofjService;
     private final AgentEnrollmentService agentEnrollmentService;
+    private final AuditService auditService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -132,7 +139,10 @@ public class AgentManagementController {
                         }
                     }
                     agent.setStatus(request.getStatus());
-                    return toResponse(agentRepository.save(agent));
+                    Agent saved = agentRepository.save(agent);
+                    auditAgent(caller, request.getStatus() == AgentStatus.SUSPENDED ? "AGENT_SUSPENDED" : "AGENT_REACTIVATED",
+                            agent, request.getStatus() == AgentStatus.SUSPENDED ? "Agent suspended" : "Agent reactivated");
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -151,12 +161,14 @@ public class AgentManagementController {
                     agent.setDeletionReason(request.getReason());
                     agent.setDeletedBy(caller.getAdminUser().getId());
                     agent.setDeletedAt(Instant.now());
-                    return toResponse(agentRepository.save(agent));
+                    Agent saved = agentRepository.save(agent);
+                    auditAgent(caller, "AGENT_DELETED", agent, "Agent deleted: " + request.getReason());
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PatchMapping("/{id}/device-binding")
-    @Operation(summary = "Reset Device Binding", description = "Lost-device recovery: clears the agent's bound device (a required reason is kept on file). The agent cannot log in from any device until their next successful login, from whichever phone they use, binds it automatically — no code to hand them, nothing transmitted out of band. Does not touch the agent's password or PIN. ADMIN or BRANCH_MANAGER (own branch only).")
+    @Operation(summary = "Reset Device Binding", description = "Lost/new-device recovery: clears this agent's login history marker (a required reason is kept on file). Devices are recognized system-wide, not owned by one agent (see Terminal) — an agent normally can't move to a device nobody has ever used before, but clearing this puts the agent back into a first-ever-login state, so their very next login registers whatever new device they use, no code to hand them, nothing transmitted out of band. Does not touch the agent's password or PIN. ADMIN or BRANCH_MANAGER (own branch only).")
     public Mono<AgentResponse> resetDeviceBinding(@PathVariable UUID id, @Valid @RequestBody ResetAgentDeviceRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
@@ -166,7 +178,25 @@ public class AgentManagementController {
                     agent.setImei(null);
                     agent.setDeviceResetReason(request.getReason());
                     agent.setDeviceResetAt(Instant.now());
-                    return toResponse(agentRepository.save(agent));
+                    Agent saved = agentRepository.save(agent);
+                    auditAgent(caller, "AGENT_DEVICE_RESET", agent, "Device binding reset: " + request.getReason());
+                    return toResponse(saved);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/{id}/password")
+    @Operation(summary = "Reset Password", description = "Back-Office-initiated login-password reset (no current-password confirmation, unlike the agent's own self-service change). Also clears any active login lockout, so this doubles as an unlock. Does not touch the transaction PIN. ADMIN or BRANCH_MANAGER (own branch only).")
+    public Mono<AgentResponse> resetPassword(@PathVariable UUID id, @Valid @RequestBody ResetAgentPasswordRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    Agent agent = findAgentOrThrow(id);
+                    AdminAccess.requireBranchScope(caller, agent.getBranchId());
+                    agent.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+                    agent.setFailedPinAttempts(0);
+                    agent.setLockedUntil(null);
+                    Agent saved = agentRepository.save(agent);
+                    auditAgent(caller, "AGENT_PASSWORD_RESET", agent, "Password reset by Back-Office");
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -178,8 +208,25 @@ public class AgentManagementController {
                     Agent agent = agentRepository.findById(id)
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + id));
                     AdminAccess.requireBranchScope(caller, agent.getBranchId());
-                    return escrowService.applyCeilingOverride(id, request.getTempCeilingXaf(), request.getReason(), request.getValidUntil());
+                    EscrowResponse result = escrowService.applyCeilingOverride(id, request.getTempCeilingXaf(), request.getReason(), request.getValidUntil());
+                    auditAgent(caller, "AGENT_CEILING_WAIVER", agent,
+                            "Temporary ceiling waiver: " + request.getTempCeilingXaf() + " XAF until " + request.getValidUntil() + ", reason: " + request.getReason());
+                    return result;
                 }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private void auditAgent(AdminUserDetails caller, String eventType, Agent agent, String details) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType(eventType)
+                .actorType(AuditActorType.ADMIN)
+                .actorId(caller.getAdminUser().getId())
+                .actorLabel(caller.getAdminUser().getLogin())
+                .actorRole(caller.getAdminUser().getRole())
+                .branchId(agent.getBranchId())
+                .agentId(agent.getId())
+                .details(details)
+                .build());
     }
 
     private Agent findAgentOrThrow(UUID id) {

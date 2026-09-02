@@ -72,15 +72,25 @@ public class NotificationService {
     }
 
     /**
-     * UC-15 follow-on: agents don't watch the Back-Office, so a same-day closing-time change would
-     * otherwise go unnoticed until an agent happened to check — SMS every agent at the branch
-     * (best-effort, same "never blocks the caller" contract as {@link #notifyCollection}: a
-     * gateway failure here must never fail the schedule update itself) and leave a BranchNotice
+     * UC-15 follow-on: agents don't watch the Back-Office, so a same-day opening/closing-time
+     * change would otherwise go unnoticed until an agent happened to check — SMS every agent at
+     * the branch (best-effort, same "never blocks the caller" contract as {@link #notifyCollection}:
+     * a gateway failure here must never fail the schedule update itself) and leave a BranchNotice
      * row the mobile app polls, so the change is visible even to an agent who missed the SMS or
-     * had the app closed at the time.
+     * had the app closed at the time. Fires for either an openTime or a closeTime change (or
+     * both) — whichever half of the window actually moved, agents who log collections against it
+     * need to know.
      */
-    public void notifyBranchScheduleChange(UUID branchId, String branchName, LocalTime newCloseTime) {
-        String message = branchName + ": today's closing time changed to " + newCloseTime + ".";
+    public void notifyBranchScheduleChange(UUID branchId, String branchName, LocalTime newOpenTime, LocalTime newCloseTime,
+                                            boolean openTimeChanged, boolean closeTimeChanged) {
+        String message;
+        if (openTimeChanged && closeTimeChanged) {
+            message = branchName + ": today's hours changed to " + newOpenTime + "-" + newCloseTime + ".";
+        } else if (closeTimeChanged) {
+            message = branchName + ": today's closing time changed to " + newCloseTime + ".";
+        } else {
+            message = branchName + ": today's opening time changed to " + newOpenTime + ".";
+        }
 
         branchNoticeRepository.save(BranchNotice.builder()
                 .id(UUID.randomUUID())

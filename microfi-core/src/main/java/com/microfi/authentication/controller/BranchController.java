@@ -1,5 +1,9 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.Branch;
@@ -14,8 +18,11 @@ import com.microfi.shared.dto.BranchPhoneRequest;
 import com.microfi.shared.dto.BranchRequest;
 import com.microfi.shared.dto.BranchRequireImeiRequest;
 import com.microfi.shared.dto.BranchResponse;
+import com.microfi.shared.dto.GeofenceRequest;
+import com.microfi.shared.dto.MessageResponse;
 import com.microfi.shared.dto.ScheduleDefaultsResponse;
 import com.microfi.shared.dto.ScheduleRequest;
+import com.microfi.transactions.service.GeofenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -59,6 +66,8 @@ public class BranchController {
     private final BranchScheduleDefaultsRepository scheduleDefaultsRepository;
     private final AgentDirectoryService agentDirectoryService;
     private final NotificationService notificationService;
+    private final GeofenceService geofenceService;
+    private final AuditService auditService;
 
     @GetMapping("/schedule-defaults")
     @Operation(summary = "Get Global Schedule Defaults", description = "Organization-wide default working hours (FR-15). Falls back to 08:00-17:00 until an ADMIN sets one explicitly. Any Back-Office role.")
@@ -69,7 +78,7 @@ public class BranchController {
     }
 
     @PutMapping("/schedule-defaults")
-    @Operation(summary = "Set Global Schedule Defaults", description = "Updates the organization-wide default working hours. By default this only fills in branches that have no schedule of their own yet (explicit per-branch configuration wins). Pass overrideAll=true to force every branch, including ones with an existing schedule, to this window in one action. ADMIN only.")
+    @Operation(summary = "Set Global Schedule Defaults", description = "Updates the organization-wide default working hours. By default this only fills in branches that have no schedule of their own yet (explicit per-branch configuration wins). Pass overrideAll=true to force every branch, including ones with an existing schedule, to this window in one action. Every branch whose openTime and/or closeTime actually changes as a result notifies its agents (SMS + in-app notice), same as the single-branch schedule endpoint. ADMIN only.")
     public Mono<ScheduleDefaultsResponse> putScheduleDefaults(
             @Valid @RequestBody ScheduleRequest request,
             @RequestParam(defaultValue = "false") boolean overrideAll,
@@ -88,11 +97,17 @@ public class BranchController {
 
                     List<Branch> targets = branchRepository.findAll().stream()
                             .filter(b -> overrideAll || b.getOpenTime() == null || b.getCloseTime() == null)
-                            .peek(b -> {
-                                b.setOpenTime(request.getOpenTime());
-                                b.setCloseTime(request.getCloseTime());
-                            })
                             .toList();
+                    for (Branch branch : targets) {
+                        boolean openTimeChanged = !java.util.Objects.equals(branch.getOpenTime(), request.getOpenTime());
+                        boolean closeTimeChanged = !java.util.Objects.equals(branch.getCloseTime(), request.getCloseTime());
+                        branch.setOpenTime(request.getOpenTime());
+                        branch.setCloseTime(request.getCloseTime());
+                        if (openTimeChanged || closeTimeChanged) {
+                            notificationService.notifyBranchScheduleChange(branch.getId(), branch.getName(),
+                                    branch.getOpenTime(), branch.getCloseTime(), openTimeChanged, closeTimeChanged);
+                        }
+                    }
                     branchRepository.saveAll(targets);
 
                     return toDefaultsResponse(defaults);
@@ -195,7 +210,7 @@ public class BranchController {
     }
 
     @PutMapping("/{id}/schedule")
-    @Operation(summary = "Configure Branch Schedule", description = "Sets the session opening/closing time windows enforced on agent sessions (FR-15). Once today's opening time has passed (branch's own timezone), openTime is locked for the rest of the day — only closeTime can still be changed; check openTimeLocked on GET before submitting. Changing closeTime notifies every agent at the branch (SMS + in-app notice). ADMIN or that branch's own BRANCH_MANAGER.")
+    @Operation(summary = "Configure Branch Schedule", description = "Sets the session opening/closing time windows enforced on agent sessions (FR-15). Once today's opening time has passed (branch's own timezone), openTime is locked for the rest of the day — only closeTime can still be changed; check openTimeLocked on GET before submitting. Changing openTime and/or closeTime notifies every agent at the branch (SMS + in-app notice). ADMIN or that branch's own BRANCH_MANAGER.")
     public Mono<BranchResponse> putSchedule(@PathVariable UUID id, @Valid @RequestBody ScheduleRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> {
@@ -209,7 +224,7 @@ public class BranchController {
                         boolean openTimeChanged = !java.util.Objects.equals(branch.getOpenTime(), request.getOpenTime());
                         if (openTimeChanged && agentDirectoryService.isBranchPastOpenTime(branch)) {
                             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                    "Today's opening time (" + branch.getOpenTime() + ") has already passed and can no longer be changed — only closing time can still be updated today.");
+                                    "Today's opening time (" + branch.getOpenTime() + ") has already passed and can no longer be changed. Only closing time can still be updated today.");
                         }
                         boolean closeTimeChanged = !java.util.Objects.equals(branch.getCloseTime(), request.getCloseTime());
 
@@ -217,10 +232,35 @@ public class BranchController {
                         branch.setCloseTime(request.getCloseTime());
                         Branch saved = branchRepository.save(branch);
 
-                        if (closeTimeChanged) {
-                            notificationService.notifyBranchScheduleChange(saved.getId(), saved.getName(), saved.getCloseTime());
+                        if (openTimeChanged || closeTimeChanged) {
+                            notificationService.notifyBranchScheduleChange(saved.getId(), saved.getName(),
+                                    saved.getOpenTime(), saved.getCloseTime(), openTimeChanged, closeTimeChanged);
                         }
                         return toResponse(saved);
+                    }).subscribeOn(Schedulers.boundedElastic());
+                });
+    }
+
+    @PutMapping("/{id}/geofence")
+    @Operation(summary = "Bulk-Apply Geofence To Branch", description = "Writes the given perimeter polygon as every currently-active agent's own geofence (BR-Fence-01) — a convenience over drawing the same shape one agent at a time, not a shared branch-level geofence. An agent added to the branch afterward still needs their own geofence set. ADMIN or that branch's own BRANCH_MANAGER.")
+    public Mono<MessageResponse> applyGeofenceToBranch(@PathVariable UUID id, @Valid @RequestBody GeofenceRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> {
+                    AdminAccess.requireBranchScope(caller, id);
+                    return Mono.fromCallable(() -> {
+                        findBranchOrThrow(id);
+                        int count = geofenceService.applyGeofenceToBranch(id, request);
+                        auditService.record(AuditLogEntry.builder()
+                                .category(AuditCategory.SECURITY)
+                                .eventType("BRANCH_GEOFENCE_BULK_APPLIED")
+                                .actorType(AuditActorType.ADMIN)
+                                .actorId(caller.getAdminUser().getId())
+                                .actorLabel(caller.getAdminUser().getLogin())
+                                .actorRole(caller.getAdminUser().getRole())
+                                .branchId(id)
+                                .details("Bulk geofence applied to " + count + " agent(s)")
+                                .build());
+                        return MessageResponse.builder().message("Applied to " + count + " agent(s)").build();
                     }).subscribeOn(Schedulers.boundedElastic());
                 });
     }

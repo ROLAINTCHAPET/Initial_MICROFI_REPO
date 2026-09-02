@@ -32,6 +32,7 @@ public class CollectionResponse {
     private Instant reconciledAt;
     private String syncStatus;
     private String deviceTxId;
+    private String terminalId;
     private List<DenominationLineDto> denominationLines;
     private boolean duplicate;
 }

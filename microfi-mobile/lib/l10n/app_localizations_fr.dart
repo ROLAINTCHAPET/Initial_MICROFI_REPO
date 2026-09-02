@@ -635,10 +635,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get caIntroMessage =>
-      'Saisissez l\'identifiant d\'activation fourni par votre agence et choisissez un identifiant de connexion et un code confidentiel. Ensuite, demandez à votre agent de parrainer votre activation, puis confirmez vous-même le paiement pour recevoir votre livret.';
+      'Saisissez votre numéro de compte MFI (le même numéro déjà fourni par votre agence) et choisissez un identifiant de connexion et un code confidentiel. Ensuite, demandez à votre agent de parrainer votre activation, puis confirmez vous-même le paiement pour recevoir votre livret.';
 
   @override
-  String get caActivationIdLabel => 'Identifiant d\'activation';
+  String get caMfiIdentifierLabel => 'Votre numéro de compte MFI';
+
+  @override
+  String caRegisteredWithMfi(String mfiName) {
+    return 'Vous êtes maintenant enregistré auprès de $mfiName.';
+  }
 
   @override
   String get caChooseLoginLabel => 'Choisir un identifiant de connexion';
@@ -760,6 +765,59 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get lgSecureAccessOnly =>
       'Accès sécurisé réservé aux agents de terrain.';
+
+  @override
+  String get lgForgotPasswordLink => 'Mot de passe oublié ?';
+
+  @override
+  String get fpTitle => 'Mot de passe oublié';
+
+  @override
+  String get fpRequestSubtitle =>
+      'Entrez votre nom d\'utilisateur. Nous enverrons un code de vérification par SMS à votre téléphone enregistré.';
+
+  @override
+  String get fpUsernameLabel => 'Nom d\'utilisateur';
+
+  @override
+  String get fpSendCodeButton => 'Envoyer le code';
+
+  @override
+  String get fpCodeSentMessage =>
+      'Si ce nom d\'utilisateur existe, un code a été envoyé par SMS.';
+
+  @override
+  String get fpConfirmSubtitle =>
+      'Entrez le code reçu et choisissez un nouveau mot de passe.';
+
+  @override
+  String get fpOtpLabel => 'Code de vérification';
+
+  @override
+  String get fpNewPasswordLabel => 'Nouveau mot de passe';
+
+  @override
+  String get fpConfirmPasswordLabel => 'Confirmer le nouveau mot de passe';
+
+  @override
+  String get fpPasswordTooShort =>
+      'Le mot de passe doit contenir au moins 8 caractères';
+
+  @override
+  String get fpPasswordMismatch => 'Les mots de passe ne correspondent pas';
+
+  @override
+  String get fpResetButton => 'Réinitialiser le mot de passe';
+
+  @override
+  String get fpSuccessMessage =>
+      'Mot de passe mis à jour. Vous pouvez maintenant vous connecter.';
+
+  @override
+  String get fpResendCode => 'Renvoyer le code';
+
+  @override
+  String get fpBackToLogin => 'Retour à la connexion';
 
   @override
   String get seUnableToCheckLocation => 'Impossible de vérifier la position.';

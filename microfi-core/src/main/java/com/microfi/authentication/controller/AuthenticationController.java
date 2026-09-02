@@ -1,14 +1,25 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.domain.AuditStatus;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.authentication.repository.TerminalRepository;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.AgentPasswordResetService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.authentication.service.TerminalService;
 import com.microfi.shared.dto.AuthRequest;
 import com.microfi.shared.dto.AuthResponse;
+import com.microfi.shared.dto.ForgotPasswordRequest;
+import com.microfi.shared.dto.MessageResponse;
+import com.microfi.shared.dto.ResetPasswordWithOtpRequest;
 import com.microfi.events.AuthEventPublisher;
 import com.microfi.shared.exception.InvalidCredentialsException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,8 +37,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,10 +48,18 @@ import java.util.Map;
 public class AuthenticationController {
 
     private final AgentDetailsService agentDetailsService;
+    private final AgentPasswordResetService agentPasswordResetService;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthEventPublisher authEventPublisher;
     private final BranchRepository branchRepository;
+    private final TerminalRepository terminalRepository;
+    private final TerminalService terminalService;
+    private final AuditService auditService;
+
+    private static final MessageResponse FORGOT_PASSWORD_ACK = MessageResponse.builder()
+            .message("If that username exists, a reset code has been sent by SMS.")
+            .build();
 
     @PostMapping("/agent/login")
     @Operation(summary = "Agent Login", description = "Authenticates an agent using their username, password, and device IMEI. Returns a JWT token. The transaction PIN is not involved in login — see POST /collections.")
@@ -58,16 +75,19 @@ public class AuthenticationController {
                     // collection time (see AgentDirectoryService#verifyTransactionPin).
                     if (agent.getStatus() == AgentStatus.DELETED) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                        auditAgentLogin(agent, request.getUsername(), "Login failed: account deleted");
                         return Mono.error(new InvalidCredentialsException("Agent account has been deleted"));
                     }
                     if (agent.getStatus() == AgentStatus.SUSPENDED) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                        auditAgentLogin(agent, request.getUsername(), "Login failed: account suspended");
                         return Mono.error(new InvalidCredentialsException("Agent account is suspended"));
                     }
 
                     // UC-01 §4.1: locked out after too many failed login attempts — rejected before the password is even checked.
                     if (agent.getLockedUntil() != null && agent.getLockedUntil().isAfter(Instant.now())) {
                         authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                        auditAgentLogin(agent, request.getUsername(), "Login failed: too many failed attempts, locked out");
                         return Mono.error(new ResponseStatusException(HttpStatus.LOCKED,
                                 "Too many failed login attempts. Try again after " + DateTimeFormatter.ISO_INSTANT.format(agent.getLockedUntil())));
                     }
@@ -78,45 +98,57 @@ public class AuthenticationController {
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .then(Mono.defer(() -> {
                                     authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                                    auditAgentLogin(agent, request.getUsername(), "Login failed: invalid password");
                                     return Mono.error(new InvalidCredentialsException("Invalid password"));
                                 }));
                     }
 
                     Branch branch = branchRepository.findById(agent.getBranchId()).orElse(null);
 
-                    // Device binding (FR-01, BR-Auth-02). Three cases:
-                    //  - already bound (agent.imei set): strict match required, regardless of the
-                    //    branch's current setting — a branch turning the requirement off later
-                    //    doesn't retroactively unbind an already-enrolled agent.
-                    //  - not yet bound, branch requires binding: this login IS the enrollment —
-                    //    bind whatever device sent it, so long as one was actually sent.
-                    //  - not yet bound, branch doesn't require binding: skip entirely.
+                    // Device recognition (FR-01, BR-Auth-02). A device/terminal is a property of
+                    // the system, not of any one agent: once a device has been used successfully
+                    // once, by anyone, it's recognized and any agent may use it from then on.
+                    // Three cases:
+                    //  - agent has logged in before, same device as last time (agent.imei matches):
+                    //    always fine — no registry lookup needed. This also keeps every already-
+                    //    bound agent's routine login working on day one, before their existing
+                    //    device has ever been explicitly recorded in the new Terminal table.
+                    //  - agent has logged in before, different device: the new device must already
+                    //    be a recognized terminal — used successfully by anyone, including this
+                    //    agent, before — regardless of the branch's current requireImei setting (a
+                    //    branch turning the requirement off later doesn't retroactively loosen an
+                    //    already-active agent). Otherwise reject; an admin must resetDeviceBinding
+                    //    to let this agent bootstrap a new terminal.
+                    //  - agent has never logged in before, branch requires a device: this login
+                    //    bootstraps the terminal registry with whatever device sent it, so long as
+                    //    one was actually sent — even if the system has never seen it before.
+                    //    (If the branch doesn't require a device, skip entirely.)
                     boolean requiresImei = branch != null && branch.effectiveRequireImei();
-                    boolean bindDeviceNow = false;
+                    boolean recognizeDeviceNow = false;
                     if (agent.getImei() != null) {
-                        if (!agent.getImei().equals(request.getImei())) {
+                        boolean sameDeviceAsLastTime = agent.getImei().equals(request.getImei());
+                        boolean knownTerminal = sameDeviceAsLastTime
+                                || (request.getImei() != null && terminalRepository.findByDeviceId(request.getImei()).isPresent());
+                        if (!knownTerminal) {
                             authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                            auditAgentLogin(agent, request.getUsername(), "Login failed: unrecognized device IMEI");
                             return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
                         }
+                        recognizeDeviceNow = true;
                     } else if (requiresImei) {
                         if (request.getImei() == null || request.getImei().isBlank()) {
                             authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                            auditAgentLogin(agent, request.getUsername(), "Login failed: device IMEI required but missing");
                             return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));
                         }
-                        bindDeviceNow = true;
+                        recognizeDeviceNow = true;
                     }
 
-                    // Enforce branch schedule window (UC-01 rule: session limited to schedule window, FR-15)
-                    String scheduleViolation = checkScheduleWindow(branch);
-                    if (scheduleViolation != null) {
-                        authEventPublisher.publishFailure(request.getUsername(), request.getImei());
-                        return Mono.error(new InvalidCredentialsException(scheduleViolation));
-                    }
-
-                    boolean finalBindDeviceNow = bindDeviceNow;
+                    boolean finalRecognizeDeviceNow = recognizeDeviceNow;
                     return Mono.fromRunnable(() -> {
                                 agentDetailsService.resetFailedLoginAttempts(agent);
-                                if (finalBindDeviceNow) {
+                                if (finalRecognizeDeviceNow) {
+                                    terminalService.recognize(request.getImei(), agent.getId());
                                     agent.setImei(request.getImei());
                                     agentDetailsService.bindDevice(agent);
                                 }
@@ -131,6 +163,7 @@ public class AuthenticationController {
 
                                 String jwtToken = jwtService.generateToken(extraClaims, agentDetails);
                                 authEventPublisher.publishSuccess(request.getUsername(), request.getImei());
+                                auditAgentLoginSuccess(agent, request.getUsername());
                                 return Mono.just(AuthResponse.builder().token(jwtToken).build());
                             }));
                 })
@@ -143,23 +176,75 @@ public class AuthenticationController {
                         return Mono.error(e);
                     }
                     authEventPublisher.publishFailure(request.getUsername(), request.getImei());
+                    auditFailedAgentLogin(request.getUsername(), e.getMessage());
                     return Mono.error(new InvalidCredentialsException("Authentication failed: " + e.getMessage()));
                 });
     }
 
-    /**
-     * Returns a rejection message if the agent's branch has a configured schedule window and the
-     * current time falls outside it, or {@code null} if the session is allowed. A branch with no
-     * (or partially configured) schedule imposes no restriction.
-     */
-    private String checkScheduleWindow(Branch branch) {
-        if (branch == null || branch.getOpenTime() == null || branch.getCloseTime() == null || branch.getTimezone() == null) {
-            return null;
-        }
-        LocalTime now = LocalTime.now(ZoneId.of(branch.getTimezone()));
-        if (now.isBefore(branch.getOpenTime()) || !now.isBefore(branch.getCloseTime())) {
-            return "Outside authorized session hours (" + branch.getOpenTime() + "-" + branch.getCloseTime() + " " + branch.getTimezone() + ")";
-        }
-        return null;
+    private void auditAgentLoginSuccess(Agent agent, String attemptedUsername) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("AGENT_LOGIN")
+                .actorType(AuditActorType.AGENT)
+                .actorId(agent.getId())
+                .actorLabel(attemptedUsername)
+                .branchId(agent.getBranchId())
+                .agentId(agent.getId())
+                .details("Login succeeded")
+                .status(AuditStatus.SUCCESS)
+                .build());
     }
+
+    private void auditAgentLogin(Agent agent, String attemptedUsername, String details) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("AGENT_LOGIN")
+                .actorType(AuditActorType.AGENT)
+                .actorId(agent.getId())
+                .actorLabel(attemptedUsername)
+                .branchId(agent.getBranchId())
+                .agentId(agent.getId())
+                .details(details)
+                .status(AuditStatus.FAILED)
+                .build());
+    }
+
+    /** No agent resolved — an unrecognized username never reaches the Agent, only the attempted username is known. */
+    private void auditFailedAgentLogin(String attemptedUsername, String reason) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("AGENT_LOGIN")
+                .actorType(AuditActorType.AGENT)
+                .actorLabel(attemptedUsername)
+                .details("Login failed: " + reason)
+                .status(AuditStatus.FAILED)
+                .build());
+    }
+
+    @PostMapping("/agent/forgot-password")
+    @Operation(summary = "Agent Forgot Password", description = "Self-service, no admin involved (contrast AgentManagementController's admin-initiated reset). Sends a one-time SMS code to the agent's registered phone. Always returns the same generic acknowledgement, whether or not the username exists, so this can't be used to enumerate valid usernames.")
+    public Mono<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return agentPasswordResetService.requestReset(request.getUsername())
+                .thenReturn(FORGOT_PASSWORD_ACK);
+    }
+
+    @PostMapping("/agent/reset-password")
+    @Operation(summary = "Agent Reset Password With Code", description = "Confirms the SMS code from /agent/forgot-password and sets a new login password. Also clears any active login lockout.")
+    public Mono<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordWithOtpRequest request) {
+        return agentPasswordResetService.confirmReset(request.getUsername(), request.getOtp(), request.getNewPassword())
+                .doOnSuccess(v -> auditSelfServicePasswordReset(request.getUsername()))
+                .thenReturn(MessageResponse.builder().message("Password updated. You can now log in.").build());
+    }
+
+    /** Self-service (contrast AgentManagementController's admin-initiated reset, same event type, different actor). Only the username is known at this layer — the OTP flow doesn't otherwise resolve the agent's id/branch here. */
+    private void auditSelfServicePasswordReset(String username) {
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("AGENT_PASSWORD_RESET")
+                .actorType(AuditActorType.AGENT)
+                .actorLabel(username)
+                .details("Password reset via self-service SMS code")
+                .build());
+    }
+
 }

@@ -11,13 +11,13 @@ import com.microfi.savings.repository.AccessTokenRepository;
 import com.microfi.savings.repository.ActivationPaymentRepository;
 import com.microfi.savings.repository.ActivationRequestRepository;
 import com.microfi.savings.repository.ClientProfileRepository;
+import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.shared.dto.CancelActivationRequestRequest;
 import com.microfi.shared.dto.ClientActivateRequest;
 import com.microfi.shared.dto.ClientActivationPendingResponse;
 import com.microfi.shared.dto.ClientActivationResponse;
 import com.microfi.shared.dto.ClientPaymentConfirmationRequest;
 import com.microfi.shared.dto.MiddlewareFeeSplit;
-import com.microfi.shared.dto.MiddlewareMemberVerification;
 import com.microfi.shared.dto.PendingActivationRequestResponse;
 import com.microfi.shared.dto.PendingClientActivationResponse;
 import com.microfi.transactions.service.CollectionService;
@@ -67,20 +67,20 @@ public class ClientActivationService {
     private final CbsClientService cbsClientService;
     private final PasswordEncoder passwordEncoder;
     private final CollectionService collectionService;
+    private final MfiSettingsService mfiSettingsService;
 
     @Value("${client.activation.fee-xaf:1000}")
     private long activationFeeXaf;
 
     public ClientActivationPendingResponse selfActivate(ClientActivateRequest request) {
-        MiddlewareMemberVerification verification = cbsClientService.verifyMember(request.getActivationId()).block();
-        if (verification == null || !verification.isVerified()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Activation ID not recognised by the CBS — visit a branch for physical registration");
-        }
-
-        ClientProfile client = clientProfileRepository.findByCbsRef(verification.getMemberId())
+        // Proves membership against MICROFI's own client_profile mirror, seeded by the MFI's own
+        // back office (POST /admin/clients) — not a separate CBS-issued code. This deployment only
+        // ever serves the one MFI whose clients live in this database, so mfiMemberNo alone (the
+        // account number the MFI already gave this person) is sufficient proof.
+        ClientProfile client = clientProfileRepository.findByMfiMemberNo(request.getMfiIdentifier())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No local record for member " + verification.getMemberId() + " — ask your branch to register you first"));
+                        "'" + request.getMfiIdentifier() + "' isn't a recognised " + mfiSettingsService.getName()
+                                + " account number. Ask your branch to register you first"));
 
         if (clientProfileRepository.findByLogin(request.getLogin()).filter(c -> !c.getId().equals(client.getId())).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Login '" + request.getLogin() + "' is already taken");
@@ -94,6 +94,7 @@ public class ClientActivationService {
                 .clientId(client.getId())
                 .mfiMemberNo(client.getMfiMemberNo())
                 .fullName(client.getFullName())
+                .mfiName(mfiSettingsService.getName())
                 .message("Credentials set. Ask your agent to sponsor activation, then confirm payment yourself to receive your digital booklet token.")
                 .build();
     }
@@ -116,7 +117,7 @@ public class ClientActivationService {
 
         ActivationRequest activationRequest = openRequestFor(client.getId());
         if (activationRequest.getSponsoredAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Already sponsored — awaiting client payment confirmation");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Already sponsored, awaiting client payment confirmation");
         }
         // Any other pending request already means this agent's cash-in-hand for it is invisible to
         // ceiling accounting until it resolves — see CollectionService.requireNoPendingActivation.
@@ -159,7 +160,7 @@ public class ClientActivationService {
 
         ActivationRequest activationRequest = openRequestFor(clientId);
         if (activationRequest.getPaidAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment already confirmed — awaiting agent sponsorship");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment already confirmed, awaiting agent sponsorship");
         }
         activationRequest.setPaidAt(Instant.now());
         activationRequestRepository.save(activationRequest);

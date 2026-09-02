@@ -10,14 +10,45 @@ services:
   - name: microfi-core
     url: http://microfi-core:8080
     routes:
-      # More specific path prefix always wins Kong's routing, regardless of declaration order —
-      # so /api/v1/auth/* always matches this route (no JWT required to log in), never the
-      # catch-all below.
+      # More specific path prefix always wins Kong's routing, regardless of declaration order — so
+      # these two exact OTP paths match here, not the broader public-auth route below, even though
+      # both are unauthenticated (no jwt plugin either way — permitAll at the Spring Security
+      # level too, see SecurityConfig). A tighter budget than the shared 20/min: this endpoint
+      # triggers a real SMS send per hit, and both paths (request + confirm) share one attacker
+      # incentive — guessing a 6-digit OTP is far more attractive at 20/min than at 5/min.
+      - name: password-reset
+        paths:
+          - /api/v1/auth/agent/forgot-password
+          - /api/v1/auth/agent/reset-password
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 5
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              fault_tolerant: true
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods: [POST, OPTIONS]
+              headers: [Authorization, Content-Type]
+
+      # Same "no JWT required" reasoning as password-reset above — everything else under
+      # /api/v1/auth/* (login, in particular) always matches this route, never the catch-all
+      # below, and never the more specific password-reset route either. /actuator/health only
+      # (never the bare /actuator prefix) — a prefix match would also unauthenticated-expose
+      # /actuator/prometheus (full JVM/request metrics) to the public internet; Prometheus itself
+      # scrapes microfi-core/microfi-middleware directly over the internal Docker network, never
+      # through this gateway, so narrowing this doesn't affect the observability stack at all.
       - name: public-auth
         paths:
           - /api/v1/auth
           - /v3/api-docs
-          - /actuator
+          - /actuator/health
         strip_path: false
         plugins:
           - name: rate-limiting
@@ -51,7 +82,13 @@ services:
               key_claim_name: iss
           - name: rate-limiting
             config:
-              minute: 600
+              # Raised from 600: the Back-Office /tracking page alone fans out 3 requests per
+              # agent (escrow + route + geofence-alerts) — ~200 requests in one burst at this
+              # deployment's agent count, all from the Next.js server's single IP (these are
+              # server-side fetches, not per-browser), so 2-3 page loads/refreshes a minute already
+              # exceeded 600. Real fix is collapsing that fan-out into batch endpoints; this buys
+              # headroom until that lands.
+              minute: 3000
               # Every MICROFI JWT shares one `iss` (see consumers below), so Kong's default
               # limit_by: consumer collapses every admin/agent/client in the system into a single
               # shared budget — one Back-Office session loading a few pages was enough to 429

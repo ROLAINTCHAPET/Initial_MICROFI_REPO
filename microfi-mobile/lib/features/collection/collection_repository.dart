@@ -74,6 +74,7 @@ class CollectionRepository {
     required double lon,
     double? accuracyM,
     required String deviceTxId,
+    required String terminalId,
     required List<DenominationLine> denominationLines,
     required String pin,
   }) async {
@@ -86,6 +87,7 @@ class CollectionRepository {
       if (accuracyM != null) 'accuracyM': accuracyM,
       'collectedAt': DateTime.now().toUtc().toIso8601String(),
       'deviceTxId': deviceTxId,
+      'terminalId': terminalId,
       'denominationLines': denominationLines.map((d) => d.toJson()).toList(),
       'pin': pin,
     });

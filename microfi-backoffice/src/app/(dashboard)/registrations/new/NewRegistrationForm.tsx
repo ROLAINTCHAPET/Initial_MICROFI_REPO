@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { ErrorDialog } from "@/components/ErrorDialog";
@@ -127,6 +127,11 @@ export function NewRegistrationForm({
   callerBranchId: string | null;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Where "back"/"cancel" return to — whichever page linked here (e.g. /agents, /team), so
+  // leaving the wizard doesn't strand the user on the registrations list when they never started
+  // there. Falls back to /registrations for direct entry (e.g. from the registrations page itself).
+  const backHref = searchParams.get("from") ?? "/registrations";
   const dict = useDictionary();
   const STEPS = stepsList(dict);
   const ROLE_META = roleMeta(dict);
@@ -263,9 +268,9 @@ export function NewRegistrationForm({
 
   return (
     <div className="max-w-4xl mx-auto w-full flex flex-col gap-6">
-      <Link href="/registrations" className="text-sm text-primary hover:underline underline-offset-2 font-medium flex items-center gap-1 w-fit">
+      <Link href={backHref} className="text-sm text-primary hover:underline underline-offset-2 font-medium flex items-center gap-1 w-fit">
         <Icon name="arrow-upward" className="size-4 -rotate-90" />
-        {dict.registrations.backToRegistrations}
+        {dict.common.back}
       </Link>
       <PageHeader title={dict.registrations.newForm.pageTitle} subtitle={dict.registrations.newForm.pageSubtitle} />
 
@@ -479,7 +484,7 @@ export function NewRegistrationForm({
           )}
 
           <div className="flex justify-between gap-2 mt-2">
-            <Button type="button" variant="ghost" onClick={stepIndex === 0 ? () => router.push("/registrations") : goBack} disabled={succeeded}>
+            <Button type="button" variant="ghost" onClick={stepIndex === 0 ? () => router.push(backHref) : goBack} disabled={succeeded}>
               {stepIndex === 0 ? dict.common.cancel : dict.common.back}
             </Button>
             {step !== "review" ? (

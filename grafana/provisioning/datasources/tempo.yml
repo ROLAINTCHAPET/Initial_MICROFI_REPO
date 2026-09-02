@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Tempo
+    uid: microfi-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: true
+    jsonData:
+      # Jump from a trace straight to its log lines — works because Spring Boot's default logging
+      # pattern already injects [traceId,spanId] once Micrometer Tracing is active (no custom
+      # logback config in either service), so Loki's raw log text contains the trace ID as-is.
+      tracesToLogsV2:
+        datasourceUid: microfi-loki
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+        filterBySpanID: false

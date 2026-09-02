@@ -19,6 +19,8 @@ public class ClientProfileSelfResponse {
     private String fullName;
     private String phone;
     private UUID branchId;
+    /** Which MFI this client belongs to — shown persistently so the client can always confirm they're on the right institution's app session. */
+    private String mfiName;
     /** NONE (never activated), ACTIVE, or EXPIRED. */
     private String tokenStatus;
     private Instant tokenExpiresAt;

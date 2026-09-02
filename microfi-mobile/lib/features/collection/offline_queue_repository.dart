@@ -27,6 +27,7 @@ class PendingCollection {
   /// the receipt already given by the time sync runs, so re-confirming intent then protects nothing
   /// this PIN didn't already cover.
   final String pin;
+  final String terminalId;
 
   PendingCollection({
     required this.deviceTxId,
@@ -39,6 +40,7 @@ class PendingCollection {
     required this.collectedAtIso,
     required this.denominationLines,
     required this.pin,
+    required this.terminalId,
   });
 
   Map<String, dynamic> toRequestBody() => {
@@ -49,6 +51,7 @@ class PendingCollection {
         if (accuracyM != null) 'accuracyM': accuracyM,
         'collectedAt': collectedAtIso,
         'deviceTxId': deviceTxId,
+        'terminalId': terminalId,
         'denominationLines': denominationLines.map((d) => d.toJson()).toList(),
         'pin': pin,
       };
@@ -70,6 +73,7 @@ class PendingCollection {
             .map((e) => DenominationLine(faceValueXaf: (e['faceValueXaf'] as num).toInt(), quantity: (e['quantity'] as num).toInt()))
             .toList(),
         pin: json['pin'] as String? ?? '',
+        terminalId: json['terminalId'] as String? ?? '',
       );
 }
 
@@ -106,7 +110,7 @@ class OfflineQueueRepository {
     return openDatabase(
       path,
       password: password,
-      version: 2,
+      version: 3,
       onCreate: (db, version) => db.execute('''
         CREATE TABLE pending_collections (
           agent_id TEXT NOT NULL,
@@ -120,12 +124,16 @@ class OfflineQueueRepository {
           collected_at_iso TEXT NOT NULL,
           denomination_lines_json TEXT NOT NULL,
           pin TEXT NOT NULL DEFAULT '',
+          terminal_id TEXT NOT NULL DEFAULT '',
           PRIMARY KEY (agent_id, device_tx_id)
         )
       '''),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute("ALTER TABLE pending_collections ADD COLUMN pin TEXT NOT NULL DEFAULT ''");
+        }
+        if (oldVersion < 3) {
+          await db.execute("ALTER TABLE pending_collections ADD COLUMN terminal_id TEXT NOT NULL DEFAULT ''");
         }
       },
     );
@@ -170,6 +178,7 @@ class OfflineQueueRepository {
         'collected_at_iso': c.collectedAtIso,
         'denomination_lines_json': jsonEncode(c.denominationLines.map((d) => d.toJson()).toList()),
         'pin': c.pin,
+        'terminal_id': c.terminalId,
       };
 
   PendingCollection _fromRow(Map<String, Object?> row) => PendingCollection(
@@ -185,6 +194,7 @@ class OfflineQueueRepository {
             .map((e) => DenominationLine(faceValueXaf: (e['faceValueXaf'] as num).toInt(), quantity: (e['quantity'] as num).toInt()))
             .toList(),
         pin: row['pin'] as String? ?? '',
+        terminalId: row['terminal_id'] as String? ?? '',
       );
 
   Future<List<PendingCollection>> list() async {

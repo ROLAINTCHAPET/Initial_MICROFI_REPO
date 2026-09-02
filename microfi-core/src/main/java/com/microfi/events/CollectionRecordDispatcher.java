@@ -46,7 +46,7 @@ public class CollectionRecordDispatcher {
                         // wasn't processed in time (an overwhelmed consumer pool, or the
                         // broker/listener being unavailable) — a distinct status from "rejected by
                         // a business rule" so the caller knows retrying is the right move.
-                        "Collection processing is temporarily backed up — please retry")));
+                        "Collection processing is temporarily backed up. Please retry")));
     }
 
     private CollectionRecordReply send(UUID agentId, CollectionRequest request) {

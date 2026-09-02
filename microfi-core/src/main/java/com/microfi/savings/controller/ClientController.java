@@ -6,12 +6,15 @@ import com.microfi.authentication.domain.AdminRole;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.repository.ClientProfileRepository;
 import com.microfi.shared.dto.ClientResponse;
+import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.CreateClientRequest;
 import com.microfi.shared.dto.UpdateClientStatusRequest;
+import com.microfi.transactions.service.CollectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +31,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** UC-06 — Multi-Channel Client Lookup. Mirrors architecture.txt section 11.1: {@code GET /clients/lookup}. */
@@ -37,6 +42,7 @@ import java.util.UUID;
 public class ClientController {
 
     private final ClientProfileRepository clientProfileRepository;
+    private final CollectionService collectionService;
 
     @GetMapping("/api/v1/clients/lookup")
     @Operation(summary = "Multi-Method Client Lookup", description = "Search by membership number, phone or name (QR/ID scans resolve to the same fields client-side), across every client — not limited to the agent's own branch. Which clients an agent may actually collect from is governed by their assigned geofence at collection time (see POST /collections), not by branch. An empty query returns every client, so the agent can browse before typing. Returns candidates for the agent to disambiguate; FR-06.")
@@ -100,6 +106,20 @@ public class ClientController {
                     ClientProfile client = findClientOrThrow(id);
                     AdminAccess.requireBranchScope(caller, client.getBranchId());
                     return toResponse(client);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/api/v1/admin/clients/{id}/collections")
+    @Operation(summary = "Client Transactions by Period", description = "Every collection recorded against this client within an arbitrary [from, to) window, newest first — Financial & Transactional export, scoped to one client. Any Back-Office role, own branch only unless ADMIN.")
+    public Mono<List<CollectionResponse>> collections(@PathVariable UUID id,
+                                                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+                                                        Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    ClientProfile client = findClientOrThrow(id);
+                    AdminAccess.requireBranchScope(caller, client.getBranchId());
+                    return collectionService.findByClientAndRange(id, from, to);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 

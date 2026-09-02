@@ -71,12 +71,17 @@ public class OfjController {
     }
 
     @GetMapping("/history")
-    @Operation(summary = "OFJ History", description = "Every past session for the branch, most recent business date first — for a reports/history screen. Any Back-Office role, own branch only.")
-    public Flux<OfjSummaryResponse> history(@PathVariable UUID branchId, Mono<Authentication> authenticationMono) {
+    @Operation(summary = "OFJ History", description = "Every past session for the branch, most recent business date first — for a reports/history screen. Omit from/to for the full unbounded history; pass both to restrict to a chosen period (used by the Audit export's date-range picker). Any Back-Office role, own branch only.")
+    public Flux<OfjSummaryResponse> history(@PathVariable UUID branchId,
+                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                             Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono)
                 .flatMapMany(caller -> {
                     AdminAccess.requireBranchScope(caller, branchId);
-                    return Mono.fromCallable(() -> ofjService.listHistory(branchId))
+                    return Mono.fromCallable(() -> (from != null && to != null)
+                                    ? ofjService.listHistory(branchId, from, to)
+                                    : ofjService.listHistory(branchId))
                             .subscribeOn(Schedulers.boundedElastic())
                             .flatMapMany(Flux::fromIterable);
                 });
@@ -119,9 +124,9 @@ public class OfjController {
     }
 
     @PostMapping("/export")
-    @Operation(summary = "Daily CBS Export", description = "FR-18: submits the closed session to the CBS Middleware for posting. Requires the session to already be closed (BR-Export-01). UC-18 actor: Branch Cashier / Administrator, own branch only.")
+    @Operation(summary = "Daily CBS Export", description = "FR-18: submits the closed session to the CBS Middleware for posting. Requires the session to already be closed (BR-Export-01). UC-18 actor: Branch Cashier / Administrator, own branch only — a Branch Manager oversees everything a cashier at their branch can do, so they're included too.")
     public Mono<ExportBatchResponse> export(@PathVariable UUID branchId, @Valid @RequestBody ExportRequest request, Mono<Authentication> authenticationMono) {
-        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_CASHIER)
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.BRANCH_CASHIER)
                 .flatMap(caller -> {
                     AdminAccess.requireBranchScope(caller, branchId);
                     return Mono.fromCallable(() -> ofjService.exportDaily(branchId, request))

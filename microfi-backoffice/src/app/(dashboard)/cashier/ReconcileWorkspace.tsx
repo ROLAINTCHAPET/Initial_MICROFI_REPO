@@ -26,14 +26,10 @@ export function ReconcileWorkspace({
   branchId,
   queue,
   validated,
-  canReconcileNow,
-  closeTime,
 }: {
   branchId: string;
   queue: QueueLine[];
   validated: ValidatedLine[];
-  canReconcileNow: boolean;
-  closeTime: string | null;
 }) {
   const router = useRouter();
   const dict = useDictionary();
@@ -183,8 +179,7 @@ export function ReconcileWorkspace({
                 </div>
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || succeeded || !canReconcileNow}
-                  title={canReconcileNow ? undefined : t(dict.cashier.reconcile.opensAfterClosingTime, { time: closeTime ? ` (${closeTime.slice(0, 5)})` : "" })}
+                  disabled={loading || succeeded}
                   className={`h-12 px-8 rounded-[var(--radius-md)] font-semibold text-sm flex items-center gap-2 cursor-pointer transition-[background-color,transform] duration-150 ease-out hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100 disabled:opacity-80 ${
                     succeeded ? "bg-success-emerald text-white" : "bg-primary text-on-primary hover:bg-primary/90"
                   }`}
@@ -193,11 +188,6 @@ export function ReconcileWorkspace({
                   {succeeded ? dict.cashier.reconcile.posted : loading ? dict.cashier.reconcile.posting : dict.cashier.reconcile.verifyAndPost}
                 </button>
               </div>
-              {!canReconcileNow && (
-                <p className="text-xs text-on-surface-variant mt-2">
-                  {t(dict.cashier.reconcile.reconciliationOpensAfterClosing, { time: closeTime ? ` (${closeTime.slice(0, 5)})` : "" })}
-                </p>
-              )}
               {error && <p role="alert" className="text-sm text-danger-red mt-3">{error}</p>}
               {!isMatch && (
                 <p className="text-xs text-on-surface-variant mt-2">

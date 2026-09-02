@@ -1,5 +1,9 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
@@ -54,6 +58,7 @@ public class CollectionService {
     private final AgentDirectoryService agentDirectoryService;
     private final GeofenceService geofenceService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final AuditService auditService;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
@@ -65,6 +70,7 @@ public class CollectionService {
         }
 
         agentDirectoryService.verifyTransactionPin(agentId, request.getPin());
+        agentDirectoryService.requireWithinScheduleWindow(agentId, request.getCollectedAt());
         requireWithinAssignedGeofence(agentId, request.getLat(), request.getLon());
         clientDirectoryService.requireActiveClient(request.getClientId());
         requireNoPendingActivation(agentId);
@@ -88,6 +94,7 @@ public class CollectionService {
                 // for a field that was already best-effort/nullable on any lookup failure anyway.
                 .collectedAt(request.getCollectedAt())
                 .deviceTxId(request.getDeviceTxId())
+                .terminalId(request.getTerminalId())
                 .build();
         collectionRepository.save(collection);
 
@@ -110,7 +117,30 @@ public class CollectionService {
         // @TransactionalEventListener(AFTER_COMMIT), so the row is guaranteed visible first.
         applicationEventPublisher.publishEvent(new CollectionGeocodeEvent(collection.getId(), collection.getLat(), collection.getLon()));
 
+        auditCollectionRecorded(collection);
         return toResponse(collection, false);
+    }
+
+    /**
+     * A lightweight pointer into the unified audit timeline, not a duplicate of the collection
+     * itself — the full record (amount, denominations, geotag, reconciliation state) stays solely
+     * in {@link Collection}, exported per-agent/per-client from there. This row exists only so a
+     * reviewer scanning /audit sees that a collection happened at all, alongside logins/
+     * suspensions/SOS, without needing to cross-reference a separate screen.
+     */
+    private void auditCollectionRecorded(Collection collection) {
+        var agentInfo = agentDirectoryService.findAuditInfo(collection.getAgentId());
+        String clientName = clientDirectoryService.findReceiptInfo(collection.getClientId()).fullName();
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.FINANCIAL)
+                .eventType("COLLECTION_RECORDED")
+                .actorType(AuditActorType.AGENT)
+                .actorId(collection.getAgentId())
+                .actorLabel(agentInfo.username())
+                .branchId(agentInfo.branchId())
+                .agentId(collection.getAgentId())
+                .details(collection.getAmountXaf() + " XAF collected from " + clientName)
+                .build());
     }
 
     private void validateDenominationBreakdown(CollectionRequest request) {
@@ -132,22 +162,27 @@ public class CollectionService {
     }
 
     /**
-     * BR-03: an agent's cumulative cash-in-hand for the day — regular collections plus any
+     * BR-03: an agent's cumulative cash-in-hand right now — regular collections plus any
      * agent-collected payments tagged elsewhere (e.g. activation fees, see
      * {@code savings.ActivationPayment}) — must never exceed their effective escrow ceiling.
      * Public so other modules whose agents physically receive cash (not just {@code Collection}
      * rows) can enforce the same lockout before accepting it.
+     * <p>
+     * "Cash-in-hand" means not yet reconciled, not "collected today" — once OfjService#reconcile
+     * sweeps an agent's collections (cash physically handed over and counted), that cash no longer
+     * counts against their ceiling, even if it's still the same calendar day. Using a calendar-day
+     * window here would otherwise keep counting cash the agent doesn't have anymore, permanently
+     * shrinking their usable ceiling for the rest of the day after every reconciliation.
      */
     public void enforceEscrowCeiling(UUID agentId, long amountXaf) {
         EscrowResponse escrow = escrowService.getStatus(agentId);
-        Instant startOfDayUtc = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
-        long cumulativeToday = collectionRepository.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc)
-                + activationDirectoryService.sumAmountByAgentAndWindow(agentId, startOfDayUtc, endOfDayUtc);
+        Instant now = Instant.now();
+        long cumulativeUnreconciled = collectionRepository.sumUnreconciledByAgent(agentId, now)
+                + activationDirectoryService.sumUnreconciled(agentId, now);
 
-        if (cumulativeToday + amountXaf > escrow.getEffectiveCeilingXaf()) {
+        if (cumulativeUnreconciled + amountXaf > escrow.getEffectiveCeilingXaf()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Would exceed escrow ceiling (BR-03): cumulative " + cumulativeToday
+                    "Would exceed escrow ceiling (BR-03): cumulative " + cumulativeUnreconciled
                             + " + " + amountXaf + " > ceiling " + escrow.getEffectiveCeilingXaf());
         }
     }
@@ -161,7 +196,7 @@ public class CollectionService {
     private void requireWithinAssignedGeofence(UUID agentId, double lat, double lon) {
         if (!geofenceService.isWithinAssignedGeofence(agentId, lat, lon)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "You are outside your assigned collection zone — move back inside your geofence to collect here");
+                    "You are outside your assigned collection zone. Move back inside your geofence to collect here");
         }
     }
 
@@ -174,7 +209,7 @@ public class CollectionService {
     public void requireNoPendingActivation(UUID agentId) {
         if (activationDirectoryService.hasPendingActivation(agentId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "You have a pending client activation payment awaiting confirmation — resolve it before collecting more cash");
+                    "You have a pending client activation payment awaiting confirmation. Resolve it before collecting more cash");
         }
     }
 
@@ -199,6 +234,7 @@ public class CollectionService {
                         .reconciledAt(collection.getReconciledAt())
                         .syncStatus(collection.getSyncStatus())
                         .deviceTxId(collection.getDeviceTxId())
+                        .terminalId(collection.getTerminalId())
                         .build())
                 .toList();
     }
@@ -212,8 +248,17 @@ public class CollectionService {
     public List<CollectionResponse> findByAgentAndDay(UUID agentId, LocalDate date) {
         Instant startOfDayUtc = date.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant endOfDayUtc = startOfDayUtc.plus(1, ChronoUnit.DAYS);
+        return findByAgentAndRange(agentId, startOfDayUtc, endOfDayUtc);
+    }
+
+    /**
+     * Back-Office agent oversight, parametrized by an arbitrary period instead of one calendar
+     * day — backs the Audit export's date-range picker (BR: every export honors the period the
+     * user chose, never a fixed "today" or "everything").
+     */
+    public List<CollectionResponse> findByAgentAndRange(UUID agentId, Instant from, Instant to) {
         List<Collection> collections = collectionRepository.findByAgentIdInAndCollectedAtBetween(
-                List.of(agentId), startOfDayUtc, endOfDayUtc);
+                List.of(agentId), from, to);
         Map<UUID, String> namesByClientId = clientDirectoryService.findFullNames(
                 collections.stream().map(Collection::getClientId).collect(Collectors.toSet()));
 
@@ -233,6 +278,35 @@ public class CollectionService {
                         .reconciledAt(collection.getReconciledAt())
                         .syncStatus(collection.getSyncStatus())
                         .deviceTxId(collection.getDeviceTxId())
+                        .terminalId(collection.getTerminalId())
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Back-Office client transactions export (Financial & Transactional category) — every
+     * collection recorded against this client within an arbitrary [from, to) window, newest
+     * first. Agent identity is resolved by the caller from its own already-fetched agent list
+     * (same pattern the OFJ oversight screens use), so this doesn't duplicate agent-name
+     * resolution the way {@link #findByAgentAndRange} resolves client names.
+     */
+    public List<CollectionResponse> findByClientAndRange(UUID clientId, Instant from, Instant to) {
+        return collectionRepository.findByClientIdAndCollectedAtBetween(clientId, from, to).stream()
+                .sorted(Comparator.comparing(Collection::getCollectedAt).reversed())
+                .map(collection -> CollectionResponse.builder()
+                        .id(collection.getId())
+                        .agentId(collection.getAgentId())
+                        .clientId(collection.getClientId())
+                        .amountXaf(collection.getAmountXaf())
+                        .lat(collection.getLat())
+                        .lon(collection.getLon())
+                        .accuracyM(collection.getAccuracyM())
+                        .locationName(collection.getLocationName())
+                        .collectedAt(collection.getCollectedAt())
+                        .reconciledAt(collection.getReconciledAt())
+                        .syncStatus(collection.getSyncStatus())
+                        .deviceTxId(collection.getDeviceTxId())
+                        .terminalId(collection.getTerminalId())
                         .build())
                 .toList();
     }
@@ -260,6 +334,7 @@ public class CollectionService {
                 .reconciledAt(collection.getReconciledAt())
                 .syncStatus(collection.getSyncStatus())
                 .deviceTxId(collection.getDeviceTxId())
+                .terminalId(collection.getTerminalId())
                 .denominationLines(lines)
                 .duplicate(duplicate)
                 .build();

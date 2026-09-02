@@ -1,5 +1,8 @@
 package com.microfi.savings.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.SecurityConfig;
@@ -19,6 +22,7 @@ import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.shared.dto.ClientActivationResponse;
 import com.microfi.shared.dto.PendingActivationRequestResponse;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
@@ -33,8 +37,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = ClientActivationController.class)
@@ -64,6 +70,9 @@ class ClientActivationControllerTest {
     @MockitoBean
     private AgentDirectoryService agentDirectoryService;
 
+    @MockitoBean
+    private AuditService auditService;
+
     private final UUID agentId = UUID.randomUUID();
     private final UUID clientId = UUID.randomUUID();
     private final UUID branchId = UUID.randomUUID();
@@ -92,6 +101,7 @@ class ClientActivationControllerTest {
     void testSponsorSuccess_resolvesAgentFromPrincipal() {
         when(clientActivationService.sponsorActivation(eq(LOGIN), eq(agentId))).thenReturn(
                 ClientActivationResponse.builder().clientId(clientId).status("AWAITING_PAYMENT").build());
+        when(agentDirectoryService.findAuditInfo(agentId)).thenReturn(new AgentDirectoryService.AgentAuditInfo(UUID.randomUUID(), "agent1"));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
@@ -102,6 +112,12 @@ class ClientActivationControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("AWAITING_PAYMENT");
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo("CLIENT_ACTIVATION_SPONSORED");
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.AGENT);
+        assertThat(captor.getValue().getActorId()).isEqualTo(agentId);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -48,6 +49,9 @@ class AdminTrackingControllerTest {
 
     @MockitoBean
     private AgentDirectoryService agentDirectoryService;
+
+    @MockitoBean
+    private AuditService auditService;
 
     @MockitoBean
     private JwtService jwtService;

@@ -37,6 +37,10 @@ public class CollectionRequest {
     @NotBlank
     private String deviceTxId;
 
+    /** Which physical terminal recorded this collection (see Terminal) — device identity is distinct from deviceTxId, which is only an idempotency key. */
+    @NotBlank
+    private String terminalId;
+
     /** Transaction confirmation — checked against the agent's own transaction PIN, independent of login (see AgentDirectoryService#verifyTransactionPin). */
     @NotBlank
     private String pin;

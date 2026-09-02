@@ -1,5 +1,6 @@
 package com.microfi.transactions.service;
 
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.GeofenceAlertResponse;
 import com.microfi.shared.dto.GeofenceRequest;
 import com.microfi.shared.dto.GeofenceResponse;
@@ -40,6 +41,7 @@ public class GeofenceService {
 
     private final GeofenceRepository geofenceRepository;
     private final GeofenceAlertRepository geofenceAlertRepository;
+    private final AgentDirectoryService agentDirectoryService;
 
     @Value("${geofence.grace-period-seconds:120}")
     private long gracePeriodSeconds;
@@ -104,6 +106,19 @@ public class GeofenceService {
         geofence.setVerticesCsv(csv);
         geofenceRepository.save(geofence);
         return toResponse(geofence);
+    }
+
+    /**
+     * Bulk convenience for a branch manager/admin who doesn't want to draw the same perimeter
+     * one agent at a time: writes {@code request}'s vertices as every currently-active agent's
+     * own {@link Geofence} row (same as calling {@link #setGeofence} once per agent). There is no
+     * shared "branch geofence" concept — an agent added to the branch afterward still needs their
+     * own geofence set, same as today. Returns how many agents were updated.
+     */
+    public int applyGeofenceToBranch(UUID branchId, GeofenceRequest request) {
+        List<UUID> agentIds = agentDirectoryService.findActiveAgentIdsByBranch(branchId);
+        agentIds.forEach(agentId -> setGeofence(agentId, request));
+        return agentIds.size();
     }
 
     public GeofenceResponse getGeofence(UUID agentId) {

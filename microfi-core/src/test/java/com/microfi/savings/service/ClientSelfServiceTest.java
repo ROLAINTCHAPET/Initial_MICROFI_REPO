@@ -5,6 +5,7 @@ import com.microfi.savings.domain.AccessTokenStatus;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.repository.AccessTokenRepository;
 import com.microfi.savings.repository.ClientProfileRepository;
+import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.shared.dto.ClientProfileSelfResponse;
 import com.microfi.shared.dto.ClientRecentCollectionResponse;
 import com.microfi.transactions.service.CollectionDirectoryService;
@@ -33,6 +34,8 @@ class ClientSelfServiceTest {
     private AccessTokenRepository accessTokenRepository;
     @Mock
     private CollectionDirectoryService collectionDirectoryService;
+    @Mock
+    private MfiSettingsService mfiSettingsService;
 
     private ClientSelfService service;
 
@@ -41,7 +44,8 @@ class ClientSelfServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new ClientSelfService(clientProfileRepository, accessTokenRepository, collectionDirectoryService);
+        service = new ClientSelfService(clientProfileRepository, accessTokenRepository, collectionDirectoryService, mfiSettingsService);
+        when(mfiSettingsService.getName()).thenReturn("MICROFI");
     }
 
     private ClientProfile client() {
