@@ -239,3 +239,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   position: absolute;
   right: 0;
 }
+
+/* TrackingMap.tsx's permanent per-ping time label — Leaflet's own .leaflet-tooltip default
+   (white box, padding, drop shadow, pointer arrow) reads fine for a single hover tooltip but is
+   far too heavy repeated at every 5-minute GPS ping along a route; this trims it down to a small
+   always-visible chip so a day's worth of points doesn't turn into a wall of boxes. */
+.ping-time-label {
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: rgba(0, 15, 34, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.ping-time-label::before {
+  display: none;
+}

@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Polyline, Polygon, CircleMarker, Popup, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Polygon, CircleMarker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { GeofenceVertex, RoutePointResponse, RouteTransactionResponse } from "@/lib/types";
 
 const DOUALA_FALLBACK: [number, number] = [4.05, 9.7];
@@ -58,7 +58,10 @@ export function TrackingMap({
       <FitBounds points={boundsSource} />
       {onMapClick && <ClickCapture onClick={onMapClick} />}
 
-      {routeLatLngs.length > 1 && <Polyline positions={routeLatLngs} pathOptions={{ color: "#000f22", weight: 3 }} />}
+      {/* The agent's track, connecting every ~5-minute GPS ping in order — see
+          location_tracking_service.dart's fixed interval on the mobile side — so the path walked
+          reads as a continuous line, not a scatter of unconnected dots. */}
+      {routeLatLngs.length > 1 && <Polyline positions={routeLatLngs} pathOptions={{ color: "#000f22", weight: 4, opacity: 0.85 }} />}
       {routeLatLngs.map((pos, i) => (
         <CircleMarker
           key={`pt-${i}`}
@@ -70,7 +73,11 @@ export function TrackingMap({
               : { color: "#000f22", fillColor: "#ffffff", fillOpacity: 1, weight: 1.5 }
           }
         >
-          <Popup>{new Date(points[i].recordedAt).toLocaleTimeString()}</Popup>
+          {/* permanent (not click-to-reveal like Popup) — the whole point is that each ~5-minute
+              ping's time is visible at a glance without hunting for it. */}
+          <Tooltip permanent direction="top" offset={[0, -6]} className="ping-time-label" opacity={1}>
+            {new Date(points[i].recordedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          </Tooltip>
         </CircleMarker>
       ))}
 
