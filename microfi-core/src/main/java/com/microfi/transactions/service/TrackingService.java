@@ -1,6 +1,7 @@
 package com.microfi.transactions.service;
 
 import com.microfi.events.SosGeocodeEvent;
+import com.microfi.events.SosRaisedEvent;
 import com.microfi.shared.dto.LocationPingRequest;
 import com.microfi.shared.dto.LocationPingResponse;
 import com.microfi.shared.dto.RoutePointDto;
@@ -115,7 +116,11 @@ public class TrackingService {
             applicationEventPublisher.publishEvent(new SosGeocodeEvent(event.getId(), event.getLat(), event.getLon()));
         }
 
-        return toSosResponse(event);
+        SosResponse response = toSosResponse(event);
+        // Unlike geocoding, the instant Back-Office sound/toast alert doesn't need a GPS fix to be
+        // worth firing — a fix-less SOS is still an emergency, so this publishes unconditionally.
+        applicationEventPublisher.publishEvent(new SosRaisedEvent(response));
+        return response;
     }
 
     /**

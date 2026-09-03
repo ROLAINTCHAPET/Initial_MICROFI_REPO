@@ -378,6 +378,9 @@
     "noUnresolvedAlerts": "Aucune alerte SOS non résolue.",
     "acknowledgeAction": "Accuser réception",
     "failedToAcknowledge": "Échec de l'accusé de réception",
+    "enableSoundAlerts": "Activer les alertes sonores SOS",
+    "newAlertToast": "{agent} a déclenché une alerte SOS",
+    "viewAction": "Voir",
     "timeAgo": {
       "justNow": "À l'instant",
       "minutesAgo": "Il y a {minutes} min",
@@ -745,6 +748,7 @@
       "COLLECTION_REJECTED_GEOFENCE": "Encaissement rejeté (hors géofence)",
       "REGISTRATION_APPROVED": "Inscription approuvée",
       "REGISTRATION_REJECTED": "Inscription rejetée",
+      "SOS_ACKNOWLEDGED": "Alerte SOS accusée réception",
       "VARIANCE_DEBT_WRITTEN_OFF": "Dette pour écart annulée"
     },
     "noResults": "Aucun événement correspondant sur cette période.",
@@ -782,7 +786,8 @@
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Paiement d'activation en espèces enregistré pour le client, statut : {param1}, référence : {param2}",
       "CLIENT_ACTIVATION_PAYMENT_CONFIRMED_DETAIL": "Paiement d'activation confirmé, statut : {param1}, référence : {param2}",
       "SOS_RAISED_WITH_FIX": "Alerte SOS déclenchée à {param1}, {param2}",
-      "SOS_RAISED_NO_FIX": "Alerte SOS déclenchée (pas de position GPS)"
+      "SOS_RAISED_NO_FIX": "Alerte SOS déclenchée (pas de position GPS)",
+      "SOS_ACKNOWLEDGED_DETAIL": "Alerte de détresse accusée réception"
     }
   },
   "branches": {

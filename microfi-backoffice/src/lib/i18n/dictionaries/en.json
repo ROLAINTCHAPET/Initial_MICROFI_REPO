@@ -378,6 +378,9 @@
     "noUnresolvedAlerts": "No unresolved SOS alerts.",
     "acknowledgeAction": "Acknowledge",
     "failedToAcknowledge": "Failed to acknowledge",
+    "enableSoundAlerts": "Enable SOS sound alerts",
+    "newAlertToast": "{agent} triggered an SOS",
+    "viewAction": "View",
     "timeAgo": {
       "justNow": "Just now",
       "minutesAgo": "{minutes}m ago",
@@ -745,6 +748,7 @@
       "COLLECTION_REJECTED_GEOFENCE": "Collection Rejected (Outside Geofence)",
       "REGISTRATION_APPROVED": "Registration Approved",
       "REGISTRATION_REJECTED": "Registration Rejected",
+      "SOS_ACKNOWLEDGED": "SOS Acknowledged",
       "VARIANCE_DEBT_WRITTEN_OFF": "Variance Debt Written Off"
     },
     "noResults": "No matching audit events in this period.",
@@ -782,7 +786,8 @@
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Activation cash payment registered for client, status: {param1}, reference: {param2}",
       "CLIENT_ACTIVATION_PAYMENT_CONFIRMED_DETAIL": "Activation payment confirmed, status: {param1}, reference: {param2}",
       "SOS_RAISED_WITH_FIX": "SOS raised at {param1}, {param2}",
-      "SOS_RAISED_NO_FIX": "SOS raised (no location fix)"
+      "SOS_RAISED_NO_FIX": "SOS raised (no location fix)",
+      "SOS_ACKNOWLEDGED_DETAIL": "Distress alert acknowledged"
     }
   },
   "branches": {

@@ -77,6 +77,7 @@ class TrackingServiceTest {
         assertThat(response.getLat()).isEqualTo(4.05);
         assertThat(response.getRaisedAt()).isNotNull();
         verify(applicationEventPublisher).publishEvent(any(com.microfi.events.SosGeocodeEvent.class));
+        verify(applicationEventPublisher).publishEvent(new com.microfi.events.SosRaisedEvent(response));
     }
 
     @Test
@@ -90,7 +91,10 @@ class TrackingServiceTest {
         assertThat(response.getLon()).isNull();
         assertThat(response.getRaisedAt()).isNotNull();
         // Nothing to geocode without a fix — must not publish an event with a null lat/lon.
-        verify(applicationEventPublisher, org.mockito.Mockito.never()).publishEvent(any());
+        verify(applicationEventPublisher, org.mockito.Mockito.never()).publishEvent(any(com.microfi.events.SosGeocodeEvent.class));
+        // The instant Back-Office sound/toast alert doesn't need a GPS fix to be worth firing —
+        // a fix-less SOS is still an emergency, so this must still publish unconditionally.
+        verify(applicationEventPublisher).publishEvent(new com.microfi.events.SosRaisedEvent(response));
     }
 
     @Test

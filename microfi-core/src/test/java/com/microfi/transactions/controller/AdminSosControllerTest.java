@@ -1,5 +1,7 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -11,17 +13,23 @@ import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.shared.dto.SosResponse;
+import com.microfi.transactions.service.SosAlertBroadcaster;
 import com.microfi.transactions.service.TrackingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.FluxExchangeResult;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
+import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -55,6 +63,12 @@ class AdminSosControllerTest {
 
     @MockitoBean
     private ClientDetailsService clientDetailsService;
+
+    @MockitoBean
+    private SosAlertBroadcaster sosAlertBroadcaster;
+
+    @MockitoBean
+    private AuditService auditService;
 
     private final UUID branchId = UUID.randomUUID();
     private final UUID agentId = UUID.randomUUID();
@@ -114,6 +128,59 @@ class AdminSosControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(sosEventId.toString());
+
+        org.mockito.Mockito.verify(auditService).record(org.mockito.ArgumentMatchers.argThat((AuditLogEntry entry) ->
+                entry.getEventType().equals("SOS_ACKNOWLEDGED") && entry.getAgentId().equals(agentId) && entry.getBranchId().equals(branchId)));
+    }
+
+    @Test
+    void streamUnrestrictedForAdminForwardsBroadcastEvents() {
+        SosResponse event = SosResponse.builder().id(UUID.randomUUID()).agentId(agentId).raisedAt(Instant.now()).build();
+        when(sosAlertBroadcaster.stream()).thenReturn(Flux.just(event));
+
+        FluxExchangeResult<SosResponse> result = webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .get()
+                .uri("/api/v1/admin/sos-events/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(SosResponse.class);
+
+        StepVerifier.create(result.getResponseBody())
+                .expectNext(event)
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void streamOnlyForwardsEventsWithinCallersBranch() {
+        UUID otherAgentId = UUID.randomUUID();
+        SosResponse inScope = SosResponse.builder().id(UUID.randomUUID()).agentId(agentId).raisedAt(Instant.now()).build();
+        SosResponse outOfScope = SosResponse.builder().id(UUID.randomUUID()).agentId(otherAgentId).raisedAt(Instant.now()).build();
+        when(agentDirectoryService.findAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(sosAlertBroadcaster.stream()).thenReturn(Flux.just(outOfScope, inScope));
+
+        FluxExchangeResult<SosResponse> result = webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .get()
+                .uri("/api/v1/admin/sos-events/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(SosResponse.class);
+
+        StepVerifier.create(result.getResponseBody())
+                .expectNext(inScope)
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void streamUnauthenticatedRejected() {
+        webTestClient.get()
+                .uri("/api/v1/admin/sos-events/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     @Test
