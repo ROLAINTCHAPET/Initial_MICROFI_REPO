@@ -2,6 +2,7 @@ package com.microfi.transactions.service;
 
 import com.microfi.audit.domain.AuditActorType;
 import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.domain.AuditStatus;
 import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
@@ -197,9 +198,33 @@ public class CollectionService {
      */
     private void requireWithinAssignedGeofence(UUID agentId, double lat, double lon) {
         if (!geofenceService.isWithinAssignedGeofence(agentId, lat, lon)) {
+            auditGeofenceRejection(agentId, lat, lon);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "You are outside your assigned collection zone. Move back inside your geofence to collect here");
         }
+    }
+
+    /**
+     * A rejected-at-the-gate attempt, not a variant of {@link #auditCollectionRecorded} — no
+     * {@link Collection} row exists to point to, so this stands alone as its own SECURITY event
+     * (an agent testing/pushing against their assigned perimeter is exactly the kind of thing a
+     * branch manager reviewing /audit should be able to see, the same reasoning as auditing failed
+     * logins rather than only successful ones).
+     */
+    private void auditGeofenceRejection(UUID agentId, double lat, double lon) {
+        var agentInfo = agentDirectoryService.findAuditInfo(agentId);
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("COLLECTION_REJECTED_GEOFENCE")
+                .actorType(AuditActorType.AGENT)
+                .actorId(agentId)
+                .actorLabel(agentInfo.username())
+                .branchId(agentInfo.branchId())
+                .agentId(agentId)
+                .status(AuditStatus.FAILED)
+                .detailsKey("COLLECTION_REJECTED_GEOFENCE_DETAIL")
+                .detailsParam1(String.format("%.5f, %.5f", lat, lon))
+                .build());
     }
 
     /**

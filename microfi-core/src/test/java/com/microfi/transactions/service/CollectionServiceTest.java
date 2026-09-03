@@ -199,6 +199,13 @@ class CollectionServiceTest {
                 .hasMessageContaining("403");
 
         org.mockito.Mockito.verify(collectionRepository, org.mockito.Mockito.never()).save(any());
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo("COLLECTION_REJECTED_GEOFENCE");
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.AGENT);
+        assertThat(captor.getValue().getAgentId()).isEqualTo(agentId);
+        assertThat(captor.getValue().getStatus()).isEqualTo(com.microfi.audit.domain.AuditStatus.FAILED);
     }
 
     @Test

@@ -740,6 +740,7 @@
       "CLIENT_LOGIN": "Client Login",
       "CLIENT_PASSWORD_RESET": "Client Password Reset",
       "COLLECTION_RECORDED": "Collection Recorded",
+      "COLLECTION_REJECTED_GEOFENCE": "Collection Rejected (Outside Geofence)",
       "REGISTRATION_APPROVED": "Registration Approved",
       "REGISTRATION_REJECTED": "Registration Rejected",
       "VARIANCE_DEBT_WRITTEN_OFF": "Variance Debt Written Off"
@@ -773,6 +774,7 @@
       "BRANCH_GEOFENCE_BULK_CLEARED_DETAIL": "Bulk geofence cleared from {param1} agent(s)",
       "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Shortage of {param1} XAF written off, reason: {param2}",
       "COLLECTION_RECORDED_DETAIL": "{param1} XAF collected from {param2}",
+      "COLLECTION_REJECTED_GEOFENCE_DETAIL": "Attempted collection outside assigned zone at ({param1})",
       "REGISTRATION_APPROVED_DETAIL": "Registration application approved for {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Registration application rejected for {param1}, reason: {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Activation cash payment registered for client, status: {param1}, reference: {param2}",

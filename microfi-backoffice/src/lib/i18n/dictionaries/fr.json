@@ -740,6 +740,7 @@
       "CLIENT_LOGIN": "Connexion client",
       "CLIENT_PASSWORD_RESET": "Réinitialisation du code confidentiel client",
       "COLLECTION_RECORDED": "Encaissement enregistré",
+      "COLLECTION_REJECTED_GEOFENCE": "Encaissement rejeté (hors géofence)",
       "REGISTRATION_APPROVED": "Inscription approuvée",
       "REGISTRATION_REJECTED": "Inscription rejetée",
       "VARIANCE_DEBT_WRITTEN_OFF": "Dette pour écart annulée"
@@ -773,6 +774,7 @@
       "BRANCH_GEOFENCE_BULK_CLEARED_DETAIL": "Zone géographique supprimée en masse de {param1} agent(s)",
       "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Écart de {param1} XAF annulé, motif : {param2}",
       "COLLECTION_RECORDED_DETAIL": "{param1} XAF encaissés auprès de {param2}",
+      "COLLECTION_REJECTED_GEOFENCE_DETAIL": "Tentative d'encaissement hors de la zone assignée à ({param1})",
       "REGISTRATION_APPROVED_DETAIL": "Demande d'inscription approuvée pour {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Demande d'inscription rejetée pour {param1}, motif : {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Paiement d'activation en espèces enregistré pour le client, statut : {param1}, référence : {param2}",

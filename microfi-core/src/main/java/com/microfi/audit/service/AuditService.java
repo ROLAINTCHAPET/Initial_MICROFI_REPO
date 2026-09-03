@@ -7,6 +7,7 @@ import com.microfi.audit.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -27,7 +28,15 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
-    @Transactional
+    /**
+     * {@code REQUIRES_NEW}, not the default: a caller auditing a rejection (e.g.
+     * CollectionService#requireWithinAssignedGeofence) is, by construction, about to throw and
+     * roll back its own transaction — joining that transaction would silently roll the audit
+     * write back right along with it, defeating the entire point of auditing a failure. Running in
+     * its own transaction means this row commits independently of whatever the caller's
+     * transaction ultimately decides.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(AuditLogEntry entry) {
         try {
             auditLogRepository.save(AuditLog.builder()
