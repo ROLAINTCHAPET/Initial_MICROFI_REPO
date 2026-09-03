@@ -82,6 +82,7 @@ export interface OfjAgentLineResponse {
   physicalTotalXaf: number;
   deltaXaf: number;
   resolved: boolean;
+  pendingConfirmationCount: number;
 }
 
 export interface OfjSummaryResponse {

@@ -261,7 +261,14 @@ async function SummaryView({
                   <Td className={line.deltaXaf < 0 ? "text-danger-red font-semibold" : "text-secondary font-semibold"}>
                     {line.deltaXaf.toLocaleString()} XAF
                   </Td>
-                  <Td>{line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" /> }</Td>
+                  <Td>
+                    <div className="flex flex-col gap-1 items-start">
+                      {line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />}
+                      {line.pendingConfirmationCount > 0 && (
+                        <span className="text-xs text-tertiary-fixed-dim font-semibold">{t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })}</span>
+                      )}
+                    </div>
+                  </Td>
                   {canRecordVariance && (
                     <Td>
                       {isShortage && (
@@ -351,7 +358,14 @@ async function HistoryView({
                     <Td className={line.deltaXaf < 0 ? "text-danger-red font-semibold" : "text-secondary font-semibold"}>
                       {line.deltaXaf.toLocaleString()} XAF
                     </Td>
-                    <Td>{line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />}</Td>
+                    <Td>
+                    <div className="flex flex-col gap-1 items-start">
+                      {line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />}
+                      {line.pendingConfirmationCount > 0 && (
+                        <span className="text-xs text-tertiary-fixed-dim font-semibold">{t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })}</span>
+                      )}
+                    </div>
+                  </Td>
                     {canRecordVariance && (
                       <Td>
                         {isShortage && (

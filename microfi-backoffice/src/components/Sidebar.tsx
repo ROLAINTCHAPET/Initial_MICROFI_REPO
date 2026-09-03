@@ -105,7 +105,7 @@ export function Sidebar({ role }: { role: AdminRole }) {
 
   return (
     <>
-      <aside className="hidden md:flex md:flex-col h-screen w-64 fixed left-0 top-0 bg-primary-container z-30 py-6">
+      <aside className="hidden md:flex md:flex-col h-screen w-64 fixed left-0 top-0 bg-primary-container z-30 py-6 overflow-y-auto">
         <SidebarContent items={items} pathname={pathname} dict={dict} />
       </aside>
 

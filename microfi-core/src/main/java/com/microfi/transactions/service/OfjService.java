@@ -574,6 +574,8 @@ public class OfjService {
                 .physicalTotalXaf(line.getPhysicalTotalXaf())
                 .deltaXaf(line.getDeltaXaf())
                 .resolved(isResolved(line))
+                .pendingConfirmationCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(
+                        line.getId(), CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
                 .build();
     }
 

@@ -421,12 +421,14 @@
     "denyReasonLabel": "Reason for denial",
     "confirmDeny": "Deny Request",
     "failedToDeny": "Failed to deny",
-    "decisionReasonPrefix": "Reason: "
+    "decisionReasonPrefix": "Reason: ",
+    "allBranchesScope": "All branches"
   },
   "ofj": {
     "pageTitle": "End of Day Oversight",
     "pageSubtitle": "Digital cash-desk reconciliation, read-only from the Back-Office.",
     "noBranches": "No branches exist yet. Create one first.",
+    "awaitingAgentConfirmation": "{count} awaiting agent confirmation",
     "viewingBranch": "Viewing branch",
     "branchFallback": "Branch",
     "reconcileCash": "Reconcile Cash",

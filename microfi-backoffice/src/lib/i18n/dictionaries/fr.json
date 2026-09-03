@@ -421,12 +421,14 @@
     "denyReasonLabel": "Motif du refus",
     "confirmDeny": "Refuser la demande",
     "failedToDeny": "Échec du refus",
-    "decisionReasonPrefix": "Motif : "
+    "decisionReasonPrefix": "Motif : ",
+    "allBranchesScope": "Toutes les agences"
   },
   "ofj": {
     "pageTitle": "Supervision de fin de journée",
     "pageSubtitle": "Rapprochement de caisse numérique, en lecture seule depuis le Back-Office.",
     "noBranches": "Aucune agence n'existe encore. Veuillez d'abord en créer une.",
+    "awaitingAgentConfirmation": "{count} en attente de confirmation de l'agent",
     "viewingBranch": "Agence consultée",
     "branchFallback": "Agence",
     "reconcileCash": "Effectuer la réconciliation",
