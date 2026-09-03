@@ -7,14 +7,14 @@ import { Badge } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import type { ReactNode } from "react";
-import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
+import type { AgentResponse, BranchResponse, OfjAgentLineResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
 import { OfjExportButtons, type OfjExportRow } from "./OfjExportButtons";
 import { VarianceExportButtons, type VarianceExportRow } from "./VarianceExportButtons";
 import { BranchSelector } from "./BranchSelector";
 import { RecordVarianceModal } from "./RecordVarianceModal";
 import { WriteOffVarianceDebtModal } from "./WriteOffVarianceDebtModal";
 import { HistoryDateRangeFilter } from "./HistoryDateRangeFilter";
-import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 import { t } from "@/lib/i18n/format";
 
@@ -24,6 +24,17 @@ function isoDaysAgo(days: number) {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toISOString().slice(0, 10);
+}
+
+// A single badge, not "Resolved" plus a separate note — a physically-balanced count that the
+// agent hasn't confirmed yet isn't actually done, so showing "Resolved" alongside it read as
+// contradictory. Reuses the PENDING badge's styling with a more specific label rather than adding
+// a whole new BadgeStatus variant just for this one combination.
+function lineStatusBadge(line: OfjAgentLineResponse, dict: Dictionary) {
+  if (line.resolved && line.pendingConfirmationCount > 0) {
+    return <Badge status="PENDING" label={t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })} />;
+  }
+  return line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />;
 }
 
 export default async function OfjOversightPage({
@@ -261,14 +272,7 @@ async function SummaryView({
                   <Td className={line.deltaXaf < 0 ? "text-danger-red font-semibold" : "text-secondary font-semibold"}>
                     {line.deltaXaf.toLocaleString()} XAF
                   </Td>
-                  <Td>
-                    <div className="flex flex-col gap-1 items-start">
-                      {line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />}
-                      {line.pendingConfirmationCount > 0 && (
-                        <span className="text-xs text-tertiary-fixed-dim font-semibold">{t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })}</span>
-                      )}
-                    </div>
-                  </Td>
+                  <Td>{lineStatusBadge(line, dict)}</Td>
                   {canRecordVariance && (
                     <Td>
                       {isShortage && (
@@ -358,14 +362,7 @@ async function HistoryView({
                     <Td className={line.deltaXaf < 0 ? "text-danger-red font-semibold" : "text-secondary font-semibold"}>
                       {line.deltaXaf.toLocaleString()} XAF
                     </Td>
-                    <Td>
-                    <div className="flex flex-col gap-1 items-start">
-                      {line.resolved ? <Badge status="RESOLVED" /> : <Badge status="OPEN" />}
-                      {line.pendingConfirmationCount > 0 && (
-                        <span className="text-xs text-tertiary-fixed-dim font-semibold">{t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })}</span>
-                      )}
-                    </div>
-                  </Td>
+                    <Td>{lineStatusBadge(line, dict)}</Td>
                     {canRecordVariance && (
                       <Td>
                         {isShortage && (
