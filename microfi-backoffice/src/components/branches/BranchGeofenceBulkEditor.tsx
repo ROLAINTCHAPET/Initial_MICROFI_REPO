@@ -18,6 +18,7 @@ export function BranchGeofenceBulkEditor({ branchId, branchLabel }: { branchId: 
   const [draftVertices, setDraftVertices] = useState<GeofenceVertex[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
@@ -46,6 +47,27 @@ export function BranchGeofenceBulkEditor({ branchId, branchLabel }: { branchId: 
       setError(dict.common.unableToReachServer);
     } finally {
       setApplying(false);
+    }
+  }
+
+  async function clearAll() {
+    if (!confirm(dict.branches.geofenceBulk.confirmClear)) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/branches/${branchId}/geofence`, { method: "DELETE" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(body?.message ?? dict.branches.geofenceBulk.failedToClear);
+        return;
+      }
+      setResult(body?.message ?? null);
+    } catch {
+      setError(dict.common.unableToReachServer);
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -99,6 +121,13 @@ export function BranchGeofenceBulkEditor({ branchId, branchLabel }: { branchId: 
               </div>
             </>
           )}
+          <button
+            onClick={clearAll}
+            disabled={clearing}
+            className="h-9 px-3 rounded-[var(--radius-sm)] border-2 border-danger-red text-danger-red text-xs font-semibold cursor-pointer disabled:opacity-60 hover:bg-error-container transition-colors"
+          >
+            {clearing ? dict.branches.geofenceBulk.clearing : dict.branches.geofenceBulk.clearButton}
+          </button>
         </div>
       </div>
     </div>

@@ -28,3 +28,16 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ message: "Unable to reach the backend" }, { status: 502 });
   }
 }
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  try {
+    await api.delete<void>(`/admin/agents/${id}/geofence`);
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    if (err instanceof ApiRequestError) {
+      return NextResponse.json({ message: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ message: "Unable to reach the backend" }, { status: 502 });
+  }
+}

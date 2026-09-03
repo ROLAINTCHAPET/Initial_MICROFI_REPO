@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -219,5 +220,73 @@ class GeofenceServiceTest {
         ArgumentCaptor<Geofence> captor = ArgumentCaptor.forClass(Geofence.class);
         verify(geofenceRepository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues()).extracting(Geofence::getAgentId).containsExactlyInAnyOrder(agent1, agent2);
+    }
+
+    @Test
+    void deleteGeofenceIsNoOpWhenAgentHasNone() {
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.empty());
+
+        geofenceService.deleteGeofence(agentId);
+
+        verify(geofenceRepository, never()).delete(any());
+        verify(geofenceAlertRepository, never()).findByAgentIdAndResolvedAtIsNull(any());
+    }
+
+    @Test
+    void deleteGeofenceRemovesGeofenceWithNoOpenBreach() {
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.of(squareGeofence));
+        when(geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agentId)).thenReturn(Optional.empty());
+
+        geofenceService.deleteGeofence(agentId);
+
+        verify(geofenceRepository).delete(squareGeofence);
+        verify(geofenceAlertRepository, never()).save(any());
+        verify(geofenceAlertRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteGeofenceResolvesOpenRaisedBreachBeforeDeleting() {
+        GeofenceAlert breach = GeofenceAlert.builder().id(UUID.randomUUID()).agentId(agentId).geofenceId(geofenceId)
+                .firstDetectedOutsideAt(Instant.now().minusSeconds(300)).raisedAt(Instant.now().minusSeconds(180)).build();
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.of(squareGeofence));
+        when(geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agentId)).thenReturn(Optional.of(breach));
+
+        geofenceService.deleteGeofence(agentId);
+
+        verify(geofenceAlertRepository).save(breach);
+        assertThat(breach.getResolvedAt()).isNotNull();
+        verify(geofenceRepository).delete(squareGeofence);
+    }
+
+    @Test
+    void deleteGeofenceDiscardsOpenUnraisedBreachBeforeDeleting() {
+        GeofenceAlert breach = GeofenceAlert.builder().id(UUID.randomUUID()).agentId(agentId).geofenceId(geofenceId)
+                .firstDetectedOutsideAt(Instant.now().minusSeconds(10)).build();
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.of(squareGeofence));
+        when(geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agentId)).thenReturn(Optional.of(breach));
+
+        geofenceService.deleteGeofence(agentId);
+
+        verify(geofenceAlertRepository).delete(breach);
+        verify(geofenceAlertRepository, never()).save(any());
+        verify(geofenceRepository).delete(squareGeofence);
+    }
+
+    @Test
+    void clearGeofenceFromBranchDeletesOnlyAgentsThatHaveOneAndReturnsCount() {
+        UUID branchId = UUID.randomUUID();
+        UUID agent1 = UUID.randomUUID();
+        UUID agent2 = UUID.randomUUID();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agent1, agent2));
+        Geofence agent1Geofence = Geofence.builder().id(UUID.randomUUID()).agentId(agent1).verticesCsv("0,0;0,10;10,10").build();
+        when(geofenceRepository.findByAgentId(agent1)).thenReturn(Optional.of(agent1Geofence));
+        when(geofenceRepository.findByAgentId(agent2)).thenReturn(Optional.empty());
+        when(geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agent1)).thenReturn(Optional.empty());
+
+        int cleared = geofenceService.clearGeofenceFromBranch(branchId);
+
+        assertThat(cleared).isEqualTo(1);
+        verify(geofenceRepository).delete(agent1Geofence);
+        verify(geofenceRepository, never()).delete(argThat(g -> g.getAgentId().equals(agent2)));
     }
 }

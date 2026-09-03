@@ -29,6 +29,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -262,6 +263,31 @@ public class BranchController {
                                 .detailsParam1(String.valueOf(count))
                                 .build());
                         return MessageResponse.builder().message("Applied to " + count + " agent(s)").build();
+                    }).subscribeOn(Schedulers.boundedElastic());
+                });
+    }
+
+    @DeleteMapping("/{id}/geofence")
+    @Operation(summary = "Bulk-Clear Geofence From Branch", description = "Removes the geofence from every currently-active agent in the branch, returning each to the same unrestricted state as before one was ever set (BR-Fence-01) — mirrors applyGeofenceToBranch, there being no shared branch-level geofence row to begin with. ADMIN or that branch's own BRANCH_MANAGER.")
+    public Mono<MessageResponse> clearGeofenceFromBranch(@PathVariable UUID id, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> {
+                    AdminAccess.requireBranchScope(caller, id);
+                    return Mono.fromCallable(() -> {
+                        findBranchOrThrow(id);
+                        int count = geofenceService.clearGeofenceFromBranch(id);
+                        auditService.record(AuditLogEntry.builder()
+                                .category(AuditCategory.SECURITY)
+                                .eventType("BRANCH_GEOFENCE_BULK_CLEARED")
+                                .actorType(AuditActorType.ADMIN)
+                                .actorId(caller.getAdminUser().getId())
+                                .actorLabel(caller.getAdminUser().getLogin())
+                                .actorRole(caller.getAdminUser().getRole())
+                                .branchId(id)
+                                .detailsKey("BRANCH_GEOFENCE_BULK_CLEARED_DETAIL")
+                                .detailsParam1(String.valueOf(count))
+                                .build());
+                        return MessageResponse.builder().message("Cleared " + count + " agent(s)").build();
                     }).subscribeOn(Schedulers.boundedElastic());
                 });
     }

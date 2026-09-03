@@ -18,12 +18,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -95,6 +98,29 @@ public class AdminTrackingController {
                             .build());
                     return result;
                 }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @DeleteMapping("/geofence")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete Geofence", description = "Removes the agent's assigned perimeter, returning them to the same unrestricted state as before one was ever set (BR-Fence-01) — collections are no longer geofence-gated for this agent until a new one is drawn. Idempotent: a no-op if the agent had none. Own branch only, unless ADMIN.")
+    public Mono<Void> deleteGeofence(@PathVariable UUID id, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromRunnable(() -> {
+                    UUID branchId = agentDirectoryService.requireBranchIdForAgent(id);
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    geofenceService.deleteGeofence(id);
+                    auditService.record(AuditLogEntry.builder()
+                            .category(AuditCategory.SECURITY)
+                            .eventType("AGENT_GEOFENCE_DELETED")
+                            .actorType(AuditActorType.ADMIN)
+                            .actorId(caller.getAdminUser().getId())
+                            .actorLabel(caller.getAdminUser().getLogin())
+                            .actorRole(caller.getAdminUser().getRole())
+                            .branchId(branchId)
+                            .agentId(id)
+                            .detailsKey("AGENT_GEOFENCE_DELETED_DETAIL")
+                            .build());
+                }).subscribeOn(Schedulers.boundedElastic())).then();
     }
 
     @GetMapping("/geofence-alerts")

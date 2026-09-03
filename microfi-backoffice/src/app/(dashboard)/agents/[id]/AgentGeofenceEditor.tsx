@@ -21,6 +21,7 @@ export function AgentGeofenceEditor({ agentId, agentLabel }: { agentId: string; 
   const [editing, setEditing] = useState(false);
   const [draftVertices, setDraftVertices] = useState<GeofenceVertex[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +74,27 @@ export function AgentGeofenceEditor({ agentId, agentLabel }: { agentId: string; 
     }
   }
 
+  async function remove() {
+    if (!confirm(dict.tracking.workspace.confirmDeleteGeofence)) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/agents/${agentId}/geofence`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.message ?? dict.tracking.workspace.geofenceDeleteFailed);
+        return;
+      }
+      setGeofence(null);
+    } catch {
+      setError(dict.common.unableToReachServer);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="relative rounded-[var(--radius-md)] border-2 border-outline-variant overflow-hidden bg-surface-container-low h-[calc(100vh-260px)] min-h-[480px]">
       {!loaded ? (
@@ -94,13 +116,25 @@ export function AgentGeofenceEditor({ agentId, agentLabel }: { agentId: string; 
 
         <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] shadow-[var(--shadow-elevation-1)] px-4 py-3 flex flex-col gap-2 w-full sm:w-auto sm:min-w-[280px]">
           {!editing ? (
-            <button
-              onClick={startEditing}
-              className="h-9 px-4 rounded-[var(--radius-sm)] bg-primary text-on-primary text-sm font-semibold cursor-pointer flex items-center justify-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95"
-            >
-              <Icon name="pencil" className="size-4" />
-              {geofence ? dict.tracking.workspace.editGeofence : dict.tracking.workspace.setGeofence}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={startEditing}
+                className="h-9 px-4 rounded-[var(--radius-sm)] bg-primary text-on-primary text-sm font-semibold cursor-pointer flex items-center justify-center gap-2 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95"
+              >
+                <Icon name="pencil" className="size-4" />
+                {geofence ? dict.tracking.workspace.editGeofence : dict.tracking.workspace.setGeofence}
+              </button>
+              {geofence && (
+                <button
+                  onClick={remove}
+                  disabled={deleting}
+                  className="h-9 px-3 rounded-[var(--radius-sm)] border-2 border-danger-red text-danger-red text-sm font-semibold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-error-container transition-colors"
+                >
+                  <Icon name="trash" className="size-4" />
+                  {deleting ? dict.tracking.workspace.deletingGeofence : dict.tracking.workspace.deleteGeofence}
+                </button>
+              )}
+            </div>
           ) : (
             <>
               <p className="text-xs text-on-surface-variant">{t(dict.tracking.workspace.placeVertices, { count: draftVertices.length })}</p>
@@ -126,9 +160,9 @@ export function AgentGeofenceEditor({ agentId, agentLabel }: { agentId: string; 
                   {saving ? dict.tracking.workspace.savingGeofence : dict.tracking.workspace.saveGeofence}
                 </button>
               </div>
-              {error && <p role="alert" className="text-xs text-danger-red">{error}</p>}
             </>
           )}
+          {error && <p role="alert" className="text-xs text-danger-red">{error}</p>}
         </div>
       </div>
     </div>

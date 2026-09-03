@@ -127,6 +127,49 @@ public class GeofenceService {
         return toResponse(geofence);
     }
 
+    /**
+     * Returns the agent to the same unrestricted state they were in before any geofence was ever
+     * set (see {@link #isWithinAssignedGeofence}'s {@code orElse(true)}) — not a new state this
+     * codebase needs to guard against, just the pre-existing default. Idempotent: deleting an
+     * already-absent geofence is a no-op rather than a 404, matching normal DELETE semantics.
+     * <p>
+     * Any still-open breach alert for this agent is closed the same way {@link #evaluateLocation}
+     * closes one when the agent returns inside — raised alerts get {@code resolvedAt} stamped
+     * (kept for BR-Fence-02's audit trail), an alert still within its grace period (never
+     * actually surfaced) is simply discarded — otherwise it would sit open forever, since nothing
+     * will ever call evaluateLocation for this agent's now-deleted geofence again.
+     */
+    public void deleteGeofence(UUID agentId) {
+        geofenceRepository.findByAgentId(agentId).ifPresent(geofence -> {
+            geofenceAlertRepository.findByAgentIdAndResolvedAtIsNull(agentId).ifPresent(breach -> {
+                if (breach.getRaisedAt() != null) {
+                    breach.setResolvedAt(Instant.now());
+                    geofenceAlertRepository.save(breach);
+                } else {
+                    geofenceAlertRepository.delete(breach);
+                }
+            });
+            geofenceRepository.delete(geofence);
+        });
+    }
+
+    /**
+     * Bulk convenience mirroring {@link #applyGeofenceToBranch} — clears every currently-active
+     * agent's own geofence (there being no shared branch-level row to begin with). Returns how
+     * many agents actually had one to clear.
+     */
+    public int clearGeofenceFromBranch(UUID branchId) {
+        List<UUID> agentIds = agentDirectoryService.findActiveAgentIdsByBranch(branchId);
+        int cleared = 0;
+        for (UUID agentId : agentIds) {
+            if (geofenceRepository.findByAgentId(agentId).isPresent()) {
+                deleteGeofence(agentId);
+                cleared++;
+            }
+        }
+        return cleared;
+    }
+
     public List<GeofenceAlertResponse> listAlerts(UUID agentId) {
         return geofenceAlertRepository.findByAgentIdOrderByFirstDetectedOutsideAtDesc(agentId).stream()
                 .map(this::toAlertResponse)
