@@ -552,6 +552,8 @@
       "geofenceSaveFailed": "Échec de l'enregistrement de la zone géographique",
       "deleteGeofence": "Supprimer la zone",
       "deletingGeofence": "Suppression…",
+      "resolvingLocation": "Résolution du lieu…",
+      "locationNameUnavailable": "Nom du lieu indisponible",
       "confirmDeleteGeofence": "Supprimer la zone géographique de cet agent ? Il ne sera plus limité à une zone spécifique.",
       "geofenceDeleteFailed": "Échec de la suppression de la zone géographique",
       "geofenceBreach": "Sortie de zone",

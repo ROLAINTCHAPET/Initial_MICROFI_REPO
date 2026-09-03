@@ -552,6 +552,8 @@
       "geofenceSaveFailed": "Failed to save geofence",
       "deleteGeofence": "Delete Geofence",
       "deletingGeofence": "Deleting…",
+      "resolvingLocation": "Resolving location…",
+      "locationNameUnavailable": "Location name unavailable",
       "confirmDeleteGeofence": "Remove this agent's geofence? They will no longer be restricted to a specific zone.",
       "geofenceDeleteFailed": "Failed to delete geofence",
       "geofenceBreach": "Geofence Breach",

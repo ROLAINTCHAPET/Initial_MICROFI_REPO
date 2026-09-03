@@ -125,6 +125,7 @@ export function TrackingWorkspace({ agents }: { agents: TrackingAgent[] }) {
     <div className="relative">
       <div className="relative rounded-[var(--radius-md)] border-2 border-outline-variant overflow-hidden bg-surface-container-low h-[calc(100vh-220px)] min-h-[480px]">
         <TrackingMap
+          agentId={selectedId ?? undefined}
           points={route?.points ?? []}
           transactions={route?.transactions ?? []}
           geofence={geofence?.vertices ?? null}

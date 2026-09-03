@@ -9,7 +9,9 @@ import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.GeofenceAlertResponse;
 import com.microfi.shared.dto.GeofenceRequest;
 import com.microfi.shared.dto.GeofenceResponse;
+import com.microfi.shared.dto.LocationNameResponse;
 import com.microfi.shared.dto.RouteResponse;
+import com.microfi.transactions.service.GeocodingService;
 import com.microfi.transactions.service.GeofenceService;
 import com.microfi.transactions.service.TrackingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,7 @@ public class AdminTrackingController {
     private final GeofenceService geofenceService;
     private final AgentDirectoryService agentDirectoryService;
     private final AuditService auditService;
+    private final GeocodingService geocodingService;
 
     @GetMapping("/route")
     @Operation(summary = "Historical Route", description = "An agent's ordered GPS trail plus that day's collection markers (UC-11, FR-11). BR-Route-01: own branch only, unless ADMIN.")
@@ -121,6 +124,17 @@ public class AdminTrackingController {
                             .detailsKey("AGENT_GEOFENCE_DELETED_DETAIL")
                             .build());
                 }).subscribeOn(Schedulers.boundedElastic())).then();
+    }
+
+    @GetMapping("/route/location-name")
+    @Operation(summary = "Resolve Location Name", description = "On-demand reverse geocode of a single point on the agent's route (UC-11) — resolved lazily per click rather than pre-computed for every ~5-minute GPS ping, which would multiply Nominatim's free-tier call volume by however many pings the map never gets clicked on. Own branch only, unless ADMIN.")
+    public Mono<LocationNameResponse> locationName(@PathVariable UUID id, @RequestParam double lat, @RequestParam double lon,
+                                                     Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminAccess.requireBranchScope(caller, agentDirectoryService.requireBranchIdForAgent(id));
+                    return LocationNameResponse.builder().locationName(geocodingService.reverseGeocode(lat, lon)).build();
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @GetMapping("/geofence-alerts")

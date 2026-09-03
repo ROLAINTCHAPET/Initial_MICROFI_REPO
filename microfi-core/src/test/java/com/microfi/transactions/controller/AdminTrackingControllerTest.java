@@ -14,6 +14,7 @@ import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.shared.dto.GeofenceAlertResponse;
 import com.microfi.shared.dto.GeofenceResponse;
 import com.microfi.shared.dto.RouteResponse;
+import com.microfi.transactions.service.GeocodingService;
 import com.microfi.transactions.service.GeofenceService;
 import com.microfi.transactions.service.TrackingService;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ class AdminTrackingControllerTest {
 
     @MockitoBean
     private AuditService auditService;
+
+    @MockitoBean
+    private GeocodingService geocodingService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -128,6 +132,31 @@ class AdminTrackingControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void locationNameResolvesForOwnBranch() {
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(branchId);
+        when(geocodingService.reverseGeocode(4.05, 9.70)).thenReturn("Akwa, Douala, Cameroon");
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .get()
+                .uri("/api/v1/admin/agents/" + agentId + "/route/location-name?lat=4.05&lon=9.70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.locationName").isEqualTo("Akwa, Douala, Cameroon");
+    }
+
+    @Test
+    void locationNameForbiddenOutsideOwnBranch() {
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(UUID.randomUUID());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .get()
+                .uri("/api/v1/admin/agents/" + agentId + "/route/location-name?lat=4.05&lon=9.70")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
