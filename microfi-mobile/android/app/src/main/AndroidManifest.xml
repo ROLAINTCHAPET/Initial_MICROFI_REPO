@@ -24,6 +24,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- "Contact Branch" (core/contact_branch.dart) places the call directly (ACTION_CALL) rather
+         than handing off to the device's own Phone app pre-filled (ACTION_DIAL, what a plain
+         tel: link does) — CALL_PHONE is the runtime permission Android requires for ACTION_CALL. -->
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
     <application
         android:label="microfi_mobile"
         android:name="${applicationName}"
