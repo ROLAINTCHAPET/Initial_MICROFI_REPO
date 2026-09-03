@@ -7,6 +7,7 @@ import com.microfi.shared.dto.MiddlewareFeeSplit;
 import com.microfi.shared.dto.MiddlewareHistoryEntry;
 import com.microfi.shared.dto.MiddlewareMemberVerification;
 import com.microfi.shared.dto.MiddlewareTransactionPostResult;
+import com.microfi.shared.dto.MiddlewareTransactionReversalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,17 @@ public class CbsClientService {
                 .retrieve()
                 .bodyToMono(MiddlewareFeeSplit.class)
                 .doOnError(e -> log.error("Middleware fee split failed for member {}: {}", memberId, e.getMessage()));
+    }
+
+    /** Reverses a previously-posted transaction by its own reference — backs the collection-rejection-with-proof flow for a collection voided after it was already exported to the CBS. */
+    public Mono<MiddlewareTransactionReversalResult> reverseTransaction(String reference, String idempotencyKey) {
+        return webClient.post()
+                .uri("/mw/v1/transactions/reverse")
+                .header("Idempotency-Key", idempotencyKey)
+                .bodyValue(Map.of("reference", reference))
+                .retrieve()
+                .bodyToMono(MiddlewareTransactionReversalResult.class)
+                .doOnError(e -> log.error("Middleware transaction reversal failed for reference {}: {}", reference, e.getMessage()));
     }
 
     /** FR-21: live balance from the CBS. */

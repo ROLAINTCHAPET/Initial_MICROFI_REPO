@@ -8,6 +8,7 @@ import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
+import com.microfi.mw.adapters.dto.TransactionReversalResult;
 
 import java.util.List;
 
@@ -26,6 +27,16 @@ public interface CoreBankingAdapter {
     BalanceResult getBalance(String memberId);
 
     TransactionPostResult postTransactions(List<CollectionLine> collections);
+
+    /**
+     * Reverses a previously-posted transaction by its own reference (one of {@link
+     * TransactionPostResult#postedReferences}) — backs Core's collection-rejection-with-proof flow
+     * for a collection that had already been posted before the error was caught. A real vendor
+     * (Amplitude, FinanSoft) may or may not support reversing an already-settled transaction at
+     * all; that's a vendor-specific constraint this interface doesn't paper over — {@link
+     * TransactionReversalResult#success} is how an adapter reports it couldn't.
+     */
+    TransactionReversalResult reverseTransaction(String reference);
 
     FeeSplitResult splitFee(String memberId, String agentId, long amountXaf);
 

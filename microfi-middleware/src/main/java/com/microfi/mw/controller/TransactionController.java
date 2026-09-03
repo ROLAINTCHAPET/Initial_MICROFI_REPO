@@ -1,8 +1,10 @@
 package com.microfi.mw.controller;
 
 import com.microfi.mw.adapters.dto.TransactionPostResult;
+import com.microfi.mw.adapters.dto.TransactionReversalResult;
 import com.microfi.mw.api.CorrelationId;
 import com.microfi.mw.api.dto.PostTransactionsRequest;
+import com.microfi.mw.api.dto.ReverseTransactionRequest;
 import com.microfi.mw.service.CbsIntegrationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,5 +31,14 @@ public class TransactionController {
                                 @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                                 @Valid @RequestBody PostTransactionsRequest request) {
         return cbsIntegrationService.postTransactions(CorrelationId.resolve(correlationId), idempotencyKey, request.collections());
+    }
+
+    @PostMapping("/reverse")
+    @Operation(summary = "Reverse a previously-posted transaction",
+            description = "Idempotent when an Idempotency-Key header is supplied. Backs Core's collection-rejection-with-proof flow for a collection voided after it was already posted.")
+    TransactionReversalResult reverse(@RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+                                       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                       @Valid @RequestBody ReverseTransactionRequest request) {
+        return cbsIntegrationService.reverseTransaction(CorrelationId.resolve(correlationId), idempotencyKey, request.reference());
     }
 }

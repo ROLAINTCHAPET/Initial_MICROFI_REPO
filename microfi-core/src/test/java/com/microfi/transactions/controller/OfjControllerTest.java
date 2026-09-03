@@ -1,5 +1,6 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.SecurityConfig;
 import com.microfi.authentication.domain.AdminRole;
@@ -39,6 +40,9 @@ class OfjControllerTest {
 
     @MockitoBean
     private OfjService ofjService;
+
+    @MockitoBean
+    private AuditService auditService;
 
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.

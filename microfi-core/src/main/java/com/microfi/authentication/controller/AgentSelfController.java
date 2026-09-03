@@ -1,5 +1,9 @@
 package com.microfi.authentication.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.Branch;
@@ -11,10 +15,16 @@ import com.microfi.notifications.service.NotificationService;
 import com.microfi.shared.dto.AgentResponse;
 import com.microfi.shared.dto.BranchNoticeResponse;
 import com.microfi.shared.dto.BranchResponse;
+import com.microfi.shared.dto.CollectionRejectionRequestResponse;
 import com.microfi.shared.dto.MfiNameResponse;
 import com.microfi.shared.dto.ChangeAgentPinRequest;
+import com.microfi.shared.dto.PendingReconciliationLineResponse;
+import com.microfi.shared.dto.RequestCollectionRejectionRequest;
 import com.microfi.shared.dto.RouteResponse;
 import com.microfi.shared.dto.SosResponse;
+import com.microfi.transactions.domain.CollectionRejectionRequest;
+import com.microfi.transactions.service.CollectionRejectionService;
+import com.microfi.transactions.service.OfjService;
 import com.microfi.transactions.service.TrackingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +35,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +47,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
+import java.util.UUID;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -58,6 +71,9 @@ public class AgentSelfController {
     private final AgentDirectoryService agentDirectoryService;
     private final NotificationService notificationService;
     private final MfiSettingsService mfiSettingsService;
+    private final OfjService ofjService;
+    private final CollectionRejectionService collectionRejectionService;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Get My Profile", description = "Resolves the caller's own agent record from their JWT — id, branch, phone, IMEI, status, whether the transaction PIN still needs to be set — everything the token itself doesn't carry. Agent principals only.")
@@ -138,6 +154,67 @@ public class AgentSelfController {
                 .flatMapMany(agent -> Mono.fromCallable(() -> notificationService.listRecentNoticesForBranch(agent.getBranchId()))
                         .subscribeOn(Schedulers.boundedElastic())
                         .flatMapMany(Flux::fromIterable));
+    }
+
+    @GetMapping("/pending-confirmations")
+    @Operation(summary = "My Pending Reconciliation Confirmations", description = "Reconciliation lines a cashier has physically counted but that still need this agent's own sign-off before the cash stops counting against their escrow ceiling — polled by the mobile app the same way branch notices/SOS acknowledgement are (no push infrastructure in this app). Agent principals only.")
+    public Flux<PendingReconciliationLineResponse> myPendingConfirmations(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMapMany(agent -> Mono.fromCallable(() -> ofjService.listPendingConfirmationLines(agent.getId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
+    }
+
+    @PostMapping("/reconciliations/{lineId}/confirm")
+    @Operation(summary = "Confirm A Reconciliation", description = "Attests the cashier's physical count for this line was correct — the only thing that actually frees the cash counted from this agent's escrow ceiling. Agent principals only, and only for their own line.")
+    public Mono<Void> confirmReconciliation(@PathVariable UUID lineId, Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromRunnable(() -> {
+                    ofjService.confirmReconciliation(agent.getId(), lineId);
+                    auditService.record(AuditLogEntry.builder()
+                            .category(AuditCategory.FINANCIAL)
+                            .eventType("COLLECTION_RECONCILIATION_CONFIRMED")
+                            .actorType(AuditActorType.AGENT)
+                            .actorId(agent.getId())
+                            .actorLabel(agent.getUsername())
+                            .branchId(agent.getBranchId())
+                            .agentId(agent.getId())
+                            .detailsKey("COLLECTION_RECONCILIATION_CONFIRMED_DETAIL")
+                            .detailsParam1("AGENT")
+                            .build());
+                }).subscribeOn(Schedulers.boundedElastic())).then();
+    }
+
+    @PostMapping("/collections/{id}/reject-request")
+    @Operation(summary = "Request Collection Rejection", description = "Asks a branch manager/admin to void one of this agent's own collections for error (wrong amount, wrong client, duplicate entry). Requires mandatory approval proof on the reviewer's side before anything actually changes (UC pending: two-party gate, see CollectionRejectionRequest). Agent principals only, and only for their own collection.")
+    public Mono<CollectionRejectionRequestResponse> requestCollectionRejection(@PathVariable UUID id, @Valid @RequestBody RequestCollectionRejectionRequest request, Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromCallable(() -> {
+                    CollectionRejectionRequest result = collectionRejectionService.requestRejection(agent.getId(), id, request.getReason());
+                    auditService.record(AuditLogEntry.builder()
+                            .category(AuditCategory.FINANCIAL)
+                            .eventType("COLLECTION_REJECTION_REQUESTED")
+                            .actorType(AuditActorType.AGENT)
+                            .actorId(agent.getId())
+                            .actorLabel(agent.getUsername())
+                            .branchId(agent.getBranchId())
+                            .agentId(agent.getId())
+                            .detailsKey("COLLECTION_REJECTION_REQUESTED_DETAIL")
+                            .detailsParam1(request.getReason())
+                            .build());
+                    return CollectionRejectionRequestResponse.builder()
+                            .id(result.getId())
+                            .collectionId(result.getCollectionId())
+                            .agentId(result.getAgentId())
+                            .reason(result.getReason())
+                            .requestedAt(result.getRequestedAt())
+                            .status(result.getStatus().name())
+                            .hasProof(false)
+                            .build();
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PatchMapping("/pin")

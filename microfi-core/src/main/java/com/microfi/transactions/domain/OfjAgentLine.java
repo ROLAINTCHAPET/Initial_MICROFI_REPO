@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -54,4 +55,11 @@ public class OfjAgentLine {
 
     @Column(nullable = false)
     private long deltaXaf;
+
+    /**
+     * Stamped to the cashier's own {@code cutoff} on every sweep that touches this line (create or
+     * repeat), not just the first one — CollectionConfirmationExpiryJob's timeout clock should
+     * start from the most recent physical count, not whenever this row happened to be created.
+     */
+    private Instant lastCountedAt;
 }

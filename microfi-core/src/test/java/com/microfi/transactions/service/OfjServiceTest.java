@@ -120,7 +120,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(4000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(4000L);
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
@@ -136,7 +136,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(3000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(3000L);
         when(activationDirectoryService.sumUnreconciled(any(), any())).thenReturn(1000L);
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
 
@@ -153,7 +153,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(varianceDebtRepository.findByOfjAgentLineId(any())).thenReturn(Optional.empty());
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(3000, 1));
@@ -167,7 +167,7 @@ class OfjServiceTest {
      * already balancing once) — the second call must ADD the newly-unreconciled amount to the
      * existing line's digitalTotalXaf (for the day's running total/audit trail), not overwrite it
      * and silently lose the first amount. The mock simulates this directly: the first sweep's
-     * collections are gone (already marked reconciled), so a second call to sumUnreconciledByAgent
+     * collections are gone (already marked reconciled), so a second call to sumUncountedByAgent
      * only sees what's newly arrived — and per ReconcileWorkspace.tsx, the cashier only ever counts
      * and submits that same newly-arrived amount, not a full recount of cash already handed over.
      */
@@ -180,7 +180,7 @@ class OfjServiceTest {
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.of(existingLine));
         // Only the NEW, still-unreconciled cash since the first reconcile — the 4000 already
         // counted was marked reconciled and no longer shows up here.
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(1500L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(1500L);
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(1500, 1));
 
@@ -205,7 +205,7 @@ class OfjServiceTest {
                 .collectionsTotalXaf(155_000L).activationsTotalXaf(0L).digitalTotalXaf(155_000L).physicalTotalXaf(155_000L).deltaXaf(0L).build();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.of(existingLine));
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
 
@@ -261,7 +261,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -283,7 +283,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -307,7 +307,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -326,7 +326,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
@@ -349,7 +349,7 @@ class OfjServiceTest {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         when(agentDirectoryService.hasPendingUnsyncedCollections(List.of(agentId))).thenReturn(true);
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
@@ -373,7 +373,7 @@ class OfjServiceTest {
         UUID otherAgentId = UUID.randomUUID();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
-        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(5000L);
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(5000L);
         // Branch has two active agents; only the first has reconciled (exact match, resolved).
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId, otherAgentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
@@ -626,7 +626,7 @@ class OfjServiceTest {
     @Test
     void listPendingAgentsIncludesActiveAgentWithUnreconciledCash() {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(4000L);
+        when(collectionRepository.sumUncountedByAgent(eq(agentId), any())).thenReturn(4000L);
         when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(500L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
@@ -647,7 +647,7 @@ class OfjServiceTest {
     @Test
     void listPendingAgentsExcludesAgentsWithNothingUnreconciled() {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
-        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(0L);
+        when(collectionRepository.sumUncountedByAgent(eq(agentId), any())).thenReturn(0L);
         when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(0L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
@@ -666,7 +666,7 @@ class OfjServiceTest {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         // Represents a collection collected 3 days ago that only just synced — still unreconciled,
         // so it's summed regardless of how far in the past its collectedAt is.
-        when(collectionRepository.sumUnreconciledByAgent(eq(agentId), any())).thenReturn(15000L);
+        when(collectionRepository.sumUncountedByAgent(eq(agentId), any())).thenReturn(15000L);
         when(activationDirectoryService.sumUnreconciled(eq(agentId), any())).thenReturn(0L);
 
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
@@ -682,5 +682,102 @@ class OfjServiceTest {
         List<OfjPendingLineResponse> pending = ofjService.listPendingAgents(branchId);
 
         assertThat(pending).isEmpty();
+    }
+
+    // ── Agent confirmation gate ──────────────────────────────────────────────────────────────
+
+    /**
+     * The whole point of splitting reconcile()'s bulk update: reconciledAt (and therefore the
+     * escrow ceiling, see CollectionRepository#sumUnreconciledByAgent) must NOT be touched at
+     * cashier-submit time anymore — only markPendingConfirmation, never the old markReconciled.
+     */
+    @Test
+    void reconcileMarksPendingConfirmationNotReconciled() {
+        OfjSession session = openSession();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(4000L);
+        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
+
+        ofjService.reconcile(branchId, reconcileRequest(5000, 1));
+
+        verify(collectionRepository).markPendingConfirmation(eq(agentId), any(Instant.class), any(UUID.class));
+        verify(collectionRepository, org.mockito.Mockito.never()).markAgentConfirmed(any(), any(), any());
+    }
+
+    @Test
+    void reconcileStampsLastCountedAtOnTheLine() {
+        OfjSession session = openSession();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
+        when(collectionRepository.sumUncountedByAgent(any(), any())).thenReturn(4000L);
+        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of());
+
+        ofjService.reconcile(branchId, reconcileRequest(5000, 1));
+
+        ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
+        verify(ofjAgentLineRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getLastCountedAt()).isNotNull();
+    }
+
+    @Test
+    void listPendingConfirmationLinesReturnsPendingTotalsOnly() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .lastCountedAt(Instant.now()).build();
+        when(collectionRepository.findDistinctPendingConfirmationLineIdsByAgent(agentId)).thenReturn(List.of(lineId));
+        when(ofjAgentLineRepository.findAllById(List.of(lineId))).thenReturn(List.of(line));
+        when(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(eq(lineId), any())).thenReturn(7000L);
+        when(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(eq(lineId), any())).thenReturn(3L);
+
+        List<com.microfi.shared.dto.PendingReconciliationLineResponse> pending = ofjService.listPendingConfirmationLines(agentId);
+
+        assertThat(pending).hasSize(1);
+        assertThat(pending.get(0).getLineId()).isEqualTo(lineId);
+        assertThat(pending.get(0).getTotalXaf()).isEqualTo(7000L);
+        assertThat(pending.get(0).getCollectionCount()).isEqualTo(3L);
+        assertThat(pending.get(0).getLastCountedAt()).isEqualTo(line.getLastCountedAt());
+    }
+
+    @Test
+    void listPendingConfirmationLinesReturnsEmptyWhenNoneOutstanding() {
+        when(collectionRepository.findDistinctPendingConfirmationLineIdsByAgent(agentId)).thenReturn(List.of());
+
+        assertThat(ofjService.listPendingConfirmationLines(agentId)).isEmpty();
+    }
+
+    @Test
+    void confirmReconciliationMarksAgentConfirmedForOwnLine() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(collectionRepository.markAgentConfirmed(eq(lineId), any(), eq(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT))).thenReturn(3);
+
+        ofjService.confirmReconciliation(agentId, lineId);
+
+        verify(collectionRepository).markAgentConfirmed(eq(lineId), any(Instant.class), eq(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT));
+    }
+
+    @Test
+    void confirmReconciliationForbiddenForAnotherAgentsLine() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(UUID.randomUUID()).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+
+        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    void confirmReconciliationConflictWhenNothingAwaitingConfirmation() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(collectionRepository.markAgentConfirmed(eq(lineId), any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
     }
 }

@@ -2,6 +2,8 @@ package com.microfi.transactions.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -74,6 +76,24 @@ public class Collection {
      */
     private Instant reconciledAt;
 
-    /** Which {@code OfjAgentLine} counted this collection — lets CBS export post exactly the collections that were just reconciled, not everything with a matching calendar date. */
+    /** Which {@code OfjAgentLine} counted this collection — lets CBS export post exactly the collections that were just reconciled, not everything with a matching calendar date. Stamped immediately at cashier-submit time regardless of {@link #reconciliationStatus}, so export/branch-closing never wait on agent confirmation. */
     private UUID reconciledInLineId;
+
+    /** Distinct from {@link #reconciledAt} being non-null — see {@link CollectionReconciliationStatus}'s doc for why the two are decoupled. */
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private CollectionReconciliationStatus reconciliationStatus = CollectionReconciliationStatus.UNRECONCILED;
+
+    /** Null until {@link #reconciliationStatus} reaches {@code CONFIRMED} — audit-trail only, no behavioral branching. */
+    @Enumerated(EnumType.STRING)
+    private CollectionConfirmedBy confirmedBy;
+
+    /** Null until {@code OfjService#postCollectionsToLedger} actually posts this collection to the CBS — the signal a rejection-approval uses to decide whether a real CBS reversal is needed, or just a local void. */
+    private Instant exportedAt;
+
+    /** The CBS's own reference for this posting (from {@code MiddlewareTransactionPostResult#postedReferences}) — needed to reverse the exact transaction later, not just "some collection for this agent." */
+    private String cbsTransactionRef;
+
+    /** Set once a {@code CollectionRejectionRequest} against this collection is approved — the collection is excluded from every downstream financial view from this point on, but the row itself is kept (never deleted) for the audit trail. */
+    private Instant voidedAt;
 }

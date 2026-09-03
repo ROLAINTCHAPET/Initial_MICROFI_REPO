@@ -9,13 +9,16 @@ import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
 import com.microfi.shared.dto.MiddlewareCollectionLine;
 import com.microfi.shared.dto.MiddlewareExportAck;
+import com.microfi.shared.dto.MiddlewareTransactionPostResult;
 import com.microfi.shared.dto.OfjAgentLineResponse;
 import com.microfi.shared.dto.OfjPendingLineResponse;
 import com.microfi.shared.dto.OfjSummaryResponse;
+import com.microfi.shared.dto.PendingReconciliationLineResponse;
 import com.microfi.shared.dto.ReconcileRequest;
 import com.microfi.shared.dto.VarianceDebtResponse;
 import com.microfi.shared.dto.VarianceRequest;
 import com.microfi.transactions.domain.Collection;
+import com.microfi.transactions.domain.CollectionReconciliationStatus;
 import com.microfi.transactions.domain.ExportBatch;
 import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.domain.OfjPhysicalDenom;
@@ -89,11 +92,13 @@ public class OfjService {
     }
 
     /**
-     * Active agents in the branch who currently have unreconciled digital cash the cashier still
-     * needs to look at. Driven directly by {@code reconciledAt IS NULL} (see
-     * CollectionRepository#sumUnreconciledByAgent), not by comparing against a stale
-     * {@code OfjAgentLine} snapshot — an agent's unreconciled total already reflects everything
-     * since their last reconciliation, including a multi-day-offline backlog that only just synced.
+     * Active agents in the branch who currently have digital cash the cashier still hasn't
+     * physically counted yet. Driven directly by {@code CollectionReconciliationStatus.UNRECONCILED}
+     * (see {@code CollectionRepository#sumUncountedByAgent}), not by comparing against a stale
+     * {@code OfjAgentLine} snapshot — an agent's uncounted total already reflects everything since
+     * their last reconciliation, including a multi-day-offline backlog that only just synced.
+     * Deliberately excludes collections already swept into a line and merely awaiting the agent's
+     * own confirmation — the cashier has nothing left to do for those.
      */
     public List<OfjPendingLineResponse> listPendingAgents(UUID branchId) {
         List<UUID> activeAgentIds = agentDirectoryService.findActiveAgentIdsByBranch(branchId);
@@ -104,7 +109,7 @@ public class OfjService {
         Instant now = Instant.now();
         List<OfjPendingLineResponse> pending = new ArrayList<>();
         for (UUID agentId : activeAgentIds) {
-            long collectionsTotal = collectionRepository.sumUnreconciledByAgent(agentId, now);
+            long collectionsTotal = collectionRepository.sumUncountedByAgent(agentId, now);
             long activationsTotal = activationDirectoryService.sumUnreconciled(agentId, now);
             long digitalTotal = collectionsTotal + activationsTotal;
             if (digitalTotal <= 0) {
@@ -172,13 +177,13 @@ public class OfjService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "OFJ session is not open for this branch/day");
         }
 
-        // A fixed instant, not "current DB state" — sumUnreconciledByAgent and markReconciled below
-        // both filter on collectedAt/paidAt < cutoff, so they see exactly the same rows regardless
-        // of anything concurrently syncing in mid-transaction. Whatever's still unreconciled and
-        // older than this moment gets swept up now — including a multi-day-offline agent's entire
-        // backlog, however far back it goes, not just "today".
+        // A fixed instant, not "current DB state" — sumUncountedByAgent and markPendingConfirmation
+        // below both filter on collectedAt/paidAt < cutoff, so they see exactly the same rows
+        // regardless of anything concurrently syncing in mid-transaction. Whatever the cashier
+        // hasn't looked at yet and is older than this moment gets swept up now — including a
+        // multi-day-offline agent's entire backlog, however far back it goes, not just "today".
         Instant cutoff = Instant.now();
-        long newCollections = collectionRepository.sumUnreconciledByAgent(request.getAgentId(), cutoff);
+        long newCollections = collectionRepository.sumUncountedByAgent(request.getAgentId(), cutoff);
         long newActivations = activationDirectoryService.sumUnreconciled(request.getAgentId(), cutoff);
         long physicalTotal = request.getPhysicalDenominationLines().stream()
                 .mapToLong(line -> line.getFaceValueXaf() * line.getQuantity())
@@ -203,9 +208,10 @@ public class OfjService {
         line.setDigitalTotalXaf(digitalTotal);
         line.setPhysicalTotalXaf(nz(line.getPhysicalTotalXaf()) + physicalTotal);
         line.setDeltaXaf(physicalTotal - newDigitalTotal);
+        line.setLastCountedAt(cutoff);
         ofjAgentLineRepository.save(line);
 
-        collectionRepository.markReconciled(request.getAgentId(), cutoff, line.getId());
+        collectionRepository.markPendingConfirmation(request.getAgentId(), cutoff, line.getId());
         activationDirectoryService.markReconciled(request.getAgentId(), cutoff, line.getId());
 
         ofjPhysicalDenomRepository.deleteByOfjAgentLineId(line.getId());
@@ -220,6 +226,50 @@ public class OfjService {
 
         maybeCloseSession(session);
         return toLineResponse(line);
+    }
+
+    /**
+     * This agent's own reconciliation lines still awaiting their confirmation — the mobile app's
+     * "you need to confirm" screen. Per-line, not per-collection: a cashier's count can bundle
+     * dozens of collections, and per-collection confirmation taps would be unusable (see
+     * CollectionReconciliationStatus's doc). The total/count shown are scoped to exactly the
+     * still-{@code PENDING_AGENT_CONFIRMATION} collections under each line, not the line's whole
+     * accumulated history — a repeat same-day sweep reuses the same line id, so a line can mix an
+     * already-confirmed earlier batch with a newer pending one.
+     */
+    public List<PendingReconciliationLineResponse> listPendingConfirmationLines(UUID agentId) {
+        List<UUID> lineIds = collectionRepository.findDistinctPendingConfirmationLineIdsByAgent(agentId);
+        if (lineIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, OfjAgentLine> linesById = ofjAgentLineRepository.findAllById(lineIds).stream()
+                .collect(Collectors.toMap(OfjAgentLine::getId, l -> l));
+        return lineIds.stream()
+                .map(lineId -> PendingReconciliationLineResponse.builder()
+                        .lineId(lineId)
+                        .totalXaf(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                        .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                        .lastCountedAt(linesById.get(lineId) != null ? linesById.get(lineId).getLastCountedAt() : null)
+                        .build())
+                .toList();
+    }
+
+    /**
+     * The agent's own sign-off on a cashier's physical count — the only thing that actually frees
+     * their escrow ceiling (see CollectionRepository#sumUnreconciledByAgent). Verifies the line
+     * genuinely belongs to this agent before touching it, same "never trust the caller's claimed
+     * ownership" principle as CollectionController resolving the agent from the JWT, not a request field.
+     */
+    public void confirmReconciliation(UUID agentId, UUID lineId) {
+        OfjAgentLine line = ofjAgentLineRepository.findById(lineId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconciliation line not found: " + lineId));
+        if (!line.getAgentId().equals(agentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot confirm another agent's reconciliation");
+        }
+        int updated = collectionRepository.markAgentConfirmed(lineId, Instant.now(), com.microfi.transactions.domain.CollectionConfirmedBy.AGENT);
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing awaiting confirmation on this line");
+        }
     }
 
     public VarianceDebtResponse recordVariance(VarianceRequest request) {
@@ -338,15 +388,23 @@ public class OfjService {
         // silently never post it even though reconcile() already counted it in digitalTotalXaf.
         List<UUID> lineIds = ofjAgentLineRepository.findByOfjId(session.getId()).stream().map(OfjAgentLine::getId).toList();
 
-        List<MiddlewareCollectionLine> lines = new ArrayList<>();
-        collectionRepository.findByReconciledInLineIdIn(lineIds).stream()
+        // Voided collections (see CollectionRejectionRequest) are excluded even if they were
+        // already swept into a line before the rejection was approved — nothing voided should
+        // ever reach the CBS, whether or not it happened to still be sitting in this batch.
+        List<Collection> collections = collectionRepository.findByReconciledInLineIdIn(lineIds).stream()
+                .filter(c -> c.getVoidedAt() == null)
+                .toList();
+        List<MiddlewareCollectionLine> lines = new ArrayList<>(collections.stream()
                 .map(collection -> MiddlewareCollectionLine.builder()
                         .collectionId(collection.getId())
                         .memberId(clientDirectoryService.findCbsRef(collection.getClientId()))
                         .amountXaf(collection.getAmountXaf())
                         .collectedAt(collection.getCollectedAt())
                         .build())
-                .forEach(lines::add);
+                .toList());
+        // Collections occupy the front of `lines` (see the loop below, which only walks the first
+        // collections.size() posted references) — activation payments are appended after and have
+        // no equivalent exportedAt/cbsTransactionRef tracking today (out of this feature's scope).
         activationDirectoryService.findByReconciledInLineIds(lineIds).stream()
                 .map(payment -> MiddlewareCollectionLine.builder()
                         .collectionId(payment.id())
@@ -360,11 +418,28 @@ public class OfjService {
             return;
         }
 
-        cbsClientService.postTransactions(lines, "ofj-export-" + session.getId())
+        MiddlewareTransactionPostResult result = cbsClientService.postTransactions(lines, "ofj-export-" + session.getId())
                 .doOnError(e -> log.error("Failed to post branch {} cash to CBS ledger for session {}: {}",
                         branchId, session.getId(), e.getMessage()))
                 .onErrorComplete()
                 .block();
+
+        // Positional correlation with `collections`, not a returned id — MiddlewareTransactionPostResult
+        // only carries a flat list of reference strings, in the same order the lines were sent
+        // (confirmed against MockCbsAdapter#postTransactions). This is only as reliable as that
+        // ordering guarantee holds for whatever adapter is active; a real vendor adapter that
+        // doesn't preserve order would need this DTO to carry an explicit collectionId<->reference
+        // mapping instead.
+        if (result != null && result.isSuccess() && result.getPostedReferences() != null) {
+            Instant exportedAt = Instant.now();
+            List<String> refs = result.getPostedReferences();
+            for (int i = 0; i < collections.size() && i < refs.size(); i++) {
+                Collection collection = collections.get(i);
+                collection.setExportedAt(exportedAt);
+                collection.setCbsTransactionRef(refs.get(i));
+                collectionRepository.save(collection);
+            }
+        }
     }
 
     private OfjSession getOrCreateSession(UUID branchId) {

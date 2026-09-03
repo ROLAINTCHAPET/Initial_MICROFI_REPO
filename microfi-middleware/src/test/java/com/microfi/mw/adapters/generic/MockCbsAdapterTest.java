@@ -3,6 +3,7 @@ package com.microfi.mw.adapters.generic;
 import com.microfi.mw.adapters.dto.CollectionLine;
 import com.microfi.mw.adapters.dto.HistoryEntry;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
+import com.microfi.mw.adapters.dto.TransactionReversalResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -85,5 +86,45 @@ class MockCbsAdapterTest {
         when(ledgerRepository.findByMemberIdOrderByPostedAtDesc(eq("CBS-NEW"))).thenReturn(List.of());
 
         assertThat(adapter.getHistory("CBS-NEW")).isEmpty();
+    }
+
+    @Test
+    void reverseTransactionPostsACompensatingNegativeEntry() {
+        MockLedgerEntry original = MockLedgerEntry.builder()
+                .memberId("CBS-1").amountXaf(2000L).reference("CBSTX-1").type("DEPOSIT").postedAt(Instant.now()).build();
+        when(ledgerRepository.findByReference("CBSTX-1")).thenReturn(java.util.Optional.of(original));
+
+        TransactionReversalResult result = adapter.reverseTransaction("CBSTX-1");
+
+        ArgumentCaptor<MockLedgerEntry> captor = ArgumentCaptor.forClass(MockLedgerEntry.class);
+        org.mockito.Mockito.verify(ledgerRepository).save(captor.capture());
+        assertThat(captor.getValue().getMemberId()).isEqualTo("CBS-1");
+        assertThat(captor.getValue().getAmountXaf()).isEqualTo(-2000L);
+        assertThat(captor.getValue().getType()).isEqualTo("REVERSAL");
+        assertThat(result.success()).isTrue();
+        assertThat(result.reversalReference()).isEqualTo("REV-CBSTX-1");
+    }
+
+    @Test
+    void reverseTransactionNetsBalanceBackToZero() {
+        // Confirms the reversal is genuinely a compensating entry, not just a status flag —
+        // sumAmountByMemberId (what getBalance reads) must reflect it the same way it reflects
+        // every other posted entry.
+        when(ledgerRepository.sumAmountByMemberId("CBS-1")).thenReturn(0L);
+
+        var balance = adapter.getBalance("CBS-1");
+
+        assertThat(balance.balanceXaf()).isEqualTo(0L);
+    }
+
+    @Test
+    void reverseTransactionFailsGracefullyForAnUnknownReference() {
+        when(ledgerRepository.findByReference("CBSTX-UNKNOWN")).thenReturn(java.util.Optional.empty());
+
+        TransactionReversalResult result = adapter.reverseTransaction("CBSTX-UNKNOWN");
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.reversalReference()).isNull();
+        org.mockito.Mockito.verify(ledgerRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 }

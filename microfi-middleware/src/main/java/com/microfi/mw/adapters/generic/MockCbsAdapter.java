@@ -9,6 +9,7 @@ import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
+import com.microfi.mw.adapters.dto.TransactionReversalResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -66,6 +67,26 @@ public class MockCbsAdapter extends AbstractCoreBankingAdapter {
                 })
                 .toList();
         return new TransactionPostResult(true, refs);
+    }
+
+    @Override
+    public TransactionReversalResult reverseTransaction(String reference) {
+        MockLedgerEntry original = ledgerRepository.findByReference(reference).orElse(null);
+        if (original == null) {
+            return new TransactionReversalResult(false, null);
+        }
+        String reversalReference = "REV-" + reference;
+        // A compensating negative entry, not a delete of the original — the mock's own history
+        // (getHistory) must keep showing both the original deposit and its reversal, same as a
+        // real CBS statement would, and sumAmountByMemberId nets them out to the correct balance.
+        ledgerRepository.save(MockLedgerEntry.builder()
+                .memberId(original.getMemberId())
+                .amountXaf(-original.getAmountXaf())
+                .reference(reversalReference)
+                .type("REVERSAL")
+                .postedAt(Instant.now())
+                .build());
+        return new TransactionReversalResult(true, reversalReference);
     }
 
     @Override

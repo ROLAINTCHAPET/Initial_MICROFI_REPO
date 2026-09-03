@@ -10,6 +10,7 @@ import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
+import com.microfi.mw.adapters.dto.TransactionReversalResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,15 @@ public class CbsIntegrationService {
         return idempotencyService.executeIdempotent(idempotencyKey, "transactions.post", collections, TransactionPostResult.class,
                 () -> callLogger.logged(correlationId, "transactions.post", adapter.vendor(),
                         () -> adapter.postTransactions(collections)));
+    }
+
+    public TransactionReversalResult reverseTransaction(String correlationId, String idempotencyKey, String reference) {
+        CoreBankingAdapter adapter = adapterFactory.getActiveAdapter();
+        record Request(String reference) {
+        }
+        return idempotencyService.executeIdempotent(idempotencyKey, "transactions.reverse", new Request(reference), TransactionReversalResult.class,
+                () -> callLogger.logged(correlationId, "transactions.reverse", adapter.vendor(),
+                        () -> adapter.reverseTransaction(reference)));
     }
 
     public FeeSplitResult splitFee(String correlationId, String idempotencyKey, String memberId, String agentId, long amountXaf) {

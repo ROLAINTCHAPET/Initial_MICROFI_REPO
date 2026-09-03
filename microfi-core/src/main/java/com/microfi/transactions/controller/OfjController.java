@@ -1,5 +1,9 @@
 package com.microfi.transactions.controller;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.shared.dto.ExportBatchResponse;
@@ -44,6 +48,7 @@ import java.util.UUID;
 public class OfjController {
 
     private final OfjService ofjService;
+    private final AuditService auditService;
 
     @GetMapping("/summary")
     @Operation(summary = "OFJ Summary", description = "Current session state: digital totals per reconciled agent, physical totals and deltas so far. Omit `date` for today (auto-creates the session if needed); any other date is read-only history and 404s if that day never had a session. Any Back-Office role, own branch only.")
@@ -107,8 +112,23 @@ public class OfjController {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.BRANCH_CASHIER)
                 .flatMap(caller -> {
                     AdminAccess.requireBranchScope(caller, branchId);
-                    return Mono.fromCallable(() -> ofjService.reconcile(branchId, request))
-                            .subscribeOn(Schedulers.boundedElastic());
+                    return Mono.fromCallable(() -> {
+                        OfjAgentLineResponse result = ofjService.reconcile(branchId, request);
+                        auditService.record(AuditLogEntry.builder()
+                                .category(AuditCategory.FINANCIAL)
+                                .eventType("COLLECTION_RECONCILIATION_SUBMITTED")
+                                .actorType(AuditActorType.ADMIN)
+                                .actorId(caller.getAdminUser().getId())
+                                .actorLabel(caller.getAdminUser().getLogin())
+                                .actorRole(caller.getAdminUser().getRole())
+                                .branchId(branchId)
+                                .agentId(request.getAgentId())
+                                .detailsKey("COLLECTION_RECONCILIATION_SUBMITTED_DETAIL")
+                                .detailsParam1(String.valueOf(result.getPhysicalTotalXaf()))
+                                .detailsParam2(String.valueOf(result.getDeltaXaf()))
+                                .build());
+                        return result;
+                    }).subscribeOn(Schedulers.boundedElastic());
                 });
     }
 

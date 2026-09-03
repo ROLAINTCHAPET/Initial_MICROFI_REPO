@@ -15,10 +15,16 @@ import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.AgentSelfService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.audit.service.AuditService;
 import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.notifications.service.NotificationService;
 import com.microfi.savings.service.ClientDetailsService;
+import com.microfi.shared.dto.PendingReconciliationLineResponse;
 import com.microfi.shared.dto.RouteResponse;
+import com.microfi.transactions.domain.CollectionRejectionRequest;
+import com.microfi.transactions.domain.CollectionRejectionStatus;
+import com.microfi.transactions.service.CollectionRejectionService;
+import com.microfi.transactions.service.OfjService;
 import com.microfi.transactions.service.TrackingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,6 +86,15 @@ class AgentSelfControllerTest {
 
     @MockitoBean
     private MfiSettingsService mfiSettingsService;
+
+    @MockitoBean
+    private OfjService ofjService;
+
+    @MockitoBean
+    private CollectionRejectionService collectionRejectionService;
+
+    @MockitoBean
+    private AuditService auditService;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID branchId = UUID.randomUUID();
@@ -282,5 +297,77 @@ class AgentSelfControllerTest {
                 .bodyValue("{\"currentPin\":\"0000\",\"newPin\":\"7392\"}")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void myPendingConfirmationsReturnsTheCallersOwnLines() {
+        when(ofjService.listPendingConfirmationLines(agentId)).thenReturn(List.of(
+                PendingReconciliationLineResponse.builder().lineId(UUID.randomUUID()).totalXaf(15000).collectionCount(3).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/pending-confirmations")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
+    void confirmReconciliationSucceedsForOwnLine() {
+        UUID lineId = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .exchange()
+                .expectStatus().isOk();
+
+        org.mockito.Mockito.verify(ofjService).confirmReconciliation(agentId, lineId);
+        org.mockito.Mockito.verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
+                entry.getEventType().equals("COLLECTION_RECONCILIATION_CONFIRMED")));
+    }
+
+    @Test
+    void confirmReconciliationPropagatesForbiddenFromService() {
+        UUID lineId = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot confirm another agent's reconciliation"))
+                .when(ofjService).confirmReconciliation(agentId, lineId);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void requestCollectionRejectionCreatesRequestForOwnCollection() {
+        UUID collectionId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        when(collectionRejectionService.requestRejection(eq(agentId), eq(collectionId), eq("Wrong client selected")))
+                .thenReturn(CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId).agentId(agentId)
+                        .reason("Wrong client selected").status(CollectionRejectionStatus.PENDING).requestedAt(java.time.Instant.now()).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/collections/" + collectionId + "/reject-request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Wrong client selected\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(requestId.toString())
+                .jsonPath("$.status").isEqualTo("PENDING");
+    }
+
+    @Test
+    void requestCollectionRejectionRejectsBlankReason() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/collections/" + UUID.randomUUID() + "/reject-request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 }
