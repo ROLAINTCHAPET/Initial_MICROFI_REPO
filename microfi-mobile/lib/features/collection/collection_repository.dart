@@ -102,6 +102,15 @@ class CollectionRepository {
     return json.map((e) => CollectionSummary.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// The individual collections behind one pending-confirmation reconciliation line — lets the
+  /// agent review what's in it before confirming, or pick one to request rejection on. See
+  /// ReconciliationRepository/ReconciliationConfirmScreen.
+  Future<List<CollectionSummary>> listForReconciliationLine(String lineId) async {
+    final client = ApiClient(token: token);
+    final json = await client.get('/agents/me/reconciliations/$lineId/collections') as List<dynamic>;
+    return json.map((e) => CollectionSummary.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   /// FR-07 batch offline sync (POST /collections/sync) — each item is processed independently
   /// server-side, so one rejected record (e.g. now over ceiling) doesn't block the rest.
   Future<List<CollectionSyncResult>> syncBatch(List<Map<String, dynamic>> requests) async {

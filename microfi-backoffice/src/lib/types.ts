@@ -113,6 +113,19 @@ export interface VarianceDebtResponse {
   writtenOffAt: string | null;
 }
 
+export interface CollectionRejectionRequestResponse {
+  id: string;
+  collectionId: string;
+  agentId: string;
+  reason: string;
+  requestedAt: string;
+  status: "PENDING" | "APPROVED" | "DENIED";
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  decisionReason: string | null;
+  hasProof: boolean;
+}
+
 export interface SosResponse {
   id: string;
   agentId: string;

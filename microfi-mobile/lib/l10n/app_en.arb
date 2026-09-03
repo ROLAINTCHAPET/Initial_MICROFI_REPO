@@ -704,5 +704,56 @@
   "ltsNotificationText": "Sharing your position with your branch while your session is open.",
   "@ltsNotificationText": {"description": "Android foreground-service notification body shown while background location tracking is active."},
   "ltsNotificationChannelName": "Field Tracking",
-  "@ltsNotificationChannelName": {"description": "Android notification channel name for the location-tracking foreground service, visible in the device's notification settings."}
+  "@ltsNotificationChannelName": {"description": "Android notification channel name for the location-tracking foreground service, visible in the device's notification settings."},
+
+  "hsPendingConfirmationBanner": "{count} reconciliation(s) awaiting your confirmation",
+  "@hsPendingConfirmationBanner": {
+    "description": "Home screen — dismissible-style banner shown when the agent has cash reconciled by a cashier still awaiting their own confirmation.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "rcTitle": "Pending Confirmations",
+  "@rcTitle": {"description": "Reconciliation confirmation screen — AppBar title."},
+  "rcSubtitle": "A cashier counted this cash. Confirm it matches what you collected — until you do, it still counts against your ceiling.",
+  "@rcSubtitle": {"description": "Reconciliation confirmation screen — explanatory subtitle."},
+  "rcEmptyState": "Nothing awaiting your confirmation.",
+  "@rcEmptyState": {"description": "Reconciliation confirmation screen — empty-state message."},
+  "rcLineSummary": "{count} collection(s) • {amount} XAF",
+  "@rcLineSummary": {
+    "description": "Reconciliation confirmation screen — one pending line's summary row.",
+    "placeholders": {"count": {"type": "int"}, "amount": {"type": "String"}}
+  },
+  "rcCountedAt": "Counted {date} at {time}",
+  "@rcCountedAt": {
+    "description": "Reconciliation confirmation screen — when the cashier physically counted this line.",
+    "placeholders": {"date": {"type": "String"}, "time": {"type": "String"}}
+  },
+  "rcConfirmButton": "Confirm",
+  "@rcConfirmButton": {"description": "Reconciliation confirmation screen — confirm action button."},
+  "rcReviewButton": "Review",
+  "@rcReviewButton": {"description": "Reconciliation confirmation screen — opens the line's individual collections."},
+  "rcConfirmDialogTitle": "Confirm Reconciliation",
+  "@rcConfirmDialogTitle": {"description": "Reconciliation confirmation screen — confirm dialog title."},
+  "rcConfirmDialogMessage": "Confirm the cashier's count of {amount} XAF across {count} collection(s) matches what you actually collected?",
+  "@rcConfirmDialogMessage": {
+    "description": "Reconciliation confirmation screen — confirm dialog body.",
+    "placeholders": {"amount": {"type": "String"}, "count": {"type": "int"}}
+  },
+  "rcConfirmSuccess": "Reconciliation confirmed.",
+  "@rcConfirmSuccess": {"description": "Reconciliation confirmation screen — success message after confirming."},
+  "rcConfirmFailed": "Failed to confirm this reconciliation.",
+  "@rcConfirmFailed": {"description": "Reconciliation confirmation screen — error message if confirming fails."},
+  "rcLineCollectionsTitle": "Collections in this Line",
+  "@rcLineCollectionsTitle": {"description": "Line-detail screen — AppBar title."},
+  "rcRequestRejectionButton": "Request Rejection",
+  "@rcRequestRejectionButton": {"description": "Line-detail screen — opens the rejection-request dialog for one collection."},
+  "rcRejectionReasonLabel": "Why should this be rejected?",
+  "@rcRejectionReasonLabel": {"description": "Rejection-request dialog — reason text field label."},
+  "rcRejectionSubmit": "Submit Request",
+  "@rcRejectionSubmit": {"description": "Rejection-request dialog — submit button."},
+  "rcRejectionSuccess": "Rejection request sent to your branch.",
+  "@rcRejectionSuccess": {"description": "Rejection-request dialog — success message."},
+  "rcRejectionFailed": "Failed to submit the rejection request.",
+  "@rcRejectionFailed": {"description": "Rejection-request dialog — error message."},
+  "rcRejectionReasonRequired": "Please explain why this should be rejected.",
+  "@rcRejectionReasonRequired": {"description": "Rejection-request dialog — validation message for a blank reason."}
 }

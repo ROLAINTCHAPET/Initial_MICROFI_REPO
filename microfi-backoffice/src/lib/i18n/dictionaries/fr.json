@@ -49,7 +49,9 @@
       "ACKNOWLEDGED": "Accusé de réception",
       "WRITTEN_OFF": "Annulée",
       "SUCCESS": "Succès",
-      "FAILED": "Échec"
+      "FAILED": "Échec",
+      "APPROVED": "Approuvé",
+      "DENIED": "Refusé"
     },
     "gauge": {
       "ceilingReached": "Plafond atteint : nouveaux encaissements bloqués",
@@ -83,6 +85,7 @@
     "endOfDayOversight": "Clôture de journée",
     "sosConsole": "Console SOS",
     "registrations": "Inscriptions",
+    "collectionRejections": "Rejets d'encaissements",
     "audit": "Audit",
     "settings": "Paramètres"
   },
@@ -353,7 +356,7 @@
       "physicalCashCount": "Comptage physique de la caisse",
       "physicalCountTotal": "Total du comptage physique",
       "match": "Correspondance",
-      "posted": "Validé",
+      "posted": "Compté — en attente de confirmation de l'agent",
       "posting": "Validation…",
       "verifyAndPost": "Vérifier et valider",
       "opensAfterClosingTime": "Ouvre après l'heure de fermeture{time}. Les fonds de la journée ne sont pas encore tous rentrés.",
@@ -387,6 +390,38 @@
       "hoursAgo": "Il y a {hours} h",
       "daysAgo": "Il y a {days} j"
     }
+  },
+  "collectionRejections": {
+    "subtitle": "Demande d'un agent de faire annuler un de ses encaissements pour erreur, en attente de votre examen.",
+    "noResults": "Aucune demande de rejet dans ce filtre.",
+    "colAgent": "Agent",
+    "colReason": "Motif",
+    "colRequestedAt": "Demandé le",
+    "colStatus": "Statut",
+    "colDecision": "Décision",
+    "filterAll": "Toutes",
+    "filterPending": "En attente",
+    "filterApproved": "Approuvées",
+    "filterDenied": "Refusées",
+    "approveButton": "Approuver",
+    "denyButton": "Refuser",
+    "approveModalTitle": "Approuver le rejet d'encaissement",
+    "approveWarningPrefix": "Ceci annulera l'encaissement et, s'il avait déjà été transmis au CBS, l'y annulera et informera par SMS le client de ",
+    "approveWarningSuffix": " que la transaction a été supprimée suite à une erreur de l'agent.",
+    "agentReasonLabel": "Motif indiqué par l'agent",
+    "proofLabel": "Justificatif d'approbation",
+    "proofAriaLabel": "Téléverser le document justificatif d'approbation",
+    "proofHelp": "PDF ou JPEG uniquement — requis pour approuver.",
+    "uploadProofRequired": "Un document justificatif est requis pour approuver cette demande.",
+    "confirmApprove": "Approuver et annuler l'encaissement",
+    "approving": "Approbation…",
+    "approved": "Approuvé",
+    "failedToApprove": "Échec de l'approbation",
+    "denyModalTitle": "Refuser le rejet d'encaissement",
+    "denyReasonLabel": "Motif du refus",
+    "confirmDeny": "Refuser la demande",
+    "failedToDeny": "Échec du refus",
+    "decisionReasonPrefix": "Motif : "
   },
   "ofj": {
     "pageTitle": "Supervision de fin de journée",
@@ -712,6 +747,10 @@
       "CLIENT": "Client",
       "SYSTEM": "Système"
     },
+    "confirmedBy": {
+      "AGENT": "l'agent",
+      "SYSTEM_AUTO_EXPIRY": "le système (aucune réponse dans le délai imparti)"
+    },
     "table": {
       "colTime": "Horodatage",
       "colEvent": "Événement",
@@ -746,6 +785,11 @@
       "CLIENT_PASSWORD_RESET": "Réinitialisation du code confidentiel client",
       "COLLECTION_RECORDED": "Encaissement enregistré",
       "COLLECTION_REJECTED_GEOFENCE": "Encaissement rejeté (hors géofence)",
+      "COLLECTION_RECONCILIATION_SUBMITTED": "Réconciliation d'encaissements soumise",
+      "COLLECTION_RECONCILIATION_CONFIRMED": "Réconciliation d'encaissements confirmée",
+      "COLLECTION_REJECTION_REQUESTED": "Demande de rejet d'encaissement",
+      "COLLECTION_REJECTION_APPROVED": "Rejet d'encaissement approuvé",
+      "COLLECTION_REJECTION_DENIED": "Rejet d'encaissement refusé",
       "REGISTRATION_APPROVED": "Inscription approuvée",
       "REGISTRATION_REJECTED": "Inscription rejetée",
       "SOS_ACKNOWLEDGED": "Alerte SOS accusée réception",
@@ -781,6 +825,11 @@
       "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Écart de {param1} XAF annulé, motif : {param2}",
       "COLLECTION_RECORDED_DETAIL": "{param1} XAF encaissés auprès de {param2}",
       "COLLECTION_REJECTED_GEOFENCE_DETAIL": "Tentative d'encaissement hors de la zone assignée à ({param1})",
+      "COLLECTION_RECONCILIATION_SUBMITTED_DETAIL": "Comptage physique {param1} XAF, écart {param2} XAF",
+      "COLLECTION_RECONCILIATION_CONFIRMED_DETAIL": "Confirmé par {param1}",
+      "COLLECTION_REJECTION_REQUESTED_DETAIL": "Motif : {param1}",
+      "COLLECTION_REJECTION_APPROVED_DETAIL": "Encaissement annulé ; justificatif au dossier",
+      "COLLECTION_REJECTION_DENIED_DETAIL": "Motif : {param1}",
       "REGISTRATION_APPROVED_DETAIL": "Demande d'inscription approuvée pour {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Demande d'inscription rejetée pour {param1}, motif : {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Paiement d'activation en espèces enregistré pour le client, statut : {param1}, référence : {param2}",

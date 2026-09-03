@@ -770,6 +770,36 @@ class OfjServiceTest {
     }
 
     @Test
+    void listCollectionsForLineReturnsCollectionsForOwnLine() {
+        UUID lineId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
+        Collection collection = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx1")
+                .reconciledInLineId(lineId).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(List.of(collection));
+        when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientDirectoryService.ClientReceiptInfo("MFI-1", "Jane Doe"));
+
+        List<com.microfi.shared.dto.CollectionResponse> result = ofjService.listCollectionsForLine(agentId, lineId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getClientName()).isEqualTo("Jane Doe");
+        assertThat(result.get(0).getAmountXaf()).isEqualTo(5000);
+    }
+
+    @Test
+    void listCollectionsForLineForbiddenForAnotherAgentsLine() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(UUID.randomUUID()).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+
+        assertThatThrownBy(() -> ofjService.listCollectionsForLine(agentId, lineId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
     void confirmReconciliationConflictWhenNothingAwaitingConfirmation() {
         UUID lineId = UUID.randomUUID();
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();

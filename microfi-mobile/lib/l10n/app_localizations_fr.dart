@@ -1001,4 +1001,73 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get ltsNotificationChannelName => 'Suivi de terrain';
+
+  @override
+  String hsPendingConfirmationBanner(int count) {
+    return '$count réconciliation(s) en attente de votre confirmation';
+  }
+
+  @override
+  String get rcTitle => 'Confirmations en attente';
+
+  @override
+  String get rcSubtitle =>
+      'Un caissier a compté cet argent. Confirmez que cela correspond à ce que vous avez encaissé — tant que vous ne l\'avez pas fait, cela compte toujours dans votre plafond.';
+
+  @override
+  String get rcEmptyState => 'Rien n\'est en attente de votre confirmation.';
+
+  @override
+  String rcLineSummary(int count, String amount) {
+    return '$count encaissement(s) • $amount XAF';
+  }
+
+  @override
+  String rcCountedAt(String date, String time) {
+    return 'Compté le $date à $time';
+  }
+
+  @override
+  String get rcConfirmButton => 'Confirmer';
+
+  @override
+  String get rcReviewButton => 'Examiner';
+
+  @override
+  String get rcConfirmDialogTitle => 'Confirmer la réconciliation';
+
+  @override
+  String rcConfirmDialogMessage(String amount, int count) {
+    return 'Confirmer que le comptage du caissier de $amount XAF sur $count encaissement(s) correspond à ce que vous avez réellement encaissé ?';
+  }
+
+  @override
+  String get rcConfirmSuccess => 'Réconciliation confirmée.';
+
+  @override
+  String get rcConfirmFailed =>
+      'Échec de la confirmation de cette réconciliation.';
+
+  @override
+  String get rcLineCollectionsTitle => 'Encaissements de cette ligne';
+
+  @override
+  String get rcRequestRejectionButton => 'Demander le rejet';
+
+  @override
+  String get rcRejectionReasonLabel =>
+      'Pourquoi cet encaissement devrait-il être rejeté ?';
+
+  @override
+  String get rcRejectionSubmit => 'Envoyer la demande';
+
+  @override
+  String get rcRejectionSuccess => 'Demande de rejet envoyée à votre agence.';
+
+  @override
+  String get rcRejectionFailed => 'Échec de l\'envoi de la demande de rejet.';
+
+  @override
+  String get rcRejectionReasonRequired =>
+      'Veuillez expliquer pourquoi cet encaissement devrait être rejeté.';
 }

@@ -20,7 +20,9 @@ export type BadgeStatus =
   | "CLOSED"
   | "RESOLVED"
   | "ACKNOWLEDGED"
-  | "WRITTEN_OFF";
+  | "WRITTEN_OFF"
+  | "APPROVED"
+  | "DENIED";
 
 const STATUS_STYLES: Record<BadgeStatus, { className: string; dot?: boolean }> = {
   SYNCED: { className: "bg-secondary-fixed text-on-secondary-fixed-variant", dot: true },
@@ -38,6 +40,8 @@ const STATUS_STYLES: Record<BadgeStatus, { className: string; dot?: boolean }> =
   INACTIVE: { className: "bg-surface-container text-on-surface-variant" },
   EXPIRED: { className: "bg-surface-container text-on-surface-variant" },
   WRITTEN_OFF: { className: "bg-surface-container text-on-surface-variant" },
+  APPROVED: { className: "bg-secondary-fixed text-on-secondary-fixed-variant", dot: true },
+  DENIED: { className: "bg-error-container text-on-error-container" },
 };
 
 export function Badge({ status, label }: { status: BadgeStatus; label?: string }) {

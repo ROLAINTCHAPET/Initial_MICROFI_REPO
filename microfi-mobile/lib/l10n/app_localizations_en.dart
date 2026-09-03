@@ -980,4 +980,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ltsNotificationChannelName => 'Field Tracking';
+
+  @override
+  String hsPendingConfirmationBanner(int count) {
+    return '$count reconciliation(s) awaiting your confirmation';
+  }
+
+  @override
+  String get rcTitle => 'Pending Confirmations';
+
+  @override
+  String get rcSubtitle =>
+      'A cashier counted this cash. Confirm it matches what you collected — until you do, it still counts against your ceiling.';
+
+  @override
+  String get rcEmptyState => 'Nothing awaiting your confirmation.';
+
+  @override
+  String rcLineSummary(int count, String amount) {
+    return '$count collection(s) • $amount XAF';
+  }
+
+  @override
+  String rcCountedAt(String date, String time) {
+    return 'Counted $date at $time';
+  }
+
+  @override
+  String get rcConfirmButton => 'Confirm';
+
+  @override
+  String get rcReviewButton => 'Review';
+
+  @override
+  String get rcConfirmDialogTitle => 'Confirm Reconciliation';
+
+  @override
+  String rcConfirmDialogMessage(String amount, int count) {
+    return 'Confirm the cashier\'s count of $amount XAF across $count collection(s) matches what you actually collected?';
+  }
+
+  @override
+  String get rcConfirmSuccess => 'Reconciliation confirmed.';
+
+  @override
+  String get rcConfirmFailed => 'Failed to confirm this reconciliation.';
+
+  @override
+  String get rcLineCollectionsTitle => 'Collections in this Line';
+
+  @override
+  String get rcRequestRejectionButton => 'Request Rejection';
+
+  @override
+  String get rcRejectionReasonLabel => 'Why should this be rejected?';
+
+  @override
+  String get rcRejectionSubmit => 'Submit Request';
+
+  @override
+  String get rcRejectionSuccess => 'Rejection request sent to your branch.';
+
+  @override
+  String get rcRejectionFailed => 'Failed to submit the rejection request.';
+
+  @override
+  String get rcRejectionReasonRequired =>
+      'Please explain why this should be rejected.';
 }

@@ -63,6 +63,13 @@ class ApiClient {
     _decode(response);
   }
 
+  /// For POST endpoints that reply 204 No Content and take no meaningful body — mirrors
+  /// patchNoContent's reasoning (post()'s return type expects a decoded JSON object back).
+  Future<void> postNoContent(String path) async {
+    final response = await http.post(Uri.parse('$baseUrl$path'), headers: _headers).timeout(_timeout);
+    _decode(response);
+  }
+
   /// For endpoints taking/returning a JSON array rather than an object (e.g. batch sync).
   Future<dynamic> postJson(String path, dynamic body) async {
     final response = await http

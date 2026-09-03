@@ -49,7 +49,9 @@
       "ACKNOWLEDGED": "Acknowledged",
       "WRITTEN_OFF": "Written Off",
       "SUCCESS": "Success",
-      "FAILED": "Failed"
+      "FAILED": "Failed",
+      "APPROVED": "Approved",
+      "DENIED": "Denied"
     },
     "gauge": {
       "ceilingReached": "Ceiling reached: new collections blocked",
@@ -83,6 +85,7 @@
     "endOfDayOversight": "End of Day Oversight",
     "sosConsole": "SOS Console",
     "registrations": "Registrations",
+    "collectionRejections": "Collection Rejections",
     "audit": "Audit",
     "settings": "Settings"
   },
@@ -353,7 +356,7 @@
       "physicalCashCount": "Physical Cash Count",
       "physicalCountTotal": "Physical Count Total",
       "match": "Match",
-      "posted": "Posted",
+      "posted": "Counted — awaiting agent confirmation",
       "posting": "Posting…",
       "verifyAndPost": "Verify & Post",
       "opensAfterClosingTime": "Opens after closing time{time}. The day's cash isn't all in yet.",
@@ -387,6 +390,38 @@
       "hoursAgo": "{hours}h ago",
       "daysAgo": "{days}d ago"
     }
+  },
+  "collectionRejections": {
+    "subtitle": "An agent's request to void one of their own collections for error, awaiting your review.",
+    "noResults": "No rejection requests in this filter.",
+    "colAgent": "Agent",
+    "colReason": "Reason",
+    "colRequestedAt": "Requested",
+    "colStatus": "Status",
+    "colDecision": "Decision",
+    "filterAll": "All",
+    "filterPending": "Pending",
+    "filterApproved": "Approved",
+    "filterDenied": "Denied",
+    "approveButton": "Approve",
+    "denyButton": "Deny",
+    "approveModalTitle": "Approve Collection Rejection",
+    "approveWarningPrefix": "This will void the collection and, if it was already posted to the CBS, reverse it and notify ",
+    "approveWarningSuffix": "'s client by SMS that it was suppressed for an agent error.",
+    "agentReasonLabel": "Agent's stated reason",
+    "proofLabel": "Approval Proof",
+    "proofAriaLabel": "Upload approval proof document",
+    "proofHelp": "PDF or JPEG only — required to approve.",
+    "uploadProofRequired": "A proof document is required to approve this request.",
+    "confirmApprove": "Approve & Void Collection",
+    "approving": "Approving…",
+    "approved": "Approved",
+    "failedToApprove": "Failed to approve",
+    "denyModalTitle": "Deny Collection Rejection",
+    "denyReasonLabel": "Reason for denial",
+    "confirmDeny": "Deny Request",
+    "failedToDeny": "Failed to deny",
+    "decisionReasonPrefix": "Reason: "
   },
   "ofj": {
     "pageTitle": "End of Day Oversight",
@@ -712,6 +747,10 @@
       "CLIENT": "Client",
       "SYSTEM": "System"
     },
+    "confirmedBy": {
+      "AGENT": "the agent",
+      "SYSTEM_AUTO_EXPIRY": "system (no response within the timeout)"
+    },
     "table": {
       "colTime": "Timestamp",
       "colEvent": "Event",
@@ -746,6 +785,11 @@
       "CLIENT_PASSWORD_RESET": "Client Password Reset",
       "COLLECTION_RECORDED": "Collection Recorded",
       "COLLECTION_REJECTED_GEOFENCE": "Collection Rejected (Outside Geofence)",
+      "COLLECTION_RECONCILIATION_SUBMITTED": "Collection Reconciliation Submitted",
+      "COLLECTION_RECONCILIATION_CONFIRMED": "Collection Reconciliation Confirmed",
+      "COLLECTION_REJECTION_REQUESTED": "Collection Rejection Requested",
+      "COLLECTION_REJECTION_APPROVED": "Collection Rejection Approved",
+      "COLLECTION_REJECTION_DENIED": "Collection Rejection Denied",
       "REGISTRATION_APPROVED": "Registration Approved",
       "REGISTRATION_REJECTED": "Registration Rejected",
       "SOS_ACKNOWLEDGED": "SOS Acknowledged",
@@ -781,6 +825,11 @@
       "VARIANCE_DEBT_WRITTEN_OFF_DETAIL": "Shortage of {param1} XAF written off, reason: {param2}",
       "COLLECTION_RECORDED_DETAIL": "{param1} XAF collected from {param2}",
       "COLLECTION_REJECTED_GEOFENCE_DETAIL": "Attempted collection outside assigned zone at ({param1})",
+      "COLLECTION_RECONCILIATION_SUBMITTED_DETAIL": "Physical count {param1} XAF, delta {param2} XAF",
+      "COLLECTION_RECONCILIATION_CONFIRMED_DETAIL": "Confirmed by {param1}",
+      "COLLECTION_REJECTION_REQUESTED_DETAIL": "Reason: {param1}",
+      "COLLECTION_REJECTION_APPROVED_DETAIL": "Collection voided; proof on file",
+      "COLLECTION_REJECTION_DENIED_DETAIL": "Reason: {param1}",
       "REGISTRATION_APPROVED_DETAIL": "Registration application approved for {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Registration application rejected for {param1}, reason: {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Activation cash payment registered for client, status: {param1}, reference: {param2}",

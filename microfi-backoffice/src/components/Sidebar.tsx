@@ -90,6 +90,7 @@ export function Sidebar({ role }: { role: AdminRole }) {
       ? [
           ...navItems(dict, role),
           { href: "/registrations", label: dict.sidebar.registrations, icon: "edit-note" as IconName },
+          { href: "/collection-rejections", label: dict.sidebar.collectionRejections, icon: "close" as IconName },
           { href: "/audit", label: dict.sidebar.audit, icon: "history" as IconName },
           { href: "/settings", label: dict.sidebar.settings, icon: "settings" as IconName },
         ]

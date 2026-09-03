@@ -166,6 +166,16 @@ public class AgentSelfController {
                         .flatMapMany(Flux::fromIterable));
     }
 
+    @GetMapping("/reconciliations/{lineId}/collections")
+    @Operation(summary = "My Reconciliation Line's Collections", description = "The individual collections behind one pending-confirmation line — lets the agent review exactly what's in it before confirming, or pick one to request rejection on. Agent principals only, and only for their own line.")
+    public Flux<com.microfi.shared.dto.CollectionResponse> myReconciliationLineCollections(@PathVariable UUID lineId, Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMapMany(agent -> Mono.fromCallable(() -> ofjService.listCollectionsForLine(agent.getId(), lineId))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
+    }
+
     @PostMapping("/reconciliations/{lineId}/confirm")
     @Operation(summary = "Confirm A Reconciliation", description = "Attests the cashier's physical count for this line was correct — the only thing that actually frees the cash counted from this agent's escrow ceiling. Agent principals only, and only for their own line.")
     public Mono<Void> confirmReconciliation(@PathVariable UUID lineId, Mono<Authentication> authenticationMono) {

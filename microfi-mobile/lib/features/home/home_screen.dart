@@ -22,6 +22,8 @@ import 'branch_notice_repository.dart';
 import 'branch_repository.dart';
 import 'contact_branch.dart';
 import 'home_repository.dart';
+import 'reconciliation_confirm_screen.dart';
+import 'reconciliation_repository.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Graphical Design/agent/agent_dashboard — the Home tab body (no Scaffold/AppBar of its own;
@@ -59,6 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _dismissedNoticeId;
   Timer? _noticePollTimer;
 
+  int _pendingConfirmationCount = 0;
+  Timer? _confirmationPollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _connectivitySub?.cancel();
     _sosPollTimer?.cancel();
     _noticePollTimer?.cancel();
+    _confirmationPollTimer?.cancel();
     super.dispose();
   }
 
@@ -108,6 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _checkSosStatus();
       _checkBranchNotices();
       _noticePollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkBranchNotices());
+      _checkPendingConfirmations();
+      _confirmationPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPendingConfirmations());
       if (pending.isNotEmpty && await ConnectivityService.instance.isOnline()) _syncNow();
     } catch (e) {
       if (!mounted) return;
@@ -308,6 +316,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Same no-push-infrastructure reasoning as branch notices/SOS above — a cashier's physical
+  // count still occupies this agent's escrow ceiling until they confirm it themselves (or it
+  // auto-expires server-side), so surfacing this promptly actually matters to how much they can
+  // collect next, not just informational.
+  Future<void> _checkPendingConfirmations() async {
+    if (_profile == null) return;
+    try {
+      final lines = await ReconciliationRepository(widget.token).listMyPendingConfirmations();
+      if (!mounted) return;
+      setState(() => _pendingConfirmationCount = lines.length);
+    } catch (_) {
+      // Best-effort — silently retried on the next poll/screen load.
+    }
+  }
+
+  void _openPendingConfirmations() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => ReconciliationConfirmScreen(token: widget.token)))
+        .then((_) => _checkPendingConfirmations());
+  }
+
   void _dismissBranchNotice() {
     final notice = _bannerNotice;
     if (notice == null) return;
@@ -384,6 +413,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (_bannerNotice != null) ...[
             _BranchNoticeBanner(notice: _bannerNotice!, onDismiss: _dismissBranchNotice),
+            const SizedBox(height: MicrofiSpacing.gapLg),
+          ],
+          if (_pendingConfirmationCount > 0) ...[
+            _PendingConfirmationBanner(count: _pendingConfirmationCount, onTap: _openPendingConfirmations),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_pendingCount > 0) ...[
@@ -705,6 +738,44 @@ class _BranchNoticeBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tappable, not dismissible like the branch-notice banner above — there's an actual action to
+/// take here (confirm or request rejection), and the cash counted stays tied up until it's taken.
+class _PendingConfirmationBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _PendingConfirmationBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: MicrofiColors.tertiaryFixed,
+          borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.fact_check_outlined, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.hsPendingConfirmationBanner(count),
+                style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onTertiaryFixedVariant, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
+          ],
+        ),
       ),
     );
   }

@@ -1813,6 +1813,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Field Tracking'**
   String get ltsNotificationChannelName;
+
+  /// Home screen — dismissible-style banner shown when the agent has cash reconciled by a cashier still awaiting their own confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} reconciliation(s) awaiting your confirmation'**
+  String hsPendingConfirmationBanner(int count);
+
+  /// Reconciliation confirmation screen — AppBar title.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Confirmations'**
+  String get rcTitle;
+
+  /// Reconciliation confirmation screen — explanatory subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A cashier counted this cash. Confirm it matches what you collected — until you do, it still counts against your ceiling.'**
+  String get rcSubtitle;
+
+  /// Reconciliation confirmation screen — empty-state message.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing awaiting your confirmation.'**
+  String get rcEmptyState;
+
+  /// Reconciliation confirmation screen — one pending line's summary row.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} collection(s) • {amount} XAF'**
+  String rcLineSummary(int count, String amount);
+
+  /// Reconciliation confirmation screen — when the cashier physically counted this line.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted {date} at {time}'**
+  String rcCountedAt(String date, String time);
+
+  /// Reconciliation confirmation screen — confirm action button.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get rcConfirmButton;
+
+  /// Reconciliation confirmation screen — opens the line's individual collections.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get rcReviewButton;
+
+  /// Reconciliation confirmation screen — confirm dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Reconciliation'**
+  String get rcConfirmDialogTitle;
+
+  /// Reconciliation confirmation screen — confirm dialog body.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the cashier\'s count of {amount} XAF across {count} collection(s) matches what you actually collected?'**
+  String rcConfirmDialogMessage(String amount, int count);
+
+  /// Reconciliation confirmation screen — success message after confirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation confirmed.'**
+  String get rcConfirmSuccess;
+
+  /// Reconciliation confirmation screen — error message if confirming fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to confirm this reconciliation.'**
+  String get rcConfirmFailed;
+
+  /// Line-detail screen — AppBar title.
+  ///
+  /// In en, this message translates to:
+  /// **'Collections in this Line'**
+  String get rcLineCollectionsTitle;
+
+  /// Line-detail screen — opens the rejection-request dialog for one collection.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Rejection'**
+  String get rcRequestRejectionButton;
+
+  /// Rejection-request dialog — reason text field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Why should this be rejected?'**
+  String get rcRejectionReasonLabel;
+
+  /// Rejection-request dialog — submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Request'**
+  String get rcRejectionSubmit;
+
+  /// Rejection-request dialog — success message.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection request sent to your branch.'**
+  String get rcRejectionSuccess;
+
+  /// Rejection-request dialog — error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to submit the rejection request.'**
+  String get rcRejectionFailed;
+
+  /// Rejection-request dialog — validation message for a blank reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Please explain why this should be rejected.'**
+  String get rcRejectionReasonRequired;
 }
 
 class _AppLocalizationsDelegate

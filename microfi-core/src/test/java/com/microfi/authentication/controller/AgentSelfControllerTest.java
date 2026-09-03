@@ -313,6 +313,21 @@ class AgentSelfControllerTest {
     }
 
     @Test
+    void myReconciliationLineCollectionsReturnsCollectionsForOwnLine() {
+        UUID lineId = UUID.randomUUID();
+        when(ofjService.listCollectionsForLine(agentId, lineId)).thenReturn(List.of(
+                com.microfi.shared.dto.CollectionResponse.builder().id(UUID.randomUUID()).agentId(agentId)
+                        .clientId(UUID.randomUUID()).clientName("Jane Doe").amountXaf(5000).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/reconciliations/" + lineId + "/collections")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Object.class).hasSize(1);
+    }
+
+    @Test
     void confirmReconciliationSucceedsForOwnLine() {
         UUID lineId = UUID.randomUUID();
 

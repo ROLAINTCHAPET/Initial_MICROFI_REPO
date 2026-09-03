@@ -34,6 +34,13 @@ const STATUS_PARAM: Partial<Record<string, ParamSlot>> = {
   AGENT_STATUS_CHANGED: "param1",
   ADMIN_USER_STATUS_CHANGED: "param1",
 };
+// COLLECTION_RECONCILIATION_CONFIRMED_DETAIL's param1 is CollectionConfirmedBy's raw enum name
+// (AGENT / SYSTEM_AUTO_EXPIRY), not free text — needs its own small map since neither dict.roles
+// nor dict.audit.actorType draw the "confirmed by the agent" vs. "auto-confirmed on timeout"
+// distinction this specific event needs.
+const CONFIRMED_BY_PARAM: Partial<Record<string, ParamSlot>> = {
+  COLLECTION_RECONCILIATION_CONFIRMED_DETAIL: "param1",
+};
 
 // dict.roles only names the three back-office roles — a registration's targetRole can also be
 // AGENT, which lives under a different dictionary branch entirely.
@@ -64,6 +71,10 @@ function detailsLabel(dict: Dictionary, log: AuditLogResponse): string {
   const roleSlot = ROLE_PARAM[log.detailsKey];
   if (roleSlot && params[roleSlot]) {
     params[roleSlot] = roleLabel(dict, params[roleSlot]);
+  }
+  const confirmedBySlot = CONFIRMED_BY_PARAM[log.detailsKey];
+  if (confirmedBySlot && params[confirmedBySlot]) {
+    params[confirmedBySlot] = (dict.audit.confirmedBy as Record<string, string>)[params[confirmedBySlot]] ?? params[confirmedBySlot];
   }
   return t(template, params);
 }

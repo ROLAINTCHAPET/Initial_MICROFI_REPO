@@ -324,5 +324,25 @@
 
   "ltsNotificationTitle": "MICROFI Collect — Suivi actif",
   "ltsNotificationText": "Votre position est partagée avec votre agence tant que votre session est ouverte.",
-  "ltsNotificationChannelName": "Suivi de terrain"
+  "ltsNotificationChannelName": "Suivi de terrain",
+
+  "hsPendingConfirmationBanner": "{count} réconciliation(s) en attente de votre confirmation",
+  "rcTitle": "Confirmations en attente",
+  "rcSubtitle": "Un caissier a compté cet argent. Confirmez que cela correspond à ce que vous avez encaissé — tant que vous ne l'avez pas fait, cela compte toujours dans votre plafond.",
+  "rcEmptyState": "Rien n'est en attente de votre confirmation.",
+  "rcLineSummary": "{count} encaissement(s) • {amount} XAF",
+  "rcCountedAt": "Compté le {date} à {time}",
+  "rcConfirmButton": "Confirmer",
+  "rcReviewButton": "Examiner",
+  "rcConfirmDialogTitle": "Confirmer la réconciliation",
+  "rcConfirmDialogMessage": "Confirmer que le comptage du caissier de {amount} XAF sur {count} encaissement(s) correspond à ce que vous avez réellement encaissé ?",
+  "rcConfirmSuccess": "Réconciliation confirmée.",
+  "rcConfirmFailed": "Échec de la confirmation de cette réconciliation.",
+  "rcLineCollectionsTitle": "Encaissements de cette ligne",
+  "rcRequestRejectionButton": "Demander le rejet",
+  "rcRejectionReasonLabel": "Pourquoi cet encaissement devrait-il être rejeté ?",
+  "rcRejectionSubmit": "Envoyer la demande",
+  "rcRejectionSuccess": "Demande de rejet envoyée à votre agence.",
+  "rcRejectionFailed": "Échec de l'envoi de la demande de rejet.",
+  "rcRejectionReasonRequired": "Veuillez expliquer pourquoi cet encaissement devrait être rejeté."
 }

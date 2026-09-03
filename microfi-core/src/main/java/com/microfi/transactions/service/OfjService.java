@@ -4,6 +4,7 @@ import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
+import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
@@ -250,6 +251,38 @@ public class OfjService {
                         .totalXaf(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
                         .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
                         .lastCountedAt(linesById.get(lineId) != null ? linesById.get(lineId).getLastCountedAt() : null)
+                        .build())
+                .toList();
+    }
+
+    /**
+     * The individual collections behind one pending-confirmation line — lets the agent review
+     * exactly what's in it before confirming, or pick one to request rejection on, rather than
+     * only ever seeing the line's aggregate total.
+     */
+    public List<CollectionResponse> listCollectionsForLine(UUID agentId, UUID lineId) {
+        OfjAgentLine line = ofjAgentLineRepository.findById(lineId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconciliation line not found: " + lineId));
+        if (!line.getAgentId().equals(agentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot view another agent's reconciliation");
+        }
+        List<Collection> collections = collectionRepository.findByReconciledInLineId(lineId);
+        return collections.stream()
+                .map(collection -> CollectionResponse.builder()
+                        .id(collection.getId())
+                        .agentId(collection.getAgentId())
+                        .clientId(collection.getClientId())
+                        .clientName(clientDirectoryService.findReceiptInfo(collection.getClientId()).fullName())
+                        .amountXaf(collection.getAmountXaf())
+                        .lat(collection.getLat())
+                        .lon(collection.getLon())
+                        .accuracyM(collection.getAccuracyM())
+                        .locationName(collection.getLocationName())
+                        .collectedAt(collection.getCollectedAt())
+                        .reconciledAt(collection.getReconciledAt())
+                        .syncStatus(collection.getSyncStatus())
+                        .deviceTxId(collection.getDeviceTxId())
+                        .terminalId(collection.getTerminalId())
                         .build())
                 .toList();
     }
