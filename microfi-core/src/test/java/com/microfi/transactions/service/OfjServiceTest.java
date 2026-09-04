@@ -863,6 +863,32 @@ class OfjServiceTest {
         assertThat(result.get(0).getAmountXaf()).isEqualTo(5000);
     }
 
+    /**
+     * Once a collection's rejection request is approved, it's fully resolved — it must not linger
+     * in the agent's own review list looking like something still actionable (see the mobile
+     * "Request Rejection" screen, which offers this action on every collection it's handed).
+     */
+    @Test
+    void listCollectionsForLineExcludesVoidedCollections() {
+        UUID lineId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
+        Collection stillActive = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(3000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx1")
+                .reconciledInLineId(lineId).build();
+        Collection voided = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx2")
+                .reconciledInLineId(lineId).voidedAt(Instant.now()).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(List.of(stillActive, voided));
+        when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientDirectoryService.ClientReceiptInfo("MFI-1", "Jane Doe"));
+
+        List<com.microfi.shared.dto.CollectionResponse> result = ofjService.listCollectionsForLine(agentId, lineId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAmountXaf()).isEqualTo(3000);
+    }
+
     @Test
     void listCollectionsForLineForbiddenForAnotherAgentsLine() {
         UUID lineId = UUID.randomUUID();
@@ -896,6 +922,57 @@ class OfjServiceTest {
         // No file/ExportBatch artifact for a single agent's own push — see OfjService#exportForAgent's doc.
         verify(exportBatchRepository, org.mockito.Mockito.never()).save(any());
         verify(cbsClientService, org.mockito.Mockito.never()).submitDailyExport(any(), anyString(), anyString());
+        verify(agentDirectoryService).markDayEnded(eq(agentId), eq(LocalDate.now(ZoneOffset.UTC)));
+    }
+
+    /**
+     * Regression guard: exportForAgent used to compute exportedTotalXaf from the requested batch
+     * and mark the agent's day ended unconditionally, even when the CBS post itself failed (see
+     * postToLedger's onErrorComplete, which swallows the failure and returns 0 posted) — silently
+     * reporting success and locking the agent out of collecting for a day that never actually
+     * exported anything.
+     */
+    @Test
+    void exportForAgentFailsAndDoesNotEndTheDayWhenCbsPostFails() {
+        UUID clientId = UUID.randomUUID();
+        Collection confirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(3000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(List.of(confirmed));
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString())).thenReturn(Mono.error(new RuntimeException("CBS down")));
+
+        assertThatThrownBy(() -> ofjService.exportForAgent(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("503");
+
+        assertThat(confirmed.getExportedAt()).isNull();
+        verify(agentDirectoryService, org.mockito.Mockito.never()).markDayEnded(any(), any());
+    }
+
+    /** Two different batches for the same agent must not collide on the same idempotency key. */
+    @Test
+    void exportForAgentUsesAContentDerivedIdempotencyKeyPerBatch() {
+        UUID clientId = UUID.randomUUID();
+        Collection first = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(1000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        Collection second = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(2000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString()))
+                .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
+
+        when(collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(List.of(first));
+        ofjService.exportForAgent(agentId);
+
+        when(collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(List.of(second));
+        ofjService.exportForAgent(agentId);
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(cbsClientService, org.mockito.Mockito.times(2)).postTransactions(any(), keyCaptor.capture());
+        assertThat(keyCaptor.getAllValues().get(0)).isNotEqualTo(keyCaptor.getAllValues().get(1));
     }
 
     @Test

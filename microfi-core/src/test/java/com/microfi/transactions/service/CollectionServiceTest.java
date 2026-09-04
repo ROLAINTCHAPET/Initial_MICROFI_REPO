@@ -179,6 +179,30 @@ class CollectionServiceTest {
     }
 
     @Test
+    void checksDayNotEndedBeforeRecording() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request);
+
+        org.mockito.Mockito.verify(agentDirectoryService).requireDayNotEnded(agentId, request.getCollectedAt());
+    }
+
+    /** Once an agent has explicitly ended their day (see OfjService#exportForAgent), no further collection is accepted until the next business date. */
+    @Test
+    void rejectsCollectionAfterAgentHasEndedTheirDay() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "You've already ended your day"))
+                .when(agentDirectoryService).requireDayNotEnded(any(), any());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
     void doesNotCheckTransactionPinOnIdempotentReplay() {
         Collection existing = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
                 .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("DEV-TX-1").build();

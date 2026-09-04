@@ -72,6 +72,7 @@ public class CollectionService {
 
         agentDirectoryService.verifyTransactionPin(agentId, request.getPin());
         agentDirectoryService.requireWithinScheduleWindow(agentId, request.getCollectedAt());
+        agentDirectoryService.requireDayNotEnded(agentId, request.getCollectedAt());
         requireWithinAssignedGeofence(agentId, request.getLat(), request.getLon());
         clientDirectoryService.requireActiveClient(request.getClientId());
         requireNoPendingActivation(agentId);

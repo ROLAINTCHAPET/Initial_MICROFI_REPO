@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -102,4 +103,14 @@ public class Agent {
     private String deletionReason;
     private UUID deletedBy;
     private Instant deletedAt;
+
+    /**
+     * The business date (UTC) this agent last called "End My Day" for — see {@code
+     * OfjService#exportForAgent}. While it equals today's UTC date, {@code
+     * AgentDirectoryService#requireDayNotEnded} blocks new collections: having pushed their
+     * confirmed cash to the CBS and signaled they're done for the day, nothing should let more
+     * digital cash accumulate against them until the next business date resets this naturally
+     * (no explicit "re-open" action needed).
+     */
+    private LocalDate dayEndedBusinessDate;
 }

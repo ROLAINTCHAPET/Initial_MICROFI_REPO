@@ -13,8 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -134,6 +136,31 @@ public class AgentDirectoryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Outside authorized collection hours (" + branch.getOpenTime() + "-" + branch.getCloseTime() + " " + branch.getTimezone() + ")");
         }
+    }
+
+    /**
+     * Blocks new collections once an agent has explicitly "ended their day" (see {@code
+     * OfjService#exportForAgent}) for the same UTC business date {@code collectedAt} falls on —
+     * same UTC-business-date convention {@code OfjSession} uses everywhere else. Resets itself
+     * naturally the moment the calendar rolls to the next business date, so there's no separate
+     * "re-open my day" action to build or forget to call.
+     */
+    public void requireDayNotEnded(UUID agentId, Instant collectedAt) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        LocalDate businessDate = collectedAt.atZone(ZoneOffset.UTC).toLocalDate();
+        if (businessDate.equals(agent.getDayEndedBusinessDate())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "You've already ended your day — collecting resumes on the next business day");
+        }
+    }
+
+    /** Called once {@code OfjService#exportForAgent} succeeds — see {@link #requireDayNotEnded}. */
+    public void markDayEnded(UUID agentId, LocalDate businessDate) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        agent.setDayEndedBusinessDate(businessDate);
+        agentRepository.save(agent);
     }
 
     /**

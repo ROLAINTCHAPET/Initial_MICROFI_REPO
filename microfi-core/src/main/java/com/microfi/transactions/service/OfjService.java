@@ -267,7 +267,11 @@ public class OfjService {
     /**
      * The individual collections behind one pending-confirmation line — lets the agent review
      * exactly what's in it before confirming, or pick one to request rejection on, rather than
-     * only ever seeing the line's aggregate total.
+     * only ever seeing the line's aggregate total. Excludes voided collections: once a rejection
+     * request against one has been approved, it's fully resolved — there's nothing left to review
+     * or a second time request rejection on (CollectionRejectionService#approve already rejects a
+     * repeat request against an already-voided collection with 409, but leaving it listed here
+     * would still show it as if the request were still live/actionable).
      */
     public List<CollectionResponse> listCollectionsForLine(UUID agentId, UUID lineId) {
         OfjAgentLine line = ofjAgentLineRepository.findById(lineId)
@@ -275,7 +279,9 @@ public class OfjService {
         if (!line.getAgentId().equals(agentId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot view another agent's reconciliation");
         }
-        List<Collection> collections = collectionRepository.findByReconciledInLineId(lineId);
+        List<Collection> collections = collectionRepository.findByReconciledInLineId(lineId).stream()
+                .filter(c -> c.getVoidedAt() == null)
+                .toList();
         return collections.stream()
                 .map(collection -> CollectionResponse.builder()
                         .id(collection.getId())
@@ -393,7 +399,10 @@ public class OfjService {
      * doc. Deliberately posts straight to the ledger with no {@link ExportBatch}/file record: a
      * single agent's slice of the day isn't "the day's export file" in the FR-18 sense, and these
      * collections are simply skipped (already {@code exportedAt}-stamped) by whichever real
-     * session-level export run covers the rest of the branch later.
+     * session-level export run covers the rest of the branch later. Also marks the agent's day as
+     * ended (see {@link AgentDirectoryService#markDayEnded}) — this is a one-way "I'm done for
+     * today" signal, not just a cash push, so it also blocks any further collection until the next
+     * business date.
      */
     public EndDayResponse exportForAgent(UUID agentId) {
         List<Collection> exportable = collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
@@ -401,9 +410,26 @@ public class OfjService {
         if (exportable.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing confirmed and unexported to export yet");
         }
-        long totalXaf = exportable.stream().mapToLong(Collection::getAmountXaf).sum();
-        int posted = postToLedger(exportable, List.of(), "ofj-end-my-day-" + agentId);
-        return EndDayResponse.builder().exportedCount(posted).exportedTotalXaf(totalXaf).build();
+        // Content-derived, not just "agentId" — a fixed per-agent key would collide (and get
+        // rejected by the middleware's idempotency check, see IdempotencyService#replay) the
+        // moment a LATER End My Day call posts a genuinely different batch of collections than an
+        // earlier one did. Deterministic on the same batch, so a true retry of the exact same
+        // unexported set still replays safely instead of double-posting.
+        String idempotencyKey = "ofj-end-my-day-" + agentId + "-" + UUID.nameUUIDFromBytes(
+                exportable.stream().map(c -> c.getId().toString()).sorted().collect(Collectors.joining(",")).getBytes());
+        int posted = postToLedger(exportable, List.of(), idempotencyKey);
+        if (posted == 0) {
+            // The CBS/middleware call itself failed (see #postToLedger's doOnError) — nothing was
+            // actually posted, so the agent's day must NOT be marked ended and they should be able
+            // to retry once the CBS is reachable again, exactly like OfjService#autoExportOnClose's
+            // own "log and let the manual retry path pick it up" contract.
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to reach the CBS right now — try again shortly");
+        }
+        long postedTotalXaf = exportable.stream().filter(c -> c.getExportedAt() != null).mapToLong(Collection::getAmountXaf).sum();
+        // Having pushed their confirmed cash and signaled they're done, the agent can't record any
+        // further collections today — see AgentDirectoryService#requireDayNotEnded.
+        agentDirectoryService.markDayEnded(agentId, LocalDate.now(ZoneOffset.UTC));
+        return EndDayResponse.builder().exportedCount(posted).exportedTotalXaf(postedTotalXaf).build();
     }
 
     /** How much confirmed-but-unexported cash this agent has ready to push via {@link #exportForAgent} — backs the mobile "End My Day" banner. */

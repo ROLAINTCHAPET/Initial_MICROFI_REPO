@@ -280,4 +280,44 @@ class AgentDirectoryServiceTest {
         java.time.Instant collectedAt = java.time.LocalDate.now(zone).atTime(13, 0).atZone(zone).toInstant();
         agentDirectoryService.requireWithinScheduleWindow(agentId, collectedAt);
     }
+
+    @Test
+    void requireDayNotEndedRejectsWhenTodaysBusinessDateAlreadyEnded() {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        Agent agent = Agent.builder().id(agentId).dayEndedBusinessDate(today).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        assertThatThrownBy(() -> agentDirectoryService.requireDayNotEnded(agentId, Instant.now()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void requireDayNotEndedAllowsCollectingOnANewBusinessDate() {
+        java.time.LocalDate yesterday = java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1);
+        Agent agent = Agent.builder().id(agentId).dayEndedBusinessDate(yesterday).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        agentDirectoryService.requireDayNotEnded(agentId, Instant.now());
+    }
+
+    @Test
+    void requireDayNotEndedAllowsWhenDayHasNeverBeenEnded() {
+        Agent agent = Agent.builder().id(agentId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        agentDirectoryService.requireDayNotEnded(agentId, Instant.now());
+    }
+
+    @Test
+    void markDayEndedStampsTodaysBusinessDateOnTheAgent() {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        Agent agent = Agent.builder().id(agentId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        agentDirectoryService.markDayEnded(agentId, today);
+
+        assertThat(agent.getDayEndedBusinessDate()).isEqualTo(today);
+    }
 }
