@@ -297,13 +297,16 @@ public class OfjService {
     }
 
     /**
-     * The individual collections behind one pending-confirmation line — lets the agent review
-     * exactly what's in it before confirming, or pick one to request rejection on, rather than
-     * only ever seeing the line's aggregate total. Excludes voided collections: once a rejection
-     * request against one has been approved, it's fully resolved — there's nothing left to review
-     * or a second time request rejection on (CollectionRejectionService#approve already rejects a
-     * repeat request against an already-voided collection with 409, but leaving it listed here
-     * would still show it as if the request were still live/actionable).
+     * The individual collections currently awaiting this agent's confirmation on one line — lets
+     * them review exactly what's in the batch before confirming, or pick one to request rejection
+     * on, rather than only ever seeing the line's aggregate total. Scoped to {@code
+     * PENDING_AGENT_CONFIRMATION} specifically, not merely "not voided": a repeat same-day cashier
+     * sweep reuses the same {@code OfjAgentLine} row (see {@code #reconcile}'s find-or-create), so
+     * a line can mix an already-{@code CONFIRMED} earlier batch with a newer pending one under the
+     * same id. Without this filter, a collection the agent already confirmed (or whose rejection
+     * was already approved) would keep showing up here looking exactly as reviewable/rejectable as
+     * something genuinely still awaiting them — confusing at best, and lets a stale "Request
+     * Rejection" tap surface a 409 the agent has no way to anticipate.
      */
     public List<CollectionResponse> listCollectionsForLine(UUID agentId, UUID lineId) {
         OfjAgentLine line = ofjAgentLineRepository.findById(lineId)
@@ -312,7 +315,7 @@ public class OfjService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot view another agent's reconciliation");
         }
         List<Collection> collections = collectionRepository.findByReconciledInLineId(lineId).stream()
-                .filter(c -> c.getVoidedAt() == null)
+                .filter(c -> c.getVoidedAt() == null && c.getReconciliationStatus() == CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION)
                 .toList();
         return collections.stream()
                 .map(collection -> CollectionResponse.builder()

@@ -278,6 +278,8 @@
   "@hsTodaysCollections": {"description": "Home screen — small label above today's cumulative collected amount on the ceiling gauge card."},
   "hsCeilingLabel": "Ceiling",
   "@hsCeilingLabel": {"description": "Home screen — label above the effective ceiling amount on the ceiling gauge card."},
+  "hsOfWhichAwaitingConfirmation": "of which {amount} XAF awaiting your confirmation",
+  "@hsOfWhichAwaitingConfirmation": {"description": "Home screen — sub-line under Today's Collections breaking out how much of that total is still PENDING_AGENT_CONFIRMATION, so it isn't mistaken for cash not yet counted by the cashier.", "placeholders": {"amount": {"type": "String"}}},
   "hsCapacityReachedDepositSoon": "{percent}% capacity reached. Deposit soon.",
   "@hsCapacityReachedDepositSoon": {
     "description": "Home screen — ceiling gauge caption when near the daily limit.",

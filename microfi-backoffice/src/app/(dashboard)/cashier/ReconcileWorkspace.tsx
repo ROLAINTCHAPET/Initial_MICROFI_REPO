@@ -25,7 +25,9 @@ export interface ValidatedLine {
 export interface WaitingConfirmationLine {
   lineId: string;
   agentLabel: string;
-  physicalTotalXaf: number;
+  /** Scoped to exactly this batch's still-pending collections — never the line's cumulative
+   * running total, which could combine an already-confirmed earlier batch with this one. */
+  pendingTotalXaf: number;
   pendingConfirmationCount: number;
 }
 
@@ -226,7 +228,7 @@ export function ReconcileWorkspace({
               <div key={item.lineId} className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-sm)] p-3 flex flex-col gap-1">
                 <span className="font-semibold text-xs text-on-surface-variant">{item.agentLabel}</span>
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-sm text-primary">{item.physicalTotalXaf.toLocaleString()} XAF</span>
+                  <span className="font-semibold text-sm text-primary">{item.pendingTotalXaf.toLocaleString()} XAF</span>
                   <Icon name="schedule" className="size-5 text-outline" />
                 </div>
                 <span className="text-xs text-on-surface-variant">{t(dict.cashier.reconcile.waitingConfirmationCount, { count: item.pendingConfirmationCount })}</span>

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeaderContext";
 import { EmptyState } from "@/components/Table";
 import { Icon } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse } from "@/lib/types";
+import type { AdminPendingConfirmationResponse, AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse } from "@/lib/types";
 import { CashierBranchSelector } from "./CashierBranchSelector";
 import { ReconcileWorkspace, type QueueLine, type ValidatedLine, type WaitingConfirmationLine } from "./ReconcileWorkspace";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -25,9 +25,10 @@ export default async function CashierPortalPage({
   }
 
   const branch = branches.find((b) => b.id === branchId);
-  const [summary, pending, agents] = await Promise.all([
+  const [summary, pending, pendingConfirmations, agents] = await Promise.all([
     api.get<OfjSummaryResponse>(`/ofj/${branchId}/summary`),
     api.get<OfjPendingLineResponse[]>(`/ofj/${branchId}/pending`),
+    api.get<AdminPendingConfirmationResponse[]>(`/ofj/${branchId}/pending-confirmations`),
     api.get<AgentResponse[]>("/admin/agents"),
   ]);
   const agentById = new Map(agents.map((a) => [a.id, a]));
@@ -50,9 +51,16 @@ export default async function CashierPortalPage({
   // signs off — see CollectionReconciliationStatus's doc. Splitting these into their own section,
   // shown before "Today's Validated", is what stops a cashier from reading "resolved" as "nothing
   // left to do here" when the agent's own confirmation is still outstanding.
-  const waitingConfirmation: WaitingConfirmationLine[] = summary.agentLines
-    .filter((l) => l.resolved && l.pendingConfirmationCount > 0)
-    .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), physicalTotalXaf: l.physicalTotalXaf, pendingConfirmationCount: l.pendingConfirmationCount }));
+  //
+  // Deliberately sourced from /pending-confirmations (scoped to exactly this line's still-
+  // PENDING_AGENT_CONFIRMATION collections), not summary.agentLines' own physicalTotalXaf/
+  // digitalTotalXaf — those are the line's CUMULATIVE running total across every same-day sweep
+  // (a repeat cashier count for the same agent reuses the same OfjAgentLine row, see
+  // OfjService#reconcile), so an agent who already confirmed an earlier 25000 batch and then had
+  // a fresh 15000 counted would otherwise show 40000 "awaiting confirmation" — combining an
+  // already-settled batch with the genuinely new one.
+  const waitingConfirmation: WaitingConfirmationLine[] = pendingConfirmations
+    .map((p) => ({ lineId: p.lineId, agentLabel: label(p.agentId), pendingTotalXaf: p.totalXaf, pendingConfirmationCount: p.collectionCount }));
 
   const validated: ValidatedLine[] = summary.agentLines
     .filter((l) => l.resolved && l.pendingConfirmationCount === 0)

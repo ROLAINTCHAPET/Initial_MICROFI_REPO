@@ -122,6 +122,7 @@
   "hsNoCollectionsRecorded": "Aucun encaissement enregistré pour le moment.",
   "hsTodaysCollections": "ENCAISSEMENTS DU JOUR",
   "hsCeilingLabel": "Plafond",
+  "hsOfWhichAwaitingConfirmation": "dont {amount} XAF en attente de votre confirmation",
   "hsCapacityReachedDepositSoon": "{percent} % de la capacité atteinte. Déposez bientôt.",
   "hsCapacityReachedSafe": "{percent} % de la capacité atteinte. Vous pouvez continuer.",
   "hsUnknownClient": "Client inconnu",

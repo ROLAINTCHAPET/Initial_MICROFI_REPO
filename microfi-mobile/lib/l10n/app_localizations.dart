@@ -740,6 +740,12 @@ abstract class AppLocalizations {
   /// **'Ceiling'**
   String get hsCeilingLabel;
 
+  /// Home screen — sub-line under Today's Collections breaking out how much of that total is still PENDING_AGENT_CONFIRMATION, so it isn't mistaken for cash not yet counted by the cashier.
+  ///
+  /// In en, this message translates to:
+  /// **'of which {amount} XAF awaiting your confirmation'**
+  String hsOfWhichAwaitingConfirmation(String amount);
+
   /// Home screen — ceiling gauge caption when near the daily limit.
   ///
   /// In en, this message translates to:

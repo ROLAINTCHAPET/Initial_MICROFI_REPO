@@ -63,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _noticePollTimer;
 
   int _pendingConfirmationCount = 0;
+  int _pendingConfirmationTotalXaf = 0;
   Timer? _confirmationPollTimer;
 
   Timer? _rejectionDecisionPollTimer;
@@ -339,7 +340,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final lines = await ReconciliationRepository(widget.token).listMyPendingConfirmations();
       if (!mounted) return;
-      setState(() => _pendingConfirmationCount = lines.length);
+      setState(() {
+        _pendingConfirmationCount = lines.length;
+        _pendingConfirmationTotalXaf = lines.fold(0, (sum, line) => sum + line.totalXaf);
+      });
     } catch (_) {
       // Best-effort — silently retried on the next poll/screen load.
     }
@@ -535,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
-          if (escrow != null) _CeilingGaugeCard(escrow: escrow),
+          if (escrow != null) _CeilingGaugeCard(escrow: escrow, pendingConfirmationTotalXaf: _pendingConfirmationTotalXaf),
           const SizedBox(height: MicrofiSpacing.gapLg),
           SizedBox(
             width: double.infinity,
@@ -618,8 +622,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _CeilingGaugeCard extends StatelessWidget {
   final EscrowStatus escrow;
+  // escrow.cumulativeTodayXaf combines two different things that occupy the escrow ceiling for
+  // different reasons — cash the cashier hasn't physically counted yet, and cash already counted
+  // but still awaiting THIS agent's own confirmation (see CollectionReconciliationStatus's doc).
+  // Showing only the combined total reads as "cumulates the reconciled and the non-reconciled"
+  // (a real point of confusion raised live) — this breaks out the confirmation-pending portion
+  // specifically so an agent can tell "not yet counted" apart from "counted, waiting on me".
+  final int pendingConfirmationTotalXaf;
 
-  const _CeilingGaugeCard({required this.escrow});
+  const _CeilingGaugeCard({required this.escrow, required this.pendingConfirmationTotalXaf});
 
   @override
   Widget build(BuildContext context) {
@@ -652,6 +663,13 @@ class _CeilingGaugeCard extends StatelessWidget {
                       const Text('XAF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MicrofiColors.primaryContainer)),
                     ],
                   ),
+                  if (pendingConfirmationTotalXaf > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      AppLocalizations.of(context)!.hsOfWhichAwaitingConfirmation(_fmt(pendingConfirmationTotalXaf)),
+                      style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
+                    ),
+                  ],
                 ],
               ),
               Column(

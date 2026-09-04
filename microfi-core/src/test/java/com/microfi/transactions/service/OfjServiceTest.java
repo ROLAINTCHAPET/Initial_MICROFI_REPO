@@ -879,7 +879,7 @@ class OfjServiceTest {
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
         Collection collection = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
                 .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx1")
-                .reconciledInLineId(lineId).build();
+                .reconciledInLineId(lineId).reconciliationStatus(CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION).build();
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
         when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(List.of(collection));
         when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientDirectoryService.ClientReceiptInfo("MFI-1", "Jane Doe"));
@@ -903,10 +903,10 @@ class OfjServiceTest {
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
         Collection stillActive = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
                 .amountXaf(3000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx1")
-                .reconciledInLineId(lineId).build();
+                .reconciledInLineId(lineId).reconciliationStatus(CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION).build();
         Collection voided = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
                 .amountXaf(5000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx2")
-                .reconciledInLineId(lineId).voidedAt(Instant.now()).build();
+                .reconciledInLineId(lineId).reconciliationStatus(CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION).voidedAt(Instant.now()).build();
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
         when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(List.of(stillActive, voided));
         when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientDirectoryService.ClientReceiptInfo("MFI-1", "Jane Doe"));
@@ -915,6 +915,35 @@ class OfjServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAmountXaf()).isEqualTo(3000);
+    }
+
+    /**
+     * Regression test: a repeat same-day cashier sweep reuses the same OfjAgentLine row, so a
+     * line can mix an already-CONFIRMED earlier batch with a newer PENDING_AGENT_CONFIRMATION one
+     * under the same id. Only the genuinely-still-pending batch belongs on this review screen —
+     * an already-confirmed collection from an earlier batch must not show up looking equally
+     * "still actionable" as the one the agent is actually being asked to review right now.
+     */
+    @Test
+    void listCollectionsForLineExcludesAlreadyConfirmedCollectionsFromAnEarlierBatch() {
+        UUID lineId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();
+        Collection stillPending = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(15000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx-new")
+                .reconciledInLineId(lineId).reconciliationStatus(CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION).build();
+        Collection alreadyConfirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(25000).lat(4.05).lon(9.70).collectedAt(Instant.now()).deviceTxId("tx-old")
+                .reconciledInLineId(lineId).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED)
+                .reconciledAt(Instant.now()).confirmedBy(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT).build();
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(List.of(stillPending, alreadyConfirmed));
+        when(clientDirectoryService.findReceiptInfo(clientId)).thenReturn(new ClientDirectoryService.ClientReceiptInfo("MFI-1", "Jane Doe"));
+
+        List<com.microfi.shared.dto.CollectionResponse> result = ofjService.listCollectionsForLine(agentId, lineId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAmountXaf()).isEqualTo(15000);
     }
 
     @Test

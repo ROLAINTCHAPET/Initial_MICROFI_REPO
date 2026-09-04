@@ -392,6 +392,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hsCeilingLabel => 'Ceiling';
 
   @override
+  String hsOfWhichAwaitingConfirmation(String amount) {
+    return 'of which $amount XAF awaiting your confirmation';
+  }
+
+  @override
   String hsCapacityReachedDepositSoon(int percent) {
     return '$percent% capacity reached. Deposit soon.';
   }

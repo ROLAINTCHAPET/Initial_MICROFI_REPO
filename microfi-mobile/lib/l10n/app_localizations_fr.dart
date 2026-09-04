@@ -400,6 +400,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hsCeilingLabel => 'Plafond';
 
   @override
+  String hsOfWhichAwaitingConfirmation(String amount) {
+    return 'dont $amount XAF en attente de votre confirmation';
+  }
+
+  @override
   String hsCapacityReachedDepositSoon(int percent) {
     return '$percent % de la capacité atteinte. Déposez bientôt.';
   }
