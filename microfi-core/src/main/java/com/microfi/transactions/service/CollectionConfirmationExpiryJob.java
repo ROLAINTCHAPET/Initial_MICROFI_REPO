@@ -67,6 +67,7 @@ public class CollectionConfirmationExpiryJob {
                         .category(AuditCategory.FINANCIAL)
                         .eventType("COLLECTION_RECONCILIATION_CONFIRMED")
                         .actorType(AuditActorType.SYSTEM)
+                        .actorLabel("SYSTEM")
                         .branchId(agentDirectoryService.requireBranchIdForAgent(line.getAgentId()))
                         .agentId(line.getAgentId())
                         .detailsKey("COLLECTION_RECONCILIATION_CONFIRMED_DETAIL")

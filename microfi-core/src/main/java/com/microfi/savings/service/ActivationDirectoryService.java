@@ -52,10 +52,19 @@ public class ActivationDirectoryService {
                 .toList();
     }
 
-    /** UC-16/18: exactly the activation-fee cash a given set of OfjAgentLines reconciled, for CBS export — see CollectionRepository#findByReconciledInLineIdIn. */
+    /** UC-16/18: exactly the not-yet-exported activation-fee cash a given set of OfjAgentLines reconciled, for CBS export — see CollectionRepository#findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull. */
     public List<ActivationCashLine> findByReconciledInLineIds(List<UUID> lineIds) {
-        return activationPaymentRepository.findByReconciledInLineIdIn(lineIds).stream()
+        return activationPaymentRepository.findByReconciledInLineIdInAndExportedAtIsNull(lineIds).stream()
                 .map(payment -> new ActivationCashLine(payment.getId(), payment.getClientId(), payment.getAmountXaf(), payment.getPaidAt()))
                 .toList();
+    }
+
+    /** Stamps exportedAt/cbsTransactionRef after a successful CBS post — same tracking pair as Collection#exportedAt, required now that export can run more than once per session. */
+    public void markExported(UUID paymentId, Instant exportedAt, String cbsTransactionRef) {
+        activationPaymentRepository.findById(paymentId).ifPresent(payment -> {
+            payment.setExportedAt(exportedAt);
+            payment.setCbsTransactionRef(cbsTransactionRef);
+            activationPaymentRepository.save(payment);
+        });
     }
 }

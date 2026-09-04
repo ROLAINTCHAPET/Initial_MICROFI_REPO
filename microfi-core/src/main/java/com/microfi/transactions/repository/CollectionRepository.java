@@ -80,6 +80,38 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
     /** UC-16/18: exactly the collections a given set of OfjAgentLines reconciled, so CBS export posts what was actually reconciled rather than everything matching a calendar date. */
     List<Collection> findByReconciledInLineIdIn(List<UUID> lineIds);
 
+    /**
+     * The real export-eligibility gate: a collection must have cleared BOTH the cashier's physical
+     * count (reconciledInLineId set) AND the agent's own sign-off (reconciliationStatus ==
+     * CONFIRMED, via #markAgentConfirmed or its 48h auto-expiry) before it may reach the CBS — a
+     * merely-{@code PENDING_AGENT_CONFIRMATION} collection is NOT export-eligible, closing the gap
+     * where the old {@link #findByReconciledInLineIdIn} let the cashier's count alone trigger a
+     * real posting the agent never actually confirmed. {@code exportedAt IS NULL} is what makes
+     * repeated export runs over the same lineIds idempotent instead of double-posting on a re-run
+     * (see OfjService's "End My Day"/scheduled-closing-time triggers, which can both fire after a
+     * branch's own export already ran).
+     */
+    List<Collection> findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+            List<UUID> lineIds, CollectionReconciliationStatus status);
+
+    /**
+     * Area C ("End My Day"): every not-yet-exported, agent-confirmed collection belonging to one
+     * agent, regardless of which reconciliation line/session it landed in. Deliberately
+     * agent-scoped rather than session-scoped — the whole point is letting one agent push their
+     * own confirmed cash immediately without waiting on the rest of the branch to balance or on
+     * the session to close.
+     */
+    List<Collection> findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+            UUID agentId, CollectionReconciliationStatus status);
+
+    @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
+            + "WHERE c.agentId = :agentId AND c.reconciliationStatus = :status AND c.voidedAt IS NULL AND c.exportedAt IS NULL")
+    long sumByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+            @Param("agentId") UUID agentId, @Param("status") CollectionReconciliationStatus status);
+
+    long countByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+            UUID agentId, CollectionReconciliationStatus status);
+
     /** One reconciliation line's collections, for the agent's own drill-down (review before confirming, or picking one to request rejection on). */
     List<Collection> findByReconciledInLineId(UUID lineId);
 

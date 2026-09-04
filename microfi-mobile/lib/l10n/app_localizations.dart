@@ -656,6 +656,42 @@ abstract class AppLocalizations {
   /// **'Your request to void a collection was denied: {reason}'**
   String hsRejectionDeniedMessage(String reason);
 
+  /// Home screen — tappable banner shown when the agent has confirmed-but-unexported cash ready to push via End My Day.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} confirmed collection(s) ready to export ({total} XAF)'**
+  String hsEndDayBanner(int count, String total);
+
+  /// Home screen — confirm-dialog action button and general label for the End My Day action.
+  ///
+  /// In en, this message translates to:
+  /// **'End My Day'**
+  String get hsEndDayButton;
+
+  /// Home screen — End My Day confirmation dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'End My Day?'**
+  String get hsEndDayConfirmDialogTitle;
+
+  /// Home screen — End My Day confirmation dialog message.
+  ///
+  /// In en, this message translates to:
+  /// **'Push {count} confirmed collection(s) totaling {total} XAF to the CBS now?'**
+  String hsEndDayConfirmDialogMessage(int count, String total);
+
+  /// Home screen — success dialog message after End My Day completes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} collection(s) totaling {total} XAF were sent to the CBS.'**
+  String hsEndDaySuccess(int count, String total);
+
+  /// Home screen — error dialog title when End My Day fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to end your day'**
+  String get hsEndDayFailed;
+
   /// Home screen — primary CTA button to start a new collection.
   ///
   /// In en, this message translates to:

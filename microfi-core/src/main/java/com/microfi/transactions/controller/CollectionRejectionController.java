@@ -76,7 +76,7 @@ public class CollectionRejectionController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .flatMap(agentId -> collectionRejectionProofStorageService.store(id, proof)
                                 .flatMap(proofPath -> Mono.fromCallable(() -> {
-                                    CollectionRejectionRequest result = collectionRejectionService.approve(id, proofPath, caller.getAdminUser().getId());
+                                    CollectionRejectionRequest result = collectionRejectionService.approve(id, proofPath, caller.getAdminUser().getId(), caller.getAdminUser().getLogin());
                                     auditService.record(AuditLogEntry.builder()
                                             .category(AuditCategory.FINANCIAL)
                                             .eventType("COLLECTION_REJECTION_APPROVED")

@@ -357,6 +357,51 @@ class AgentSelfControllerTest {
     }
 
     @Test
+    void myExportableSummaryReturnsTheCallersOwnReadyTotal() {
+        when(ofjService.getExportableSummary(agentId)).thenReturn(
+                com.microfi.shared.dto.ExportableSummaryResponse.builder().readyCount(2).readyTotalXaf(9000).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/exportable-summary")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.readyCount").isEqualTo(2)
+                .jsonPath("$.readyTotalXaf").isEqualTo(9000);
+    }
+
+    @Test
+    void endMyDaySucceedsAndAudits() {
+        when(ofjService.exportForAgent(agentId)).thenReturn(
+                com.microfi.shared.dto.EndDayResponse.builder().exportedCount(2).exportedTotalXaf(9000).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/end-my-day")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.exportedCount").isEqualTo(2)
+                .jsonPath("$.exportedTotalXaf").isEqualTo(9000);
+
+        org.mockito.Mockito.verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
+                entry.getEventType().equals("AGENT_END_OF_DAY_EXPORT")));
+    }
+
+    @Test
+    void endMyDayPropagatesConflictWhenNothingReady() {
+        org.mockito.Mockito.when(ofjService.exportForAgent(agentId))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Nothing confirmed and unexported to export yet"));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/end-my-day")
+                .exchange()
+                .expectStatus().is4xxClientError();
+    }
+
+    @Test
     void requestCollectionRejectionCreatesRequestForOwnCollection() {
         UUID collectionId = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();

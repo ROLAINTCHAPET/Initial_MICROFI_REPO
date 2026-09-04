@@ -16,6 +16,8 @@ import com.microfi.shared.dto.AgentResponse;
 import com.microfi.shared.dto.BranchNoticeResponse;
 import com.microfi.shared.dto.BranchResponse;
 import com.microfi.shared.dto.CollectionRejectionRequestResponse;
+import com.microfi.shared.dto.EndDayResponse;
+import com.microfi.shared.dto.ExportableSummaryResponse;
 import com.microfi.shared.dto.MfiNameResponse;
 import com.microfi.shared.dto.ChangeAgentPinRequest;
 import com.microfi.shared.dto.PendingReconciliationLineResponse;
@@ -195,6 +197,38 @@ public class AgentSelfController {
                             .detailsParam1("AGENT")
                             .build());
                 }).subscribeOn(Schedulers.boundedElastic())).then();
+    }
+
+    @GetMapping("/exportable-summary")
+    @Operation(summary = "My Exportable Summary", description = "How much confirmed-but-unexported cash this agent has ready to push via End My Day — backs the mobile app's decision to show that action at all. Agent principals only.")
+    public Mono<ExportableSummaryResponse> myExportableSummary(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromCallable(() -> ofjService.getExportableSummary(agent.getId()))
+                        .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/end-my-day")
+    @Operation(summary = "End My Day", description = "Pushes this agent's own confirmed-but-unexported collections to the CBS ledger immediately, without waiting for the branch's session to close or for the scheduled closing-time export. Agent principals only, own cash only.")
+    public Mono<EndDayResponse> endMyDay(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromCallable(() -> {
+                    EndDayResponse result = ofjService.exportForAgent(agent.getId());
+                    auditService.record(AuditLogEntry.builder()
+                            .category(AuditCategory.FINANCIAL)
+                            .eventType("AGENT_END_OF_DAY_EXPORT")
+                            .actorType(AuditActorType.AGENT)
+                            .actorId(agent.getId())
+                            .actorLabel(agent.getUsername())
+                            .branchId(agent.getBranchId())
+                            .agentId(agent.getId())
+                            .detailsKey("AGENT_END_OF_DAY_EXPORT_DETAIL")
+                            .detailsParam1(String.valueOf(result.getExportedCount()))
+                            .detailsParam2(String.valueOf(result.getExportedTotalXaf()))
+                            .build());
+                    return result;
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PostMapping("/collections/{id}/reject-request")

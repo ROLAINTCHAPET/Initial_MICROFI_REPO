@@ -350,6 +350,30 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String hsEndDayBanner(int count, String total) {
+    return '$count encaissement(s) confirmé(s) prêt(s) à exporter ($total XAF)';
+  }
+
+  @override
+  String get hsEndDayButton => 'Terminer ma journée';
+
+  @override
+  String get hsEndDayConfirmDialogTitle => 'Terminer votre journée ?';
+
+  @override
+  String hsEndDayConfirmDialogMessage(int count, String total) {
+    return 'Transmettre $count encaissement(s) confirmé(s) totalisant $total XAF au CBS maintenant ?';
+  }
+
+  @override
+  String hsEndDaySuccess(int count, String total) {
+    return '$count encaissement(s) totalisant $total XAF ont été transmis au CBS.';
+  }
+
+  @override
+  String get hsEndDayFailed => 'Impossible de terminer votre journée';
+
+  @override
   String get hsNewCollection => 'Nouvel encaissement';
 
   @override

@@ -118,7 +118,7 @@ class CollectionRejectionControllerTest {
         when(collectionRejectionService.findAgentIdForRequest(requestId)).thenReturn(agentId);
         when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(branchId);
         when(collectionRejectionProofStorageService.store(eq(requestId), any())).thenReturn(Mono.just("proofs/abc.jpg"));
-        when(collectionRejectionService.approve(eq(requestId), eq("proofs/abc.jpg"), any())).thenReturn(
+        when(collectionRejectionService.approve(eq(requestId), eq("proofs/abc.jpg"), any(), any())).thenReturn(
                 CollectionRejectionRequest.builder().id(requestId).agentId(agentId).collectionId(UUID.randomUUID())
                         .reason("Wrong amount").status(CollectionRejectionStatus.APPROVED).requestedAt(Instant.now())
                         .proofPath("proofs/abc.jpg").build());

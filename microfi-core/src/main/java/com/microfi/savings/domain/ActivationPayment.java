@@ -51,4 +51,8 @@ public class ActivationPayment {
     /** Same reconciliation-tracking pair as {@link com.microfi.transactions.domain.Collection#reconciledAt} — see that Javadoc. */
     private Instant reconciledAt;
     private UUID reconciledInLineId;
+
+    /** Same CBS-posting tracking pair as {@link com.microfi.transactions.domain.Collection#exportedAt} — required once export can run more than once per session, so a repeated run never re-posts a fee already sent to the CBS. */
+    private Instant exportedAt;
+    private String cbsTransactionRef;
 }

@@ -344,6 +344,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String hsEndDayBanner(int count, String total) {
+    return '$count confirmed collection(s) ready to export ($total XAF)';
+  }
+
+  @override
+  String get hsEndDayButton => 'End My Day';
+
+  @override
+  String get hsEndDayConfirmDialogTitle => 'End My Day?';
+
+  @override
+  String hsEndDayConfirmDialogMessage(int count, String total) {
+    return 'Push $count confirmed collection(s) totaling $total XAF to the CBS now?';
+  }
+
+  @override
+  String hsEndDaySuccess(int count, String total) {
+    return '$count collection(s) totaling $total XAF were sent to the CBS.';
+  }
+
+  @override
+  String get hsEndDayFailed => 'Unable to end your day';
+
+  @override
   String get hsNewCollection => 'New Collection';
 
   @override

@@ -45,6 +45,30 @@ class CollectionRejectionRequest {
       );
 }
 
+class ExportableSummary {
+  final int readyCount;
+  final int readyTotalXaf;
+
+  ExportableSummary({required this.readyCount, required this.readyTotalXaf});
+
+  factory ExportableSummary.fromJson(Map<String, dynamic> json) => ExportableSummary(
+        readyCount: json['readyCount'] as int,
+        readyTotalXaf: json['readyTotalXaf'] as int,
+      );
+}
+
+class EndDayResult {
+  final int exportedCount;
+  final int exportedTotalXaf;
+
+  EndDayResult({required this.exportedCount, required this.exportedTotalXaf});
+
+  factory EndDayResult.fromJson(Map<String, dynamic> json) => EndDayResult(
+        exportedCount: json['exportedCount'] as int,
+        exportedTotalXaf: json['exportedTotalXaf'] as int,
+      );
+}
+
 /// A cashier has physically counted this cash, but it still occupies the agent's own escrow
 /// ceiling until they confirm it themselves (or it auto-expires server-side) — see
 /// CollectionReconciliationStatus's doc on the backend. There's no push infrastructure in this
@@ -76,5 +100,21 @@ class ReconciliationRepository {
     final client = ApiClient(token: token);
     final json = await client.get('/agents/me/collection-rejection-requests') as List<dynamic>;
     return json.map((e) => CollectionRejectionRequest.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Whether this agent has confirmed-but-unexported cash ready to push via [endMyDay] — polled so
+  /// HomeScreen only shows the "End My Day" action when there's actually something to send.
+  Future<ExportableSummary> fetchExportableSummary() async {
+    final client = ApiClient(token: token);
+    final json = await client.get('/agents/me/exportable-summary') as Map<String, dynamic>;
+    return ExportableSummary.fromJson(json);
+  }
+
+  /// Pushes this agent's own confirmed-but-unexported collections to the CBS ledger immediately,
+  /// without waiting for the branch's session to close or for the scheduled closing-time export.
+  Future<EndDayResult> endMyDay() async {
+    final client = ApiClient(token: token);
+    final json = await client.post('/agents/me/end-my-day', {});
+    return EndDayResult.fromJson(json);
   }
 }

@@ -1,5 +1,7 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.service.AuditService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
 import com.microfi.notifications.gateway.SmsGateway;
 import com.microfi.notifications.gateway.SmsGatewayFactory;
@@ -49,6 +51,10 @@ class CollectionRejectionServiceTest {
     private SmsGatewayFactory smsGatewayFactory;
     @Mock
     private SmsGateway smsGateway;
+    @Mock
+    private AgentDirectoryService agentDirectoryService;
+    @Mock
+    private AuditService auditService;
 
     private CollectionRejectionService service;
 
@@ -59,7 +65,8 @@ class CollectionRejectionServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new CollectionRejectionService(collectionRejectionRequestRepository, collectionRepository,
-                ofjAgentLineRepository, clientDirectoryService, cbsClientService, smsGatewayFactory);
+                ofjAgentLineRepository, clientDirectoryService, cbsClientService, smsGatewayFactory,
+                agentDirectoryService, auditService);
         when(collectionRejectionRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -120,7 +127,7 @@ class CollectionRejectionServiceTest {
         when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(collection().build()));
         when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        CollectionRejectionRequest result = service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
+        CollectionRejectionRequest result = service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
 
         assertThat(result.getStatus()).isEqualTo(CollectionRejectionStatus.APPROVED);
         assertThat(result.getProofPath()).isEqualTo("proofs/abc.pdf");
@@ -145,7 +152,7 @@ class CollectionRejectionServiceTest {
         when(smsGatewayFactory.getActiveGateway()).thenReturn(smsGateway);
         when(smsGateway.send(anyString(), anyString())).thenReturn(Mono.just(new SmsSendResult(true, "msg-1", null)));
 
-        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
+        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
 
         verify(cbsClientService).reverseTransaction(eq("CBSTX-123"), anyString());
         verify(smsGateway).send(eq("237600000000"), anyString());
@@ -165,7 +172,7 @@ class CollectionRejectionServiceTest {
         when(smsGatewayFactory.getActiveGateway()).thenReturn(smsGateway);
         when(smsGateway.send(anyString(), anyString())).thenReturn(Mono.just(new SmsSendResult(true, "msg-1", null)));
 
-        CollectionRejectionRequest result = service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
+        CollectionRejectionRequest result = service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
 
         assertThat(result.getStatus()).isEqualTo(CollectionRejectionStatus.APPROVED);
     }
@@ -185,7 +192,7 @@ class CollectionRejectionServiceTest {
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
         when(ofjAgentLineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
+        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
 
         ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
         verify(ofjAgentLineRepository).save(captor.capture());
@@ -194,12 +201,92 @@ class CollectionRejectionServiceTest {
     }
 
     @Test
+    void approveRequeuesUnexportedSiblingsBackToUnreconciled() {
+        UUID requestId = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        UUID reviewerId = UUID.randomUUID();
+        CollectionRejectionRequest request = CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId)
+                .agentId(agentId).status(CollectionRejectionStatus.PENDING).build();
+        Collection rejected = collection().reconciledInLineId(lineId).build();
+        Collection stillPendingSibling = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(UUID.randomUUID())
+                .amountXaf(2000).collectedAt(java.time.Instant.now()).deviceTxId("tx2")
+                .reconciledInLineId(lineId).reconciliationStatus(com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION)
+                .build();
+        Collection alreadyConfirmedSibling = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(UUID.randomUUID())
+                .amountXaf(3000).collectedAt(java.time.Instant.now()).deviceTxId("tx3")
+                .reconciledInLineId(lineId).reconciliationStatus(com.microfi.transactions.domain.CollectionReconciliationStatus.CONFIRMED)
+                .reconciledAt(java.time.Instant.now()).confirmedBy(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT)
+                .build();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .collectionsTotalXaf(10000L).digitalTotalXaf(10000L).build();
+        when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(rejected));
+        when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(collectionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(collectionRepository.findByReconciledInLineId(lineId))
+                .thenReturn(java.util.List.of(rejected, stillPendingSibling, alreadyConfirmedSibling));
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(ofjAgentLineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(UUID.randomUUID());
+
+        service.approve(requestId, "proofs/abc.pdf", reviewerId, "admin1");
+
+        assertThat(stillPendingSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.UNRECONCILED);
+        assertThat(stillPendingSibling.getReconciledInLineId()).isNull();
+        assertThat(alreadyConfirmedSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.UNRECONCILED);
+        assertThat(alreadyConfirmedSibling.getReconciledInLineId()).isNull();
+        assertThat(alreadyConfirmedSibling.getReconciledAt()).isNull();
+        assertThat(alreadyConfirmedSibling.getConfirmedBy()).isNull();
+
+        ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
+        verify(ofjAgentLineRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        // First save: debit the rejected collection's own 5000. Second save (requeue): debit the
+        // two requeued siblings' 2000+3000 on top of that — 10000 - 5000 - 2000 - 3000 = 0.
+        assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(0L);
+        assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(0L);
+        verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
+                "COLLECTION_REJECTION_SIBLINGS_REQUEUED".equals(entry.getEventType())));
+    }
+
+    @Test
+    void approveLeavesAlreadyExportedSiblingsCompletelyUntouched() {
+        UUID requestId = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        CollectionRejectionRequest request = CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId)
+                .agentId(agentId).status(CollectionRejectionStatus.PENDING).build();
+        Collection rejected = collection().reconciledInLineId(lineId).build();
+        Collection alreadyExportedSibling = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(UUID.randomUUID())
+                .amountXaf(4000).collectedAt(java.time.Instant.now()).deviceTxId("tx4")
+                .reconciledInLineId(lineId).reconciliationStatus(com.microfi.transactions.domain.CollectionReconciliationStatus.CONFIRMED)
+                .exportedAt(java.time.Instant.now()).cbsTransactionRef("CBSTX-999")
+                .build();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .collectionsTotalXaf(9000L).digitalTotalXaf(9000L).build();
+        when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(rejected));
+        when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(java.util.List.of(rejected, alreadyExportedSibling));
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(ofjAgentLineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
+
+        assertThat(alreadyExportedSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.CONFIRMED);
+        assertThat(alreadyExportedSibling.getReconciledInLineId()).isEqualTo(lineId);
+        verify(collectionRepository, never()).saveAll(any());
+        // Only the rejected collection's own 5000 is debited — the exported sibling's 4000 stays.
+        ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
+        verify(ofjAgentLineRepository, org.mockito.Mockito.times(1)).save(captor.capture());
+        assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(4000L);
+    }
+
+    @Test
     void approveConflictWhenAlreadyDecided() {
         UUID requestId = UUID.randomUUID();
         when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(
                 CollectionRejectionRequest.builder().id(requestId).status(CollectionRejectionStatus.DENIED).build()));
 
-        assertThatThrownBy(() -> service.approve(requestId, "proof.pdf", UUID.randomUUID()))
+        assertThatThrownBy(() -> service.approve(requestId, "proof.pdf", UUID.randomUUID(), "admin1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
     }

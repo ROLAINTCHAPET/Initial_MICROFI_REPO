@@ -1,12 +1,15 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
 import com.microfi.savings.service.ActivationCashLine;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.DenominationLineDto;
+import com.microfi.shared.dto.EndDayResponse;
 import com.microfi.shared.dto.ExportRequest;
+import com.microfi.shared.dto.ExportableSummaryResponse;
 import com.microfi.shared.dto.MiddlewareExportAck;
 import com.microfi.shared.dto.MiddlewareTransactionPostResult;
 import com.microfi.shared.dto.OfjAgentLineResponse;
@@ -16,6 +19,8 @@ import com.microfi.shared.dto.ReconcileRequest;
 import com.microfi.shared.dto.VarianceDebtResponse;
 import com.microfi.shared.dto.VarianceRequest;
 import com.microfi.transactions.domain.Collection;
+import com.microfi.transactions.domain.CollectionConfirmedBy;
+import com.microfi.transactions.domain.CollectionReconciliationStatus;
 import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.domain.OfjSession;
 import com.microfi.transactions.domain.OfjSessionStatus;
@@ -72,6 +77,8 @@ class OfjServiceTest {
     private ActivationDirectoryService activationDirectoryService;
     @Mock
     private ClientDirectoryService clientDirectoryService;
+    @Mock
+    private AuditService auditService;
 
     private OfjService ofjService;
 
@@ -84,7 +91,7 @@ class OfjServiceTest {
         MockitoAnnotations.openMocks(this);
         ofjService = new OfjService(ofjSessionRepository, ofjAgentLineRepository, ofjPhysicalDenomRepository,
                 varianceDebtRepository, exportBatchRepository, collectionRepository, cbsClientService, agentDirectoryService,
-                activationDirectoryService, clientDirectoryService);
+                activationDirectoryService, clientDirectoryService, auditService);
         when(ofjSessionRepository.save(any(OfjSession.class))).thenAnswer(inv -> inv.getArgument(0));
         when(ofjAgentLineRepository.save(any(OfjAgentLine.class))).thenAnswer(inv -> inv.getArgument(0));
         when(varianceDebtRepository.save(any(VarianceDebt.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -222,15 +229,13 @@ class OfjServiceTest {
      * Regression test for a bug caught by live testing: an agent who collected more cash after
      * their branch's session happened to auto-close (every agent known at the time balanced) had
      * no way to be reconciled again — the cashier's "pending" queue and the reconcile call itself
-     * both silently refused to acknowledge the new cash. Reopening is safe as long as nothing has
-     * been exported to the CBS yet (see {@link #reconcileRejectsWhenSessionAlreadyExported}).
+     * both silently refused to acknowledge the new cash.
      */
     @Test
     void reconcileReopensClosedSessionWhenNotYetExported() {
         OfjSession closed = openSession();
         closed.setStatus(OfjSessionStatus.CLOSED);
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
-        when(exportBatchRepository.findByOfjId(closed.getId())).thenReturn(Optional.empty());
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(closed.getId(), agentId)).thenReturn(Optional.empty());
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
 
@@ -242,18 +247,24 @@ class OfjServiceTest {
         assertThat(captor.getAllValues().stream().anyMatch(s -> s.getStatus() == OfjSessionStatus.OPEN)).isTrue();
     }
 
+    /**
+     * Export became per-collection-idempotent rather than session-final (see CollectionRepository's
+     * confirmed-and-unexported query), so reopening a CLOSED session that was already exported must
+     * now succeed unconditionally — an already-exported collection simply never gets reselected by
+     * a later export run regardless of how many times the session was reopened in between.
+     */
     @Test
-    void reconcileRejectsWhenSessionAlreadyExported() {
+    void reconcileReopensClosedSessionEvenWhenAlreadyExported() {
         OfjSession closed = openSession();
         closed.setStatus(OfjSessionStatus.CLOSED);
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
-        when(exportBatchRepository.findByOfjId(closed.getId())).thenReturn(Optional.of(
-                com.microfi.transactions.domain.ExportBatch.builder().id(UUID.randomUUID()).ofjId(closed.getId())
-                        .fileUri("export/x.csv").format("CSV").build()));
+        when(ofjAgentLineRepository.findByOfjIdAndAgentId(closed.getId(), agentId)).thenReturn(Optional.empty());
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
 
-        assertThatThrownBy(() -> ofjService.reconcile(branchId, reconcileRequest(5000, 1)))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("409");
+        OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
+
+        assertThat(response.getPhysicalTotalXaf()).isEqualTo(5000);
+        verify(exportBatchRepository, org.mockito.Mockito.never()).findByOfjId(any());
     }
 
     @Test
@@ -287,8 +298,14 @@ class OfjServiceTest {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
-        when(exportBatchRepository.findByOfjId(session.getId())).thenReturn(Optional.empty());
-        when(collectionRepository.findByReconciledInLineIdIn(any())).thenReturn(List.of());
+        UUID clientId = UUID.randomUUID();
+        Collection confirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(5000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(resolvedLine.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of(confirmed));
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString()))
+                .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
         when(cbsClientService.submitDailyExport(any(), anyString(), anyString()))
                 .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-AUTO").build()));
         when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -311,8 +328,7 @@ class OfjServiceTest {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
-        when(exportBatchRepository.findByOfjId(session.getId())).thenReturn(Optional.empty());
-        when(collectionRepository.findByReconciledInLineIdIn(any()))
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(any(), any()))
                 .thenThrow(new RuntimeException("CBS unreachable"));
 
         OfjAgentLineResponse response = ofjService.reconcile(branchId, reconcileRequest(5000, 1));
@@ -321,8 +337,13 @@ class OfjServiceTest {
         org.mockito.Mockito.verify(exportBatchRepository, org.mockito.Mockito.never()).save(any());
     }
 
+    /**
+     * Export is now per-collection-idempotent instead of session-final: a session that was already
+     * exported still triggers another auto-export attempt on close, but it's a harmless no-op
+     * because nothing confirmed-and-unexported remains — no CBS call, no new ExportBatch row.
+     */
     @Test
-    void autoExportSkipsWhenSessionAlreadyExported() {
+    void autoExportSkipsWhenNothingNewToExport() {
         OfjSession session = openSession();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
         when(ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), agentId)).thenReturn(Optional.empty());
@@ -330,13 +351,11 @@ class OfjServiceTest {
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         OfjAgentLine resolvedLine = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId).deltaXaf(0).build();
         when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(resolvedLine));
-        when(exportBatchRepository.findByOfjId(session.getId())).thenReturn(Optional.of(
-                com.microfi.transactions.domain.ExportBatch.builder().id(UUID.randomUUID()).ofjId(session.getId())
-                        .fileUri("export/x.csv").format("CSV").build()));
 
         ofjService.reconcile(branchId, reconcileRequest(5000, 1));
 
         verify(cbsClientService, org.mockito.Mockito.never()).submitDailyExport(any(), anyString(), anyString());
+        verify(exportBatchRepository, org.mockito.Mockito.never()).save(any());
     }
 
     /**
@@ -444,6 +463,17 @@ class OfjServiceTest {
     void exportSucceedsForClosedSession() {
         OfjSession closed = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.CLOSED).build();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
+        UUID clientId = UUID.randomUUID();
+        Collection confirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(2000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(line.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of(confirmed));
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString()))
+                .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
         when(cbsClientService.submitDailyExport(any(), anyString(), anyString()))
                 .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-1").build()));
         when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -454,19 +484,64 @@ class OfjServiceTest {
         assertThat(response.getFormat()).isEqualTo("CSV");
     }
 
+    /**
+     * Export is no longer "one-shot per session, reject the second attempt" — it's per-collection-
+     * idempotent, so a re-run with nothing new confirmed-and-unexported must fail with a
+     * "nothing new to export" 409, not the old "already exported" one, and must never re-post.
+     */
     @Test
-    void exportRejectsWhenSessionAlreadyExported() {
+    void exportRejectsWhenNothingNewToExport() {
         OfjSession closed = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.CLOSED).build();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
-        when(exportBatchRepository.findByOfjId(closed.getId())).thenReturn(Optional.of(
-                com.microfi.transactions.domain.ExportBatch.builder().id(UUID.randomUUID()).ofjId(closed.getId())
-                        .fileUri("export/x.csv").format("CSV").build()));
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of());
 
         assertThatThrownBy(() -> ofjService.exportDaily(branchId, new ExportRequest()))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
 
         verify(cbsClientService, org.mockito.Mockito.never()).submitDailyExport(any(), anyString(), anyString());
+    }
+
+    /**
+     * A merely-reconciled-but-not-yet-agent-confirmed collection must never reach the CBS — export
+     * now requires both the cashier's physical count AND the agent's own sign-off.
+     */
+    @Test
+    void exportSkipsCollectionsStillAwaitingAgentConfirmation() {
+        OfjSession closed = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.CLOSED).build();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
+        // A still-PENDING_AGENT_CONFIRMATION collection simply never matches the CONFIRMED-only
+        // query below — nothing stubbed for it means the default empty list, i.e. it's excluded.
+
+        assertThatThrownBy(() -> ofjService.exportDaily(branchId, new ExportRequest()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+
+        verify(cbsClientService, org.mockito.Mockito.never()).postTransactions(any(), anyString());
+    }
+
+    /** An already-exported collection must never be posted a second time on a repeated export run. */
+    @Test
+    void exportNeverDoublePostsAnAlreadyExportedCollection() {
+        OfjSession closed = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.CLOSED).build();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
+        // The confirmed-and-unexported query itself is what enforces this — an already-exported
+        // collection simply never matches it (exportedAt IS NULL), so it's never even a candidate.
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(line.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> ofjService.exportDaily(branchId, new ExportRequest()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+
+        verify(cbsClientService, org.mockito.Mockito.never()).postTransactions(any(), anyString());
     }
 
     /**
@@ -485,11 +560,12 @@ class OfjServiceTest {
 
         UUID clientId = UUID.randomUUID();
         Collection collection = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
-                .amountXaf(2000L).collectedAt(Instant.now()).build();
+                .amountXaf(2000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
         OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
-        when(collectionRepository.findByReconciledInLineIdIn(List.of(line.getId()))).thenReturn(List.of(collection));
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(line.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of(collection));
         when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
         when(cbsClientService.postTransactions(any(), anyString()))
                 .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
@@ -499,19 +575,17 @@ class OfjServiceTest {
         verify(cbsClientService, times(1)).postTransactions(any(), anyString());
     }
 
-    /** A branch with no collections that day must not call the middleware with an empty/@NotEmpty-violating list. */
+    /** A branch with no collections that day must not call the middleware with an empty/@NotEmpty-violating list, and must correctly report nothing new to export. */
     @Test
     void exportSkipsLedgerPostingWhenNoCollections() {
         OfjSession closed = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.CLOSED).build();
         when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(closed));
-        when(cbsClientService.submitDailyExport(any(), anyString(), anyString()))
-                .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-1").build()));
-        when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of());
-        when(collectionRepository.findByReconciledInLineIdIn(any())).thenReturn(List.of());
 
-        ofjService.exportDaily(branchId, new ExportRequest());
+        assertThatThrownBy(() -> ofjService.exportDaily(branchId, new ExportRequest()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
 
         verify(cbsClientService, times(0)).postTransactions(any(), anyString());
     }
@@ -534,7 +608,8 @@ class OfjServiceTest {
         OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(closed.getId()).agentId(agentId).deltaXaf(0).build();
         when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
         when(ofjAgentLineRepository.findByOfjId(closed.getId())).thenReturn(List.of(line));
-        when(collectionRepository.findByReconciledInLineIdIn(List.of(line.getId()))).thenReturn(List.of());
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(line.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of());
         when(activationDirectoryService.findByReconciledInLineIds(List.of(line.getId())))
                 .thenReturn(List.of(new ActivationCashLine(UUID.randomUUID(), clientId, 1000L, Instant.now())));
         when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-ACT-1");
@@ -797,6 +872,53 @@ class OfjServiceTest {
         assertThatThrownBy(() -> ofjService.listCollectionsForLine(agentId, lineId))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+    }
+
+    // ── Agent "End My Day" ───────────────────────────────────────────────────────────────────
+
+    @Test
+    void exportForAgentPostsOnlyThatAgentsConfirmedUnexportedCollections() {
+        UUID clientId = UUID.randomUUID();
+        Collection confirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(3000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(List.of(confirmed));
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString()))
+                .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
+
+        EndDayResponse response = ofjService.exportForAgent(agentId);
+
+        assertThat(response.getExportedCount()).isEqualTo(1);
+        assertThat(response.getExportedTotalXaf()).isEqualTo(3000L);
+        assertThat(confirmed.getExportedAt()).isNotNull();
+        assertThat(confirmed.getCbsTransactionRef()).isEqualTo("CBSTX-1");
+        // No file/ExportBatch artifact for a single agent's own push — see OfjService#exportForAgent's doc.
+        verify(exportBatchRepository, org.mockito.Mockito.never()).save(any());
+        verify(cbsClientService, org.mockito.Mockito.never()).submitDailyExport(any(), anyString(), anyString());
+    }
+
+    @Test
+    void exportForAgentConflictWhenNothingReady() {
+        when(collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> ofjService.exportForAgent(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void exportableSummaryReflectsConfirmedUnexportedCount() {
+        when(collectionRepository.countByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(2L);
+        when(collectionRepository.sumByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED)).thenReturn(9000L);
+
+        ExportableSummaryResponse summary = ofjService.getExportableSummary(agentId);
+
+        assertThat(summary.getReadyCount()).isEqualTo(2L);
+        assertThat(summary.getReadyTotalXaf()).isEqualTo(9000L);
     }
 
     @Test

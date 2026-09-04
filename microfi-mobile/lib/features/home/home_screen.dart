@@ -67,6 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Timer? _rejectionDecisionPollTimer;
 
+  int _exportableCount = 0;
+  int _exportableTotalXaf = 0;
+  Timer? _exportablePollTimer;
+  bool _endingDay = false;
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _noticePollTimer?.cancel();
     _confirmationPollTimer?.cancel();
     _rejectionDecisionPollTimer?.cancel();
+    _exportablePollTimer?.cancel();
     super.dispose();
   }
 
@@ -122,6 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _confirmationPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPendingConfirmations());
       _checkRejectionDecisions();
       _rejectionDecisionPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkRejectionDecisions());
+      _checkExportable();
+      _exportablePollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkExportable());
       if (pending.isNotEmpty && await ConnectivityService.instance.isOnline()) _syncNow();
     } catch (e) {
       if (!mounted) return;
@@ -370,6 +378,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Backs the "End My Day" banner: confirmed cash sits unexported until this agent pushes it
+  // themselves, the branch's session closes, or the scheduled closing-time job catches it — this
+  // just tells the agent there's something ready right now, same polling reasoning as everything
+  // else on this screen.
+  Future<void> _checkExportable() async {
+    if (_profile == null) return;
+    try {
+      final summary = await ReconciliationRepository(widget.token).fetchExportableSummary();
+      if (!mounted) return;
+      setState(() {
+        _exportableCount = summary.readyCount;
+        _exportableTotalXaf = summary.readyTotalXaf;
+      });
+    } catch (_) {
+      // Best-effort — silently retried on the next poll/screen load.
+    }
+  }
+
+  Future<void> _endMyDay() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(l10n.hsEndDayConfirmDialogTitle),
+        content: Text(l10n.hsEndDayConfirmDialogMessage(_exportableCount, _fmt(_exportableTotalXaf))),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.hsEndDayButton)),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _endingDay = true);
+    try {
+      final result = await ReconciliationRepository(widget.token).endMyDay();
+      if (!mounted) return;
+      await showSuccessDialog(context, l10n.hsEndDaySuccess(result.exportedCount, _fmt(result.exportedTotalXaf)));
+      _checkExportable();
+    } catch (e) {
+      if (!mounted) return;
+      await showErrorDialog(context, e, title: l10n.hsEndDayFailed);
+    } finally {
+      if (mounted) setState(() => _endingDay = false);
+    }
+  }
+
+  String _fmt(int value) {
+    final s = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(s[i]);
+    }
+    return buffer.toString();
+  }
+
   void _openPendingConfirmations() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => ReconciliationConfirmScreen(token: widget.token)))
@@ -456,6 +521,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (_pendingConfirmationCount > 0) ...[
             _PendingConfirmationBanner(count: _pendingConfirmationCount, onTap: _openPendingConfirmations),
+            const SizedBox(height: MicrofiSpacing.gapLg),
+          ],
+          if (_exportableCount > 0) ...[
+            _EndDayBanner(count: _exportableCount, totalXaf: _exportableTotalXaf, sending: _endingDay, onTap: _endingDay ? null : _endMyDay),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_pendingCount > 0) ...[
@@ -817,6 +886,59 @@ class _PendingConfirmationBanner extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Confirmed cash sitting unexported until this agent pushes it themselves — the tap triggers the
+/// push directly (behind a confirm dialog, see HomeScreen._endMyDay), it doesn't navigate anywhere.
+class _EndDayBanner extends StatelessWidget {
+  final int count;
+  final int totalXaf;
+  final bool sending;
+  final VoidCallback? onTap;
+
+  const _EndDayBanner({required this.count, required this.totalXaf, required this.sending, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: MicrofiColors.secondaryFixed,
+          borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_upload_outlined, color: MicrofiColors.onSecondaryFixedVariant, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.hsEndDayBanner(count, _fmt(totalXaf)),
+                style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onSecondaryFixedVariant, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (sending)
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: MicrofiColors.onSecondaryFixedVariant))
+            else
+              const Icon(Icons.chevron_right, color: MicrofiColors.onSecondaryFixedVariant, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmt(int value) {
+    final s = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(s[i]);
+    }
+    return buffer.toString();
   }
 }
 

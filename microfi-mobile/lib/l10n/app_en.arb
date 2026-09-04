@@ -241,6 +241,27 @@
   "@hsRejectionApprovedMessage": {"description": "Home screen — SnackBar shown when a manager/admin approves this agent's collection-rejection request."},
   "hsRejectionDeniedMessage": "Your request to void a collection was denied: {reason}",
   "@hsRejectionDeniedMessage": {"description": "Home screen — SnackBar shown when a manager/admin denies this agent's collection-rejection request.", "placeholders": {"reason": {"type": "String"}}},
+  "hsEndDayBanner": "{count} confirmed collection(s) ready to export ({total} XAF)",
+  "@hsEndDayBanner": {
+    "description": "Home screen — tappable banner shown when the agent has confirmed-but-unexported cash ready to push via End My Day.",
+    "placeholders": {"count": {"type": "int"}, "total": {"type": "String"}}
+  },
+  "hsEndDayButton": "End My Day",
+  "@hsEndDayButton": {"description": "Home screen — confirm-dialog action button and general label for the End My Day action."},
+  "hsEndDayConfirmDialogTitle": "End My Day?",
+  "@hsEndDayConfirmDialogTitle": {"description": "Home screen — End My Day confirmation dialog title."},
+  "hsEndDayConfirmDialogMessage": "Push {count} confirmed collection(s) totaling {total} XAF to the CBS now?",
+  "@hsEndDayConfirmDialogMessage": {
+    "description": "Home screen — End My Day confirmation dialog message.",
+    "placeholders": {"count": {"type": "int"}, "total": {"type": "String"}}
+  },
+  "hsEndDaySuccess": "{count} collection(s) totaling {total} XAF were sent to the CBS.",
+  "@hsEndDaySuccess": {
+    "description": "Home screen — success dialog message after End My Day completes.",
+    "placeholders": {"count": {"type": "int"}, "total": {"type": "String"}}
+  },
+  "hsEndDayFailed": "Unable to end your day",
+  "@hsEndDayFailed": {"description": "Home screen — error dialog title when End My Day fails."},
   "hsNewCollection": "New Collection",
   "@hsNewCollection": {"description": "Home screen — primary CTA button to start a new collection."},
   "hsMyRoute": "My Route",

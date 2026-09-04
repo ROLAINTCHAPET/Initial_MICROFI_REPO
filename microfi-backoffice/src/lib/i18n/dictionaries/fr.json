@@ -448,7 +448,7 @@
       "noActivity": "Aucune activité d'agent enregistrée pour cette session pour le moment."
     },
     "history": {
-      "colResolved": "Résolu",
+      "colResolved": "Statut",
       "colBusinessDate": "Date d'exercice",
       "noSessions": "Aucune session de fin de journée passée pour cette agence pour le moment."
     },
@@ -793,6 +793,9 @@
       "COLLECTION_REJECTION_REQUESTED": "Demande de rejet d'encaissement",
       "COLLECTION_REJECTION_APPROVED": "Rejet d'encaissement approuvé",
       "COLLECTION_REJECTION_DENIED": "Rejet d'encaissement refusé",
+      "COLLECTION_REJECTION_SIBLINGS_REQUEUED": "Ligne de réconciliation remise en attente",
+      "OFJ_EXPORT_SUBMITTED": "Export CBS soumis",
+      "AGENT_END_OF_DAY_EXPORT": "Export de fin de journée de l'agent",
       "REGISTRATION_APPROVED": "Inscription approuvée",
       "REGISTRATION_REJECTED": "Inscription rejetée",
       "SOS_ACKNOWLEDGED": "Alerte SOS accusée réception",
@@ -833,6 +836,9 @@
       "COLLECTION_REJECTION_REQUESTED_DETAIL": "Motif : {param1}",
       "COLLECTION_REJECTION_APPROVED_DETAIL": "Encaissement annulé ; justificatif au dossier",
       "COLLECTION_REJECTION_DENIED_DETAIL": "Motif : {param1}",
+      "COLLECTION_REJECTION_SIBLINGS_REQUEUED_DETAIL": "{param1} encaissement(s) associé(s) totalisant {param2} XAF remis en attente de réconciliation",
+      "OFJ_EXPORT_SUBMITTED_DETAIL": "Déclencheur : {param1}, {param2} ligne(s) transmise(s)",
+      "AGENT_END_OF_DAY_EXPORT_DETAIL": "{param1} encaissement(s) totalisant {param2} XAF transmis au CBS",
       "REGISTRATION_APPROVED_DETAIL": "Demande d'inscription approuvée pour {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Demande d'inscription rejetée pour {param1}, motif : {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Paiement d'activation en espèces enregistré pour le client, statut : {param1}, référence : {param2}",

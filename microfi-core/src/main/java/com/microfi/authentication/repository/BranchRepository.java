@@ -18,4 +18,7 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
      * refresh.
      */
     List<Branch> findAllByOrderByNameAsc();
+
+    /** OfjClosingTimeExportJob: only branches with both fields actually configured have a meaningful "closing time" to trigger export on. */
+    List<Branch> findByCloseTimeIsNotNullAndTimezoneIsNotNull();
 }

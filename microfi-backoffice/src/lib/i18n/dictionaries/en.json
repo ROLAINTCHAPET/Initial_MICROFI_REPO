@@ -448,7 +448,7 @@
       "noActivity": "No agent activity recorded for this session yet."
     },
     "history": {
-      "colResolved": "Resolved",
+      "colResolved": "Status",
       "colBusinessDate": "Business Date",
       "noSessions": "No past End of Day sessions for this branch yet."
     },
@@ -793,6 +793,9 @@
       "COLLECTION_REJECTION_REQUESTED": "Collection Rejection Requested",
       "COLLECTION_REJECTION_APPROVED": "Collection Rejection Approved",
       "COLLECTION_REJECTION_DENIED": "Collection Rejection Denied",
+      "COLLECTION_REJECTION_SIBLINGS_REQUEUED": "Reconciliation Line Requeued",
+      "OFJ_EXPORT_SUBMITTED": "CBS Export Submitted",
+      "AGENT_END_OF_DAY_EXPORT": "Agent End-of-Day Export",
       "REGISTRATION_APPROVED": "Registration Approved",
       "REGISTRATION_REJECTED": "Registration Rejected",
       "SOS_ACKNOWLEDGED": "SOS Acknowledged",
@@ -833,6 +836,9 @@
       "COLLECTION_REJECTION_REQUESTED_DETAIL": "Reason: {param1}",
       "COLLECTION_REJECTION_APPROVED_DETAIL": "Collection voided; proof on file",
       "COLLECTION_REJECTION_DENIED_DETAIL": "Reason: {param1}",
+      "COLLECTION_REJECTION_SIBLINGS_REQUEUED_DETAIL": "{param1} sibling collection(s) totaling {param2} XAF sent back to the pending queue",
+      "OFJ_EXPORT_SUBMITTED_DETAIL": "Trigger: {param1}, {param2} line(s) posted",
+      "AGENT_END_OF_DAY_EXPORT_DETAIL": "{param1} collection(s) totaling {param2} XAF pushed to the CBS",
       "REGISTRATION_APPROVED_DETAIL": "Registration application approved for {param1} ({param2})",
       "REGISTRATION_REJECTED_DETAIL": "Registration application rejected for {param1}, reason: {param2}",
       "CLIENT_ACTIVATION_SPONSORED_DETAIL": "Activation cash payment registered for client, status: {param1}, reference: {param2}",

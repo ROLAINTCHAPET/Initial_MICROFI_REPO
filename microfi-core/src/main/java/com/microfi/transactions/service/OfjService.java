@@ -1,13 +1,20 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
+import com.microfi.savings.service.ActivationCashLine;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.DenominationLineDto;
+import com.microfi.shared.dto.EndDayResponse;
 import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
+import com.microfi.shared.dto.ExportableSummaryResponse;
 import com.microfi.shared.dto.MiddlewareCollectionLine;
 import com.microfi.shared.dto.MiddlewareExportAck;
 import com.microfi.shared.dto.MiddlewareTransactionPostResult;
@@ -21,6 +28,7 @@ import com.microfi.shared.dto.VarianceRequest;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionReconciliationStatus;
 import com.microfi.transactions.domain.ExportBatch;
+import com.microfi.transactions.domain.ExportTrigger;
 import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.domain.OfjPhysicalDenom;
 import com.microfi.transactions.domain.OfjSession;
@@ -47,6 +55,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -72,6 +81,7 @@ public class OfjService {
     private final AgentDirectoryService agentDirectoryService;
     private final ActivationDirectoryService activationDirectoryService;
     private final ClientDirectoryService clientDirectoryService;
+    private final AuditService auditService;
 
     public OfjSummaryResponse getSummary(UUID branchId) {
         return toSummary(getOrCreateSession(branchId));
@@ -165,13 +175,11 @@ public class OfjService {
         OfjSession session = getOrCreateSession(branchId);
         if (session.getStatus() == OfjSessionStatus.CLOSED) {
             // "Closed" only ever meant "every agent known at the time balanced" (maybeCloseSession)
-            // — nothing stops an agent from collecting more afterward. Reopening is safe as long as
-            // nothing has been exported to the CBS yet; once it has, that day's numbers are final
-            // and new cash belongs to whatever session covers it going forward.
-            if (exportBatchRepository.findByOfjId(session.getId()).isPresent()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "OFJ session already exported for this branch/day. Cash recorded afterward can't be added to it");
-            }
+            // — nothing stops an agent from collecting more afterward. Reopening is always safe now
+            // that export is per-collection-idempotent rather than session-final (see
+            // CollectionRepository's confirmed-and-unexported query): an already-exported
+            // collection simply never gets selected again by a later export run, whether the
+            // session was ever reopened in between or not.
             session.setStatus(OfjSessionStatus.OPEN);
             session.setClosedAt(null);
             ofjSessionRepository.save(session);
@@ -368,27 +376,71 @@ public class OfjService {
                 .filter(s -> s.getStatus() == OfjSessionStatus.CLOSED)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
                         "No closed OFJ session for branch " + branchId + " on " + today + " (BR-Export-01)"));
-        if (exportBatchRepository.findByOfjId(session.getId()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "This session was already exported. See the automatic export triggered when it closed");
-        }
 
         String format = (request.getFormat() == null || request.getFormat().isBlank()) ? "CSV" : request.getFormat();
         // Blocking on the middleware call is safe here: this method always runs on the
         // boundedElastic worker the controller dispatches it to, never on the Netty event loop.
-        ExportBatch batch = doExport(branchId, session, format);
-        return toExportResponse(batch);
+        return doExport(branchId, session, format, ExportTrigger.MANUAL)
+                .map(this::toExportResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Nothing new to export — every reconciled-and-confirmed collection for this session was already posted"));
+    }
+
+    /**
+     * An agent pushing their own confirmed-but-unexported cash to the CBS immediately, without
+     * waiting for the rest of the branch to balance or for the session to close — see
+     * CollectionRepository#findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull's
+     * doc. Deliberately posts straight to the ledger with no {@link ExportBatch}/file record: a
+     * single agent's slice of the day isn't "the day's export file" in the FR-18 sense, and these
+     * collections are simply skipped (already {@code exportedAt}-stamped) by whichever real
+     * session-level export run covers the rest of the branch later.
+     */
+    public EndDayResponse exportForAgent(UUID agentId) {
+        List<Collection> exportable = collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                agentId, CollectionReconciliationStatus.CONFIRMED);
+        if (exportable.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing confirmed and unexported to export yet");
+        }
+        long totalXaf = exportable.stream().mapToLong(Collection::getAmountXaf).sum();
+        int posted = postToLedger(exportable, List.of(), "ofj-end-my-day-" + agentId);
+        return EndDayResponse.builder().exportedCount(posted).exportedTotalXaf(totalXaf).build();
+    }
+
+    /** How much confirmed-but-unexported cash this agent has ready to push via {@link #exportForAgent} — backs the mobile "End My Day" banner. */
+    public ExportableSummaryResponse getExportableSummary(UUID agentId) {
+        return ExportableSummaryResponse.builder()
+                .readyCount(collectionRepository.countByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                        agentId, CollectionReconciliationStatus.CONFIRMED))
+                .readyTotalXaf(collectionRepository.sumByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                        agentId, CollectionReconciliationStatus.CONFIRMED))
+                .build();
+    }
+
+    /**
+     * OfjClosingTimeExportJob's entry point: sweeps whatever's confirmed-and-unexported for this
+     * branch's session, regardless of session status — deliberately NOT {@link #exportDaily}, since
+     * the whole point is catching a branch where one agent hasn't balanced yet (session still
+     * {@code OPEN}) but another agent's confirmed cash is sitting unexported.
+     */
+    public void runScheduledClosingExport(OfjSession session) {
+        doExport(session.getBranchId(), session, "CSV", ExportTrigger.SCHEDULED_CLOSING_TIME);
     }
 
     /**
      * The actual CBS posting + export-file bookkeeping, shared by the manual {@link #exportDaily}
-     * endpoint and {@link #maybeCloseSession}'s automatic trigger — a client's balance/history is
-     * entirely CBS-driven (savings.ClientSelfService), so without this, "reconciled" cash would
-     * sit invisible to the client until someone remembered to click Export separately.
+     * endpoint, {@link #maybeCloseSession}'s automatic trigger, and the scheduled closing-time job.
+     * Returns empty when nothing was actually newly posted (repeated runs over an
+     * already-exported session are expected and harmless — see the confirmed-and-unexported
+     * query — so this deliberately doesn't create an empty {@link ExportBatch} row every time a
+     * re-run finds nothing pending).
      */
-    private ExportBatch doExport(UUID branchId, OfjSession session, String format) {
+    private Optional<ExportBatch> doExport(UUID branchId, OfjSession session, String format, ExportTrigger trigger) {
+        int posted = postCollectionsToLedger(branchId, session);
+        if (posted == 0) {
+            return Optional.empty();
+        }
+
         String fileUri = "export/" + branchId + "/" + session.getBusinessDate() + "." + format.toLowerCase();
-        postCollectionsToLedger(branchId, session);
         MiddlewareExportAck ack = cbsClientService.submitDailyExport(branchId, fileUri, format).block();
 
         ExportBatch batch = ExportBatch.builder()
@@ -396,24 +448,35 @@ public class OfjService {
                 .ofjId(session.getId())
                 .fileUri(fileUri)
                 .format(format)
+                .trigger(trigger)
                 .ackStatus(ack != null && ack.isAcknowledged() ? "ACKNOWLEDGED:" + ack.getAckReference() : "FAILED")
                 .build();
         exportBatchRepository.save(batch);
-        return batch;
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.FINANCIAL)
+                .eventType("OFJ_EXPORT_SUBMITTED")
+                .actorType(trigger == ExportTrigger.MANUAL ? AuditActorType.ADMIN : AuditActorType.SYSTEM)
+                .actorLabel(trigger == ExportTrigger.MANUAL ? "Back-Office" : "SYSTEM")
+                .branchId(branchId)
+                .detailsKey("OFJ_EXPORT_SUBMITTED_DETAIL")
+                .detailsParam1(trigger.name())
+                .detailsParam2(String.valueOf(posted))
+                .build());
+        return Optional.of(batch);
     }
 
     /**
-     * Posts the branch's closed-session cash — both regular {@link Collection} deposits and
-     * finalized UC-19 activation fees ({@code ActivationPayment}, real cash the same as a
+     * Posts the branch's confirmed-and-unexported cash — both regular {@link Collection} deposits
+     * and finalized UC-19 activation fees ({@code ActivationPayment}, real cash the same as a
      * Collection, see {@link ActivationDirectoryService}) — to the CBS ledger, so the mock (and
      * any real adapter) genuinely reflects what clients contributed/paid rather than
-     * {@code getBalance}/{@code getHistory} being disconnected from real activity. Idempotency-keyed
-     * on the session id so a retried export never double-posts the same day's cash.
+     * {@code getBalance}/{@code getHistory} being disconnected from real activity. Returns how many
+     * lines were actually posted (0 if there was nothing new).
      */
-    private void postCollectionsToLedger(UUID branchId, OfjSession session) {
+    private int postCollectionsToLedger(UUID branchId, OfjSession session) {
         List<UUID> activeAgentIds = agentDirectoryService.findActiveAgentIdsByBranch(branchId);
         if (activeAgentIds.isEmpty()) {
-            return;
+            return 0;
         }
 
         // Posts exactly what THIS session's lines actually reconciled, not "whatever has a
@@ -422,12 +485,19 @@ public class OfjService {
         // silently never post it even though reconcile() already counted it in digitalTotalXaf.
         List<UUID> lineIds = ofjAgentLineRepository.findByOfjId(session.getId()).stream().map(OfjAgentLine::getId).toList();
 
-        // Voided collections (see CollectionRejectionRequest) are excluded even if they were
-        // already swept into a line before the rejection was approved — nothing voided should
-        // ever reach the CBS, whether or not it happened to still be sitting in this batch.
-        List<Collection> collections = collectionRepository.findByReconciledInLineIdIn(lineIds).stream()
-                .filter(c -> c.getVoidedAt() == null)
-                .toList();
+        List<Collection> collections = collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                lineIds, CollectionReconciliationStatus.CONFIRMED);
+        List<ActivationCashLine> activationLines = activationDirectoryService.findByReconciledInLineIds(lineIds);
+        return postToLedger(collections, activationLines, "ofj-export-" + session.getId());
+    }
+
+    /**
+     * The shared CBS-posting core both {@link #postCollectionsToLedger} (whole-session) and
+     * {@link #exportForAgent} (one agent's own cash) call, so both stamp {@code exportedAt}/
+     * {@code cbsTransactionRef} identically instead of duplicating the posting logic. Returns how
+     * many lines were actually posted.
+     */
+    private int postToLedger(List<Collection> collections, List<ActivationCashLine> activationLines, String idempotencyKey) {
         List<MiddlewareCollectionLine> lines = new ArrayList<>(collections.stream()
                 .map(collection -> MiddlewareCollectionLine.builder()
                         .collectionId(collection.getId())
@@ -436,10 +506,10 @@ public class OfjService {
                         .collectedAt(collection.getCollectedAt())
                         .build())
                 .toList());
-        // Collections occupy the front of `lines` (see the loop below, which only walks the first
-        // collections.size() posted references) — activation payments are appended after and have
-        // no equivalent exportedAt/cbsTransactionRef tracking today (out of this feature's scope).
-        activationDirectoryService.findByReconciledInLineIds(lineIds).stream()
+        // Collections occupy the front of `lines` (see the loop below, which walks collections
+        // first, then activationLines) — activation payments get their own exportedAt/cbsTransactionRef
+        // stamped the same way via ActivationDirectoryService#markExported.
+        activationLines.stream()
                 .map(payment -> MiddlewareCollectionLine.builder()
                         .collectionId(payment.id())
                         .memberId(clientDirectoryService.findCbsRef(payment.clientId()))
@@ -449,31 +519,39 @@ public class OfjService {
                 .forEach(lines::add);
 
         if (lines.isEmpty()) {
-            return;
+            return 0;
         }
 
-        MiddlewareTransactionPostResult result = cbsClientService.postTransactions(lines, "ofj-export-" + session.getId())
-                .doOnError(e -> log.error("Failed to post branch {} cash to CBS ledger for session {}: {}",
-                        branchId, session.getId(), e.getMessage()))
+        MiddlewareTransactionPostResult result = cbsClientService.postTransactions(lines, idempotencyKey)
+                .doOnError(e -> log.error("Failed to post cash to CBS ledger for {}: {}", idempotencyKey, e.getMessage()))
                 .onErrorComplete()
                 .block();
 
-        // Positional correlation with `collections`, not a returned id — MiddlewareTransactionPostResult
-        // only carries a flat list of reference strings, in the same order the lines were sent
-        // (confirmed against MockCbsAdapter#postTransactions). This is only as reliable as that
-        // ordering guarantee holds for whatever adapter is active; a real vendor adapter that
-        // doesn't preserve order would need this DTO to carry an explicit collectionId<->reference
-        // mapping instead.
-        if (result != null && result.isSuccess() && result.getPostedReferences() != null) {
-            Instant exportedAt = Instant.now();
-            List<String> refs = result.getPostedReferences();
-            for (int i = 0; i < collections.size() && i < refs.size(); i++) {
-                Collection collection = collections.get(i);
-                collection.setExportedAt(exportedAt);
-                collection.setCbsTransactionRef(refs.get(i));
-                collectionRepository.save(collection);
-            }
+        // Positional correlation with `collections`/`activationLines`, not a returned id —
+        // MiddlewareTransactionPostResult only carries a flat list of reference strings, in the
+        // same order the lines were sent (confirmed against MockCbsAdapter#postTransactions). This
+        // is only as reliable as that ordering guarantee holds for whatever adapter is active; a
+        // real vendor adapter that doesn't preserve order would need this DTO to carry an explicit
+        // collectionId<->reference mapping instead.
+        if (result == null || !result.isSuccess() || result.getPostedReferences() == null) {
+            return 0;
         }
+        Instant exportedAt = Instant.now();
+        List<String> refs = result.getPostedReferences();
+        int posted = 0;
+        for (int i = 0; i < collections.size() && i < refs.size(); i++) {
+            Collection collection = collections.get(i);
+            collection.setExportedAt(exportedAt);
+            collection.setCbsTransactionRef(refs.get(i));
+            collectionRepository.save(collection);
+            posted++;
+        }
+        for (int i = collections.size(); i < collections.size() + activationLines.size() && i < refs.size(); i++) {
+            ActivationCashLine payment = activationLines.get(i - collections.size());
+            activationDirectoryService.markExported(payment.id(), exportedAt, refs.get(i));
+            posted++;
+        }
+        return posted;
     }
 
     private OfjSession getOrCreateSession(UUID branchId) {
@@ -543,11 +621,8 @@ public class OfjService {
      * {@link #exportDaily} endpoint stays available to retry once the CBS is reachable again.
      */
     private void autoExportOnClose(OfjSession session) {
-        if (exportBatchRepository.findByOfjId(session.getId()).isPresent()) {
-            return;
-        }
         try {
-            doExport(session.getBranchId(), session, "CSV");
+            doExport(session.getBranchId(), session, "CSV", ExportTrigger.AUTO_ON_CLOSE);
         } catch (Exception e) {
             log.error("Automatic CBS export failed for branch {} session {}: {} — retry via POST /ofj/{}/export",
                     session.getBranchId(), session.getId(), e.getMessage(), session.getBranchId());

@@ -1,9 +1,15 @@
 package com.microfi.transactions.service;
 
+import com.microfi.audit.domain.AuditActorType;
+import com.microfi.audit.domain.AuditCategory;
+import com.microfi.audit.service.AuditLogEntry;
+import com.microfi.audit.service.AuditService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
 import com.microfi.notifications.gateway.SmsGatewayFactory;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
+import com.microfi.transactions.domain.CollectionReconciliationStatus;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionStatus;
 import com.microfi.transactions.domain.OfjAgentLine;
@@ -41,6 +47,8 @@ public class CollectionRejectionService {
     private final ClientDirectoryService clientDirectoryService;
     private final CbsClientService cbsClientService;
     private final SmsGatewayFactory smsGatewayFactory;
+    private final AgentDirectoryService agentDirectoryService;
+    private final AuditService auditService;
 
     public CollectionRejectionRequest requestRejection(UUID agentId, UUID collectionId, String reason) {
         Collection collection = requireCollection(collectionId);
@@ -70,7 +78,7 @@ public class CollectionRejectionService {
      * collection still {@code PENDING_AGENT_CONFIRMATION}/{@code CONFIRMED}-but-not-yet-exported
      * was never posted anywhere the client could see, so there's nothing to reverse or explain.
      */
-    public CollectionRejectionRequest approve(UUID requestId, String proofPath, UUID reviewerId) {
+    public CollectionRejectionRequest approve(UUID requestId, String proofPath, UUID reviewerId, String reviewerLabel) {
         CollectionRejectionRequest request = requireOpenRequest(requestId);
         Collection collection = requireCollection(request.getCollectionId());
 
@@ -90,12 +98,14 @@ public class CollectionRejectionService {
         // cash that's since been voided, whether the agent had already confirmed it or was still
         // waiting to (pendingConfirmationCount is filtered dynamically instead, since it's derived
         // fresh on every read rather than stored).
-        if (collection.getReconciledInLineId() != null) {
-            ofjAgentLineRepository.findById(collection.getReconciledInLineId()).ifPresent(line -> {
+        UUID originalLineId = collection.getReconciledInLineId();
+        if (originalLineId != null) {
+            ofjAgentLineRepository.findById(originalLineId).ifPresent(line -> {
                 line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) - collection.getAmountXaf());
                 line.setDigitalTotalXaf(line.getDigitalTotalXaf() - collection.getAmountXaf());
                 ofjAgentLineRepository.save(line);
             });
+            requeueUnexportedSiblings(originalLineId, collection.getAgentId(), reviewerId, reviewerLabel);
         }
 
         if (collection.getExportedAt() != null && collection.getCbsTransactionRef() != null) {
@@ -106,6 +116,61 @@ public class CollectionRejectionService {
 
     private static long nz(Long value) {
         return value == null ? 0L : value;
+    }
+
+    /**
+     * BR-Requeue-01: an approved rejection restarts reconciliation for the rest of the batch — the
+     * cashier's physical count no longer matches a digital total that includes an error, so the
+     * cashier redoes it fresh, exactly like a first-time reconciliation. Every sibling under the
+     * same {@code reconciledInLineId} that is neither voided nor already exported goes back to
+     * {@code UNRECONCILED} (clearing {@code reconciledInLineId}/{@code reconciliationStatus}/
+     * {@code reconciledAt}/{@code confirmedBy}), which also automatically re-occupies the agent's
+     * escrow ceiling — {@link CollectionRepository#sumUnreconciledByAgent} filters on {@code
+     * reconciledAt IS NULL}, nothing else to change there. Already-exported siblings are left
+     * completely untouched: that money is posted to the CBS and final regardless of a different
+     * sibling's error. Scoped to the WHOLE line, not "only the collections from the same physical
+     * sweep as the voided one" — {@code Collection} carries no per-sweep marker distinguishing one
+     * same-day cashier count from another reusing the same {@code OfjAgentLine} row (see
+     * {@code OfjService#reconcile}'s find-or-create), so there is no narrower boundary to reset to.
+     * The line's own {@code physicalTotalXaf}/{@code deltaXaf} are deliberately left untouched too
+     * — for the same "no per-sweep boundary" reason, there's no reliable way to know which portion
+     * of the physical count belongs to just this batch; the écart is expected to look off until the
+     * cashier's next physical count naturally corrects it.
+     */
+    private void requeueUnexportedSiblings(UUID lineId, UUID agentId, UUID reviewerId, String reviewerLabel) {
+        List<Collection> siblings = collectionRepository.findByReconciledInLineId(lineId).stream()
+                .filter(c -> c.getVoidedAt() == null && c.getExportedAt() == null)
+                .toList();
+        if (siblings.isEmpty()) {
+            return;
+        }
+        long resetAmountXaf = siblings.stream().mapToLong(Collection::getAmountXaf).sum();
+        for (Collection sibling : siblings) {
+            sibling.setReconciledInLineId(null);
+            sibling.setReconciliationStatus(CollectionReconciliationStatus.UNRECONCILED);
+            sibling.setReconciledAt(null);
+            sibling.setConfirmedBy(null);
+        }
+        collectionRepository.saveAll(siblings);
+
+        ofjAgentLineRepository.findById(lineId).ifPresent(line -> {
+            line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) - resetAmountXaf);
+            line.setDigitalTotalXaf(line.getDigitalTotalXaf() - resetAmountXaf);
+            ofjAgentLineRepository.save(line);
+        });
+
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.FINANCIAL)
+                .eventType("COLLECTION_REJECTION_SIBLINGS_REQUEUED")
+                .actorType(AuditActorType.ADMIN)
+                .actorId(reviewerId)
+                .actorLabel(reviewerLabel)
+                .branchId(agentDirectoryService.requireBranchIdForAgent(agentId))
+                .agentId(agentId)
+                .detailsKey("COLLECTION_REJECTION_SIBLINGS_REQUEUED_DETAIL")
+                .detailsParam1(String.valueOf(siblings.size()))
+                .detailsParam2(String.valueOf(resetAmountXaf))
+                .build());
     }
 
     public CollectionRejectionRequest deny(UUID requestId, String decisionReason, UUID reviewerId) {
