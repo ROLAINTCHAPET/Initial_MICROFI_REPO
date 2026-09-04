@@ -7,6 +7,8 @@ import type { ExportColumn, ExportMeta } from "@/lib/export";
 export interface CollectionRejectionExportRow {
   agentLabel: string;
   reason: string;
+  actualAmountXaf: number;
+  expectedAmountXaf: number | "";
   requestedAt: string;
   status: string;
   decisionReason: string;
@@ -29,6 +31,8 @@ export function CollectionRejectionsExportButtons({
   const columns: ExportColumn<CollectionRejectionExportRow>[] = [
     { header: dict.collectionRejections.colAgent, value: (r) => r.agentLabel },
     { header: dict.collectionRejections.colReason, value: (r) => r.reason },
+    { header: dict.collectionRejections.colAmount, value: (r) => r.actualAmountXaf },
+    { header: dict.collectionRejections.colExpectedAmount, value: (r) => r.expectedAmountXaf },
     { header: dict.collectionRejections.colRequestedAt, value: (r) => r.requestedAt },
     { header: dict.collectionRejections.colStatus, value: (r) => r.status },
     { header: dict.collectionRejections.colDecision, value: (r) => r.decisionReason },

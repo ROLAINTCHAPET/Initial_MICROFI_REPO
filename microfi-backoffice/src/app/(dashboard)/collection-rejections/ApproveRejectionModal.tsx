@@ -6,8 +6,21 @@ import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/format";
 
-export function ApproveRejectionModal({ requestId, agentLabel, reason }: { requestId: string; agentLabel: string; reason: string }) {
+export function ApproveRejectionModal({
+  requestId,
+  agentLabel,
+  reason,
+  actualAmountXaf,
+  expectedAmountXaf,
+}: {
+  requestId: string;
+  agentLabel: string;
+  reason: string;
+  actualAmountXaf: number;
+  expectedAmountXaf: number | null;
+}) {
   const router = useRouter();
   const dict = useDictionary();
   const [open, setOpen] = useState(false);
@@ -79,6 +92,19 @@ export function ApproveRejectionModal({ requestId, agentLabel, reason }: { reque
           <div className="flex flex-col gap-1">
             <span className="text-sm font-semibold text-on-surface">{dict.collectionRejections.agentReasonLabel}</span>
             <p className="text-sm text-on-surface-variant bg-surface-container-low border-2 border-outline-variant rounded-[var(--radius-sm)] p-3">{reason}</p>
+          </div>
+
+          <div className="flex gap-4 bg-surface-container-low border-2 border-outline-variant rounded-[var(--radius-sm)] p-3">
+            <div className="flex-1">
+              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{dict.collectionRejections.colAmount}</span>
+              <p className="text-sm font-semibold text-on-surface">{actualAmountXaf.toLocaleString()} XAF</p>
+            </div>
+            {expectedAmountXaf != null && (
+              <div className="flex-1">
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{dict.collectionRejections.colExpectedAmount}</span>
+                <p className="text-sm font-semibold text-secondary">{t(dict.collectionRejections.expectedAmount, { amount: expectedAmountXaf.toLocaleString() })}</p>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

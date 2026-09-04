@@ -239,32 +239,48 @@ class _ReconciliationLineCollectionsScreenState extends State<ReconciliationLine
 
   Future<void> _requestRejection(CollectionSummary collection) async {
     final l10n = AppLocalizations.of(context)!;
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
+    final reasonController = TextEditingController();
+    // Optional, since not every rejection reason is amount-related (wrong client, duplicate
+    // entry, etc.) — but when it is, the reviewer needs to see what the agent claims the amount
+    // should actually have been right next to what was actually recorded (see
+    // CollectionRejectionRequest#actualAmountXaf/expectedAmountXaf on the backend).
+    final expectedAmountController = TextEditingController();
+    final result = await showDialog<(String reason, int? expectedAmountXaf)>(
       context: context,
       builder: (_) => AlertDialog(
         title: Text(l10n.rcRequestRejectionButton),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: InputDecoration(labelText: l10n.rcRejectionReasonLabel, border: const OutlineInputBorder()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(labelText: l10n.rcRejectionReasonLabel, border: const OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: expectedAmountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: l10n.rcExpectedAmountLabel, border: const OutlineInputBorder(), suffixText: 'XAF'),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonCancel)),
           FilledButton(
             onPressed: () {
-              if (controller.text.trim().isEmpty) return;
-              Navigator.of(context).pop(controller.text.trim());
+              if (reasonController.text.trim().isEmpty) return;
+              Navigator.of(context).pop((reasonController.text.trim(), int.tryParse(expectedAmountController.text.trim())));
             },
             child: Text(l10n.rcRejectionSubmit),
           ),
         ],
       ),
     );
-    if (reason == null || reason.isEmpty) return;
+    if (result == null || result.$1.isEmpty) return;
 
     try {
-      await _reconciliationRepository.requestCollectionRejection(collection.id, reason);
+      await _reconciliationRepository.requestCollectionRejection(collection.id, result.$1, expectedAmountXaf: result.$2);
       if (!mounted) return;
       await showSuccessDialog(context, l10n.rcRejectionSuccess);
     } catch (e) {

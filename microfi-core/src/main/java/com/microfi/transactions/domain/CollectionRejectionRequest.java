@@ -42,6 +42,12 @@ public class CollectionRejectionRequest {
     @Column(nullable = false)
     private String reason;
 
+    /** Snapshot of {@code Collection#amountXaf} at request time — the amount the agent says is wrong, kept even if the collection itself were ever inspected later, so the reviewer always sees exactly what was recorded without a second lookup. */
+    private long actualAmountXaf;
+
+    /** What the agent says the amount should actually have been — optional, since not every rejection reason is amount-related (wrong client, duplicate entry, etc.). */
+    private Long expectedAmountXaf;
+
     @Builder.Default
     private Instant requestedAt = Instant.now();
 

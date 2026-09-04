@@ -13,6 +13,8 @@ public class CollectionRejectionRequestResponse {
     private UUID collectionId;
     private UUID agentId;
     private String reason;
+    private long actualAmountXaf;
+    private Long expectedAmountXaf;
     private Instant requestedAt;
     private String status;
     private UUID reviewedBy;

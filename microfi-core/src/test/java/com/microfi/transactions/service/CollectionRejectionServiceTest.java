@@ -80,11 +80,15 @@ class CollectionRejectionServiceTest {
         when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(collection().build()));
         when(collectionRejectionRequestRepository.findByCollectionIdAndStatus(collectionId, CollectionRejectionStatus.PENDING)).thenReturn(Optional.empty());
 
-        CollectionRejectionRequest result = service.requestRejection(agentId, collectionId, "Wrong amount entered");
+        CollectionRejectionRequest result = service.requestRejection(agentId, collectionId, "Wrong amount entered", 4000L);
 
         assertThat(result.getStatus()).isEqualTo(CollectionRejectionStatus.PENDING);
         assertThat(result.getAgentId()).isEqualTo(agentId);
         assertThat(result.getReason()).isEqualTo("Wrong amount entered");
+        // actualAmountXaf is snapshotted from the collection itself (5000, see collection()'s
+        // builder), not whatever the caller happened to pass — only expectedAmountXaf comes from the agent.
+        assertThat(result.getActualAmountXaf()).isEqualTo(5000L);
+        assertThat(result.getExpectedAmountXaf()).isEqualTo(4000L);
     }
 
     @Test
@@ -92,7 +96,7 @@ class CollectionRejectionServiceTest {
         when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(
                 collection().agentId(UUID.randomUUID()).build()));
 
-        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason"))
+        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
     }
@@ -102,7 +106,7 @@ class CollectionRejectionServiceTest {
         when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(
                 collection().voidedAt(java.time.Instant.now()).build()));
 
-        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason"))
+        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
     }
@@ -113,7 +117,7 @@ class CollectionRejectionServiceTest {
         when(collectionRejectionRequestRepository.findByCollectionIdAndStatus(collectionId, CollectionRejectionStatus.PENDING))
                 .thenReturn(Optional.of(CollectionRejectionRequest.builder().id(UUID.randomUUID()).build()));
 
-        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason"))
+        assertThatThrownBy(() -> service.requestRejection(agentId, collectionId, "reason", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
     }
@@ -239,13 +243,52 @@ class CollectionRejectionServiceTest {
         assertThat(alreadyConfirmedSibling.getConfirmedBy()).isNull();
 
         ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
-        verify(ofjAgentLineRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-        // First save: debit the rejected collection's own 5000. Second save (requeue): debit the
-        // two requeued siblings' 2000+3000 on top of that — 10000 - 5000 - 2000 - 3000 = 0.
+        // One combined debit — the rejected collection's own 5000 plus the two requeued siblings'
+        // 2000+3000 — not two separate saves: 10000 - 5000 - 2000 - 3000 = 0.
+        verify(ofjAgentLineRepository, org.mockito.Mockito.times(1)).save(captor.capture());
         assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(0L);
         assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(0L);
+        // Regression: nothing legitimately confirmed remains on the line at all (digitalTotalXaf
+        // dropped to 0) — physicalTotalXaf/deltaXaf must be zeroed too, or the line would keep
+        // showing a stale physical count as if it were still validated against something real.
+        assertThat(captor.getValue().getPhysicalTotalXaf()).isEqualTo(0L);
+        assertThat(captor.getValue().getDeltaXaf()).isEqualTo(0L);
         verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
                 "COLLECTION_REJECTION_SIBLINGS_REQUEUED".equals(entry.getEventType())));
+    }
+
+    /**
+     * Mixed-sweep case: some OTHER, still-legitimate confirmed content remains on the line after
+     * the rejected collection and its unexported siblings are removed — physicalTotalXaf must be
+     * left alone here, since there's no reliable way to know which portion of it belongs to the
+     * voided/requeued part versus the part that's genuinely still valid.
+     */
+    @Test
+    void approveLeavesPhysicalTotalAloneWhenSomeLegitimateContentRemainsOnTheLine() {
+        UUID requestId = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        CollectionRejectionRequest request = CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId)
+                .agentId(agentId).status(CollectionRejectionStatus.PENDING).build();
+        Collection rejected = collection().reconciledInLineId(lineId).build();
+        // No siblings returned at all here (simulates an already-exported sibling being excluded,
+        // or none existing) — only the rejected collection's own 5000 is debited from a much
+        // larger line, leaving digitalTotalXaf comfortably positive.
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .collectionsTotalXaf(50000L).digitalTotalXaf(50000L).physicalTotalXaf(50000L).deltaXaf(0L).build();
+        when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(rejected));
+        when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(collectionRepository.findByReconciledInLineId(lineId)).thenReturn(java.util.List.of(rejected));
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(ofjAgentLineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID(), "admin1");
+
+        ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
+        verify(ofjAgentLineRepository).save(captor.capture());
+        assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(45000L);
+        assertThat(captor.getValue().getPhysicalTotalXaf()).isEqualTo(50000L);
+        assertThat(captor.getValue().getDeltaXaf()).isEqualTo(0L);
     }
 
     @Test

@@ -349,6 +349,7 @@
   "rcLineCollectionsTitle": "Encaissements de cette ligne",
   "rcRequestRejectionButton": "Demander le rejet",
   "rcRejectionReasonLabel": "Pourquoi cet encaissement devrait-il être rejeté ?",
+  "rcExpectedAmountLabel": "Montant attendu (facultatif)",
   "rcRejectionSubmit": "Envoyer la demande",
   "rcRejectionSuccess": "Demande de rejet envoyée à votre agence.",
   "rcRejectionFailed": "Échec de l'envoi de la demande de rejet.",

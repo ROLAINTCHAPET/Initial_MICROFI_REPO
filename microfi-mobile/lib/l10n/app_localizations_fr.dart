@@ -1092,6 +1092,9 @@ class AppLocalizationsFr extends AppLocalizations {
       'Pourquoi cet encaissement devrait-il être rejeté ?';
 
   @override
+  String get rcExpectedAmountLabel => 'Montant attendu (facultatif)';
+
+  @override
   String get rcRejectionSubmit => 'Envoyer la demande';
 
   @override

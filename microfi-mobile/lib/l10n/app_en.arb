@@ -773,6 +773,8 @@
   "@rcRequestRejectionButton": {"description": "Line-detail screen — opens the rejection-request dialog for one collection."},
   "rcRejectionReasonLabel": "Why should this be rejected?",
   "@rcRejectionReasonLabel": {"description": "Rejection-request dialog — reason text field label."},
+  "rcExpectedAmountLabel": "Expected amount (optional)",
+  "@rcExpectedAmountLabel": {"description": "Rejection-request dialog — optional field for what the amount should actually have been, shown to the reviewer alongside the recorded amount."},
   "rcRejectionSubmit": "Submit Request",
   "@rcRejectionSubmit": {"description": "Rejection-request dialog — submit button."},
   "rcRejectionSuccess": "Rejection request sent to your branch.",

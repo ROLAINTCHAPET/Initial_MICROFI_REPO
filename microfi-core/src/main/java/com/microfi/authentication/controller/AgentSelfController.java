@@ -237,7 +237,7 @@ public class AgentSelfController {
         return authenticationMono
                 .map(this::requireAgent)
                 .flatMap(agent -> Mono.fromCallable(() -> {
-                    CollectionRejectionRequest result = collectionRejectionService.requestRejection(agent.getId(), id, request.getReason());
+                    CollectionRejectionRequest result = collectionRejectionService.requestRejection(agent.getId(), id, request.getReason(), request.getExpectedAmountXaf());
                     auditService.record(AuditLogEntry.builder()
                             .category(AuditCategory.FINANCIAL)
                             .eventType("COLLECTION_REJECTION_REQUESTED")
@@ -259,6 +259,8 @@ public class AgentSelfController {
                 .collectionId(r.getCollectionId())
                 .agentId(r.getAgentId())
                 .reason(r.getReason())
+                .actualAmountXaf(r.getActualAmountXaf())
+                .expectedAmountXaf(r.getExpectedAmountXaf())
                 .requestedAt(r.getRequestedAt())
                 .status(r.getStatus().name())
                 .reviewedBy(r.getReviewedBy())

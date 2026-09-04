@@ -405,9 +405,9 @@ class AgentSelfControllerTest {
     void requestCollectionRejectionCreatesRequestForOwnCollection() {
         UUID collectionId = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
-        when(collectionRejectionService.requestRejection(eq(agentId), eq(collectionId), eq("Wrong client selected")))
+        when(collectionRejectionService.requestRejection(eq(agentId), eq(collectionId), eq("Wrong client selected"), isNull()))
                 .thenReturn(CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId).agentId(agentId)
-                        .reason("Wrong client selected").status(CollectionRejectionStatus.PENDING).requestedAt(java.time.Instant.now()).build());
+                        .reason("Wrong client selected").actualAmountXaf(5000L).status(CollectionRejectionStatus.PENDING).requestedAt(java.time.Instant.now()).build());
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()

@@ -1069,6 +1069,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcRejectionReasonLabel => 'Why should this be rejected?';
 
   @override
+  String get rcExpectedAmountLabel => 'Expected amount (optional)';
+
+  @override
   String get rcRejectionSubmit => 'Submit Request';
 
   @override

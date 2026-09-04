@@ -7,9 +7,10 @@ import { Badge } from "@/components/Badge";
 import type { AgentResponse, BranchResponse, CollectionRejectionRequestResponse } from "@/lib/types";
 import { ApproveRejectionModal } from "./ApproveRejectionModal";
 import { DenyRejectionButton } from "./DenyRejectionButton";
-import { CollectionRejectionsExportButtons } from "./CollectionRejectionsExportButtons";
+import { CollectionRejectionsExportButtons, type CollectionRejectionExportRow } from "./CollectionRejectionsExportButtons";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
+import { t } from "@/lib/i18n/format";
 
 type StatusFilter = "PENDING" | "APPROVED" | "DENIED" | "ALL";
 
@@ -45,11 +46,13 @@ export default async function CollectionRejectionsPage({
     { key: "ALL", label: dict.collectionRejections.filterAll },
   ];
 
-  const exportRows = requests.map((r) => {
+  const exportRows: CollectionRejectionExportRow[] = requests.map((r) => {
     const agent = agentById.get(r.agentId);
     return {
       agentLabel: agent ? `${agent.fullName} (${agent.employeeCode})` : r.agentId,
       reason: r.reason,
+      actualAmountXaf: r.actualAmountXaf,
+      expectedAmountXaf: r.expectedAmountXaf ?? "",
       requestedAt: new Date(r.requestedAt).toLocaleString(),
       status: dict.common.status[r.status],
       decisionReason: r.decisionReason ?? "",
@@ -88,6 +91,7 @@ export default async function CollectionRejectionsPage({
           <Thead>
             <Th>{dict.collectionRejections.colAgent}</Th>
             <Th>{dict.collectionRejections.colReason}</Th>
+            <Th>{dict.collectionRejections.colAmount}</Th>
             <Th>{dict.collectionRejections.colRequestedAt}</Th>
             <Th>{dict.collectionRejections.colStatus}</Th>
             <Th>{dict.collectionRejections.colDecision}</Th>
@@ -101,6 +105,14 @@ export default async function CollectionRejectionsPage({
                 <Tr key={r.id}>
                   <Td className="font-medium text-on-surface">{agentLabel}</Td>
                   <Td className="text-on-surface-variant max-w-[280px]">{r.reason}</Td>
+                  <Td className="whitespace-nowrap">
+                    <span className="text-on-surface font-medium">{r.actualAmountXaf.toLocaleString()} XAF</span>
+                    {r.expectedAmountXaf != null && (
+                      <p className="text-xs text-on-surface-variant mt-0.5">
+                        {t(dict.collectionRejections.expectedAmount, { amount: r.expectedAmountXaf.toLocaleString() })}
+                      </p>
+                    )}
+                  </Td>
                   <Td className="text-on-surface-variant whitespace-nowrap">{new Date(r.requestedAt).toLocaleString()}</Td>
                   <Td>
                     <Badge status={r.status} />
@@ -111,7 +123,13 @@ export default async function CollectionRejectionsPage({
                   <Td>
                     {r.status === "PENDING" && (
                       <div className="flex items-center gap-2">
-                        <ApproveRejectionModal requestId={r.id} agentLabel={agentLabel} reason={r.reason} />
+                        <ApproveRejectionModal
+                          requestId={r.id}
+                          agentLabel={agentLabel}
+                          reason={r.reason}
+                          actualAmountXaf={r.actualAmountXaf}
+                          expectedAmountXaf={r.expectedAmountXaf}
+                        />
                         <DenyRejectionButton requestId={r.id} />
                       </div>
                     )}

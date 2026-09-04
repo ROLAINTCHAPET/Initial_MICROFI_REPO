@@ -25,6 +25,8 @@ class CollectionRejectionRequest {
   final String id;
   final String collectionId;
   final String reason;
+  final int actualAmountXaf;
+  final int? expectedAmountXaf;
   final String status;
   final String? decisionReason;
 
@@ -32,6 +34,8 @@ class CollectionRejectionRequest {
     required this.id,
     required this.collectionId,
     required this.reason,
+    required this.actualAmountXaf,
+    required this.expectedAmountXaf,
     required this.status,
     required this.decisionReason,
   });
@@ -40,6 +44,8 @@ class CollectionRejectionRequest {
         id: json['id'] as String,
         collectionId: json['collectionId'] as String,
         reason: json['reason'] as String,
+        actualAmountXaf: json['actualAmountXaf'] as int,
+        expectedAmountXaf: json['expectedAmountXaf'] as int?,
         status: json['status'] as String,
         decisionReason: json['decisionReason'] as String?,
       );
@@ -89,9 +95,12 @@ class ReconciliationRepository {
     await client.postNoContent('/agents/me/reconciliations/$lineId/confirm');
   }
 
-  Future<void> requestCollectionRejection(String collectionId, String reason) async {
+  Future<void> requestCollectionRejection(String collectionId, String reason, {int? expectedAmountXaf}) async {
     final client = ApiClient(token: token);
-    await client.post('/agents/me/collections/$collectionId/reject-request', {'reason': reason});
+    await client.post('/agents/me/collections/$collectionId/reject-request', {
+      'reason': reason,
+      if (expectedAmountXaf != null) 'expectedAmountXaf': expectedAmountXaf,
+    });
   }
 
   /// Same polling pattern as everything else here — the mobile app has no way to learn a

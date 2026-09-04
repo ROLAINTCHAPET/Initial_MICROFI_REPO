@@ -50,7 +50,7 @@ public class CollectionRejectionService {
     private final AgentDirectoryService agentDirectoryService;
     private final AuditService auditService;
 
-    public CollectionRejectionRequest requestRejection(UUID agentId, UUID collectionId, String reason) {
+    public CollectionRejectionRequest requestRejection(UUID agentId, UUID collectionId, String reason, Long expectedAmountXaf) {
         Collection collection = requireCollection(collectionId);
         if (!collection.getAgentId().equals(agentId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot request rejection of another agent's collection");
@@ -63,11 +63,16 @@ public class CollectionRejectionService {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "A rejection request is already pending for this collection");
                 });
 
+        // actualAmountXaf is snapshotted from the collection itself, not left to the agent to
+        // retype — the reviewer needs to see exactly what was actually recorded (the "false
+        // amount") right next to what the agent claims it should have been.
         CollectionRejectionRequest request = CollectionRejectionRequest.builder()
                 .id(UUID.randomUUID())
                 .collectionId(collectionId)
                 .agentId(agentId)
                 .reason(reason)
+                .actualAmountXaf(collection.getAmountXaf())
+                .expectedAmountXaf(expectedAmountXaf)
                 .build();
         return collectionRejectionRequestRepository.save(request);
     }
@@ -97,15 +102,14 @@ public class CollectionRejectionService {
         // an approved rejection must debit them here or the branch's OFJ summary keeps counting
         // cash that's since been voided, whether the agent had already confirmed it or was still
         // waiting to (pendingConfirmationCount is filtered dynamically instead, since it's derived
-        // fresh on every read rather than stored).
+        // fresh on every read rather than stored). Combined into one update with the sibling
+        // requeue below (rather than two separate debits) so the "did digital drop to zero"
+        // decision that governs physicalTotalXaf/deltaXaf sees the true final state, not a
+        // half-updated one from this collection's debit alone.
         UUID originalLineId = collection.getReconciledInLineId();
         if (originalLineId != null) {
-            ofjAgentLineRepository.findById(originalLineId).ifPresent(line -> {
-                line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) - collection.getAmountXaf());
-                line.setDigitalTotalXaf(line.getDigitalTotalXaf() - collection.getAmountXaf());
-                ofjAgentLineRepository.save(line);
-            });
-            requeueUnexportedSiblings(originalLineId, collection.getAgentId(), reviewerId, reviewerLabel);
+            List<Collection> siblings = requeueUnexportedSiblings(originalLineId, collection.getAgentId(), reviewerId, reviewerLabel);
+            debitLine(originalLineId, collection.getAmountXaf() + siblings.stream().mapToLong(Collection::getAmountXaf).sum());
         }
 
         if (collection.getExportedAt() != null && collection.getCbsTransactionRef() != null) {
@@ -116,6 +120,33 @@ public class CollectionRejectionService {
 
     private static long nz(Long value) {
         return value == null ? 0L : value;
+    }
+
+    /**
+     * Debits exactly {@code amountXaf} from the line's stored collectionsTotalXaf/digitalTotalXaf
+     * — and, only once that leaves {@code digitalTotalXaf <= 0} (nothing legitimately confirmed
+     * remains on the line at all), also zeroes {@code physicalTotalXaf}/{@code deltaXaf}. Without
+     * that second step, a line whose entire digital content was voided/requeued would keep
+     * showing its old physical count as if it were still validated against something — a real,
+     * confusing bug caught live: a branch's "Validés aujourd'hui" queue kept showing a stale
+     * physical total for a line that, after a rejection, had zero collections left reconciled
+     * against it. When some OTHER, still-legitimate confirmed content remains on the line
+     * (digitalTotalXaf stays positive — a genuinely mixed multi-sweep line), physicalTotalXaf is
+     * left alone: there's no reliable way to know which portion of it belongs to the voided/
+     * requeued part versus the part that's still valid.
+     */
+    private void debitLine(UUID lineId, long amountXaf) {
+        ofjAgentLineRepository.findById(lineId).ifPresent(line -> {
+            long newCollectionsTotal = nz(line.getCollectionsTotalXaf()) - amountXaf;
+            long newDigitalTotal = line.getDigitalTotalXaf() - amountXaf;
+            line.setCollectionsTotalXaf(newCollectionsTotal);
+            line.setDigitalTotalXaf(newDigitalTotal);
+            if (newDigitalTotal <= 0) {
+                line.setPhysicalTotalXaf(0L);
+                line.setDeltaXaf(0L);
+            }
+            ofjAgentLineRepository.save(line);
+        });
     }
 
     /**
@@ -132,17 +163,15 @@ public class CollectionRejectionService {
      * sweep as the voided one" — {@code Collection} carries no per-sweep marker distinguishing one
      * same-day cashier count from another reusing the same {@code OfjAgentLine} row (see
      * {@code OfjService#reconcile}'s find-or-create), so there is no narrower boundary to reset to.
-     * The line's own {@code physicalTotalXaf}/{@code deltaXaf} are deliberately left untouched too
-     * — for the same "no per-sweep boundary" reason, there's no reliable way to know which portion
-     * of the physical count belongs to just this batch; the écart is expected to look off until the
-     * cashier's next physical count naturally corrects it.
+     * Returns the reset siblings so the caller can fold their amount into the same line debit as
+     * the rejected collection itself (see {@link #debitLine}).
      */
-    private void requeueUnexportedSiblings(UUID lineId, UUID agentId, UUID reviewerId, String reviewerLabel) {
+    private List<Collection> requeueUnexportedSiblings(UUID lineId, UUID agentId, UUID reviewerId, String reviewerLabel) {
         List<Collection> siblings = collectionRepository.findByReconciledInLineId(lineId).stream()
                 .filter(c -> c.getVoidedAt() == null && c.getExportedAt() == null)
                 .toList();
         if (siblings.isEmpty()) {
-            return;
+            return siblings;
         }
         long resetAmountXaf = siblings.stream().mapToLong(Collection::getAmountXaf).sum();
         for (Collection sibling : siblings) {
@@ -152,12 +181,6 @@ public class CollectionRejectionService {
             sibling.setConfirmedBy(null);
         }
         collectionRepository.saveAll(siblings);
-
-        ofjAgentLineRepository.findById(lineId).ifPresent(line -> {
-            line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) - resetAmountXaf);
-            line.setDigitalTotalXaf(line.getDigitalTotalXaf() - resetAmountXaf);
-            ofjAgentLineRepository.save(line);
-        });
 
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.FINANCIAL)
@@ -171,6 +194,7 @@ public class CollectionRejectionService {
                 .detailsParam1(String.valueOf(siblings.size()))
                 .detailsParam2(String.valueOf(resetAmountXaf))
                 .build());
+        return siblings;
     }
 
     public CollectionRejectionRequest deny(UUID requestId, String decisionReason, UUID reviewerId) {

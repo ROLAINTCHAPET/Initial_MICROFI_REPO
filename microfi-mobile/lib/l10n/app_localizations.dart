@@ -1952,6 +1952,12 @@ abstract class AppLocalizations {
   /// **'Why should this be rejected?'**
   String get rcRejectionReasonLabel;
 
+  /// Rejection-request dialog — optional field for what the amount should actually have been, shown to the reviewer alongside the recorded amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected amount (optional)'**
+  String get rcExpectedAmountLabel;
+
   /// Rejection-request dialog — submit button.
   ///
   /// In en, this message translates to:

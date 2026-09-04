@@ -128,6 +128,8 @@ export interface CollectionRejectionRequestResponse {
   collectionId: string;
   agentId: string;
   reason: string;
+  actualAmountXaf: number;
+  expectedAmountXaf: number | null;
   requestedAt: string;
   status: "PENDING" | "APPROVED" | "DENIED";
   reviewedBy: string | null;
