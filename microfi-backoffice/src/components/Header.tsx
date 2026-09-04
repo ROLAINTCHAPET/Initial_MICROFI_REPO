@@ -16,7 +16,17 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? parts[0]?.[1] ?? "")).toUpperCase();
 }
 
-export function Header({ login, role, unresolvedSosCount }: { login: string; role: AdminRole; unresolvedSosCount: number }) {
+export function Header({
+  login,
+  role,
+  unresolvedSosCount,
+  pendingRejectionCount,
+}: {
+  login: string;
+  role: AdminRole;
+  unresolvedSosCount: number;
+  pendingRejectionCount: number;
+}) {
   const router = useRouter();
   const pageHeader = usePageHeaderValue();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -59,6 +69,18 @@ export function Header({ login, role, unresolvedSosCount }: { login: string; rol
           {unresolvedSosCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-danger-red text-white text-[10px] font-bold flex items-center justify-center">
               {unresolvedSosCount}
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/collection-rejections"
+          className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-[var(--radius-sm)] transition-[background-color,transform] duration-150 ease-out hover:scale-110 active:scale-90"
+          title={pendingRejectionCount > 0 ? t(dict.collectionRejections.tooltipPending, { count: pendingRejectionCount }) : dict.collectionRejections.tooltipNone}
+        >
+          <Icon name="warning" className="size-5" />
+          {pendingRejectionCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center">
+              {pendingRejectionCount}
             </span>
           )}
         </Link>

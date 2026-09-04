@@ -7,11 +7,14 @@ import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.AdminRole;
+import com.microfi.authentication.AdminUserDetails;
+import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.shared.dto.CollectionRejectionRequestResponse;
 import com.microfi.shared.dto.DenyCollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionStatus;
+import com.microfi.transactions.service.CollectionRejectionAlertBroadcaster;
 import com.microfi.transactions.service.CollectionRejectionProofStorageService;
 import com.microfi.transactions.service.CollectionRejectionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +25,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,7 +41,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -57,6 +63,23 @@ public class CollectionRejectionController {
     private final CollectionRejectionProofStorageService collectionRejectionProofStorageService;
     private final AgentDirectoryService agentDirectoryService;
     private final AuditService auditService;
+    private final CollectionRejectionAlertBroadcaster collectionRejectionAlertBroadcaster;
+
+    /** Comment-only, no data — purely to keep the connection past Kong's ~60s idle-read timeout, same as AdminSosController's stream. */
+    private static final Flux<ServerSentEvent<CollectionRejectionRequestResponse>> HEARTBEAT =
+            Flux.interval(Duration.ofSeconds(20)).map(tick -> ServerSentEvent.<CollectionRejectionRequestResponse>builder().comment("keep-alive").build());
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream Collection Rejection Requests", description = "Server-Sent Events push of newly-submitted rejection requests, for an instant Back-Office notification instead of waiting on the next page load. Branch scope resolved once at connect time and held fixed for the connection's life, same as AdminSosController#stream. ADMIN or BRANCH_MANAGER.")
+    public Flux<ServerSentEvent<CollectionRejectionRequestResponse>> stream(Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMapMany(caller -> Mono.fromCallable(() -> Optional.ofNullable(scopedAgentIds(caller)))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(agentIds -> collectionRejectionAlertBroadcaster.stream()
+                                .filter(r -> agentIds.isEmpty() || agentIds.get().contains(r.getAgentId()))
+                                .map(r -> ServerSentEvent.builder(r).build())))
+                .mergeWith(HEARTBEAT);
+    }
 
     @GetMapping
     @Operation(summary = "List Collection Rejection Requests", description = "Most recent first. ADMIN sees every branch; BRANCH_MANAGER sees only their own branch's agents.")

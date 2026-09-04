@@ -397,6 +397,9 @@
   "collectionRejections": {
     "subtitle": "An agent's request to void one of their own collections for error, awaiting your review.",
     "noResults": "No rejection requests in this filter.",
+    "newRequestToast": "{agent} requested a collection rejection",
+    "tooltipPending": "{count} rejection request(s) awaiting review",
+    "tooltipNone": "No rejection requests awaiting review",
     "colAgent": "Agent",
     "colReason": "Reason",
     "colAmount": "Amount Recorded",

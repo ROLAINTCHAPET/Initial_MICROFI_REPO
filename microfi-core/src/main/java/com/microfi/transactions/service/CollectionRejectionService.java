@@ -6,8 +6,10 @@ import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.cbsclient.CbsClientService;
+import com.microfi.events.CollectionRejectionRequestedEvent;
 import com.microfi.notifications.gateway.SmsGatewayFactory;
 import com.microfi.savings.service.ClientDirectoryService;
+import com.microfi.shared.dto.CollectionRejectionRequestResponse;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionReconciliationStatus;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
@@ -18,6 +20,7 @@ import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.OfjAgentLineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -49,6 +52,7 @@ public class CollectionRejectionService {
     private final SmsGatewayFactory smsGatewayFactory;
     private final AgentDirectoryService agentDirectoryService;
     private final AuditService auditService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public CollectionRejectionRequest requestRejection(UUID agentId, UUID collectionId, String reason, Long expectedAmountXaf) {
         Collection collection = requireCollection(collectionId);
@@ -74,7 +78,28 @@ public class CollectionRejectionService {
                 .actualAmountXaf(collection.getAmountXaf())
                 .expectedAmountXaf(expectedAmountXaf)
                 .build();
-        return collectionRejectionRequestRepository.save(request);
+        CollectionRejectionRequest saved = collectionRejectionRequestRepository.save(request);
+
+        // UC pending: an admin/manager needs to see this the moment it's submitted, the same
+        // instant-push reasoning as SosAlertBroadcaster's doc — published here (inside this
+        // @Transactional method) rather than in the controller so CollectionRejectionAlertEventRelay's
+        // AFTER_COMMIT listener only ever fires for a request that's genuinely persisted.
+        applicationEventPublisher.publishEvent(new CollectionRejectionRequestedEvent(toAlertResponse(saved)));
+        return saved;
+    }
+
+    private CollectionRejectionRequestResponse toAlertResponse(CollectionRejectionRequest r) {
+        return CollectionRejectionRequestResponse.builder()
+                .id(r.getId())
+                .collectionId(r.getCollectionId())
+                .agentId(r.getAgentId())
+                .reason(r.getReason())
+                .actualAmountXaf(r.getActualAmountXaf() == null ? 0L : r.getActualAmountXaf())
+                .expectedAmountXaf(r.getExpectedAmountXaf())
+                .requestedAt(r.getRequestedAt())
+                .status(r.getStatus().name())
+                .hasProof(false)
+                .build();
     }
 
     /**

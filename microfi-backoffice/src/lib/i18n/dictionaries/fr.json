@@ -397,6 +397,9 @@
   "collectionRejections": {
     "subtitle": "Demande d'un agent de faire annuler un de ses encaissements pour erreur, en attente de votre examen.",
     "noResults": "Aucune demande de rejet dans ce filtre.",
+    "newRequestToast": "{agent} a demandé le rejet d'un encaissement",
+    "tooltipPending": "{count} demande(s) de rejet en attente d'examen",
+    "tooltipNone": "Aucune demande de rejet en attente d'examen",
     "colAgent": "Agent",
     "colReason": "Motif",
     "colAmount": "Montant enregistré",

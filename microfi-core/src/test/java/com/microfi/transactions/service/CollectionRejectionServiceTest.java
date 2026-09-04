@@ -55,6 +55,8 @@ class CollectionRejectionServiceTest {
     private AgentDirectoryService agentDirectoryService;
     @Mock
     private AuditService auditService;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
 
     private CollectionRejectionService service;
 
@@ -66,7 +68,7 @@ class CollectionRejectionServiceTest {
         MockitoAnnotations.openMocks(this);
         service = new CollectionRejectionService(collectionRejectionRequestRepository, collectionRepository,
                 ofjAgentLineRepository, clientDirectoryService, cbsClientService, smsGatewayFactory,
-                agentDirectoryService, auditService);
+                agentDirectoryService, auditService, applicationEventPublisher);
         when(collectionRejectionRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -89,6 +91,21 @@ class CollectionRejectionServiceTest {
         // builder), not whatever the caller happened to pass — only expectedAmountXaf comes from the agent.
         assertThat(result.getActualAmountXaf()).isEqualTo(5000L);
         assertThat(result.getExpectedAmountXaf()).isEqualTo(4000L);
+    }
+
+    /** UC pending: an admin/manager needs to see this the moment it's submitted — same instant-push reasoning as the SOS broadcaster. */
+    @Test
+    void requestRejectionPublishesAnAlertEvent() {
+        when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(collection().build()));
+        when(collectionRejectionRequestRepository.findByCollectionIdAndStatus(collectionId, CollectionRejectionStatus.PENDING)).thenReturn(Optional.empty());
+
+        service.requestRejection(agentId, collectionId, "Wrong amount entered", null);
+
+        org.mockito.ArgumentCaptor<com.microfi.events.CollectionRejectionRequestedEvent> captor =
+                org.mockito.ArgumentCaptor.forClass(com.microfi.events.CollectionRejectionRequestedEvent.class);
+        verify(applicationEventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().response().getAgentId()).isEqualTo(agentId);
+        assertThat(captor.getValue().response().getReason()).isEqualTo("Wrong amount entered");
     }
 
     @Test

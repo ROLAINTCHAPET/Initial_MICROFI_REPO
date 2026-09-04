@@ -11,8 +11,10 @@ import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.savings.service.ClientDetailsService;
+import com.microfi.shared.dto.CollectionRejectionRequestResponse;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionStatus;
+import com.microfi.transactions.service.CollectionRejectionAlertBroadcaster;
 import com.microfi.transactions.service.CollectionRejectionProofStorageService;
 import com.microfi.transactions.service.CollectionRejectionService;
 import org.junit.jupiter.api.Test;
@@ -27,9 +29,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.FluxExchangeResult;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -68,6 +74,9 @@ class CollectionRejectionControllerTest {
 
     @MockitoBean
     private ClientDetailsService clientDetailsService;
+
+    @MockitoBean
+    private CollectionRejectionAlertBroadcaster collectionRejectionAlertBroadcaster;
 
     private final UUID branchId = UUID.randomUUID();
     private final UUID agentId = UUID.randomUUID();
@@ -169,6 +178,55 @@ class CollectionRejectionControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("DENIED");
+    }
+
+    @Test
+    void streamUnrestrictedForAdminForwardsBroadcastEvents() {
+        CollectionRejectionRequestResponse event = CollectionRejectionRequestResponse.builder()
+                .id(UUID.randomUUID()).agentId(agentId).collectionId(UUID.randomUUID()).reason("Wrong amount")
+                .status("PENDING").requestedAt(Instant.now()).build();
+        when(collectionRejectionAlertBroadcaster.stream()).thenReturn(Flux.just(event));
+
+        FluxExchangeResult<CollectionRejectionRequestResponse> result = webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .get()
+                .uri("/api/v1/admin/collection-rejection-requests/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(CollectionRejectionRequestResponse.class);
+
+        StepVerifier.create(result.getResponseBody())
+                .expectNext(event)
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void streamOnlyForwardsEventsWithinCallersBranch() {
+        UUID otherAgentId = UUID.randomUUID();
+        CollectionRejectionRequestResponse inScope = CollectionRejectionRequestResponse.builder()
+                .id(UUID.randomUUID()).agentId(agentId).collectionId(UUID.randomUUID()).reason("Wrong amount")
+                .status("PENDING").requestedAt(Instant.now()).build();
+        CollectionRejectionRequestResponse outOfScope = CollectionRejectionRequestResponse.builder()
+                .id(UUID.randomUUID()).agentId(otherAgentId).collectionId(UUID.randomUUID()).reason("Wrong amount")
+                .status("PENDING").requestedAt(Instant.now()).build();
+        when(agentDirectoryService.findAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(collectionRejectionAlertBroadcaster.stream()).thenReturn(Flux.just(outOfScope, inScope));
+
+        FluxExchangeResult<CollectionRejectionRequestResponse> result = webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .get()
+                .uri("/api/v1/admin/collection-rejection-requests/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(CollectionRejectionRequestResponse.class);
+
+        StepVerifier.create(result.getResponseBody())
+                .expectNext(inScope)
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
     }
 
     @Test
