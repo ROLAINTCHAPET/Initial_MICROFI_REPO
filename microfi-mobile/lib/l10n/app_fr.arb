@@ -106,6 +106,8 @@
   "hsSosSentMessage": "Alerte SOS envoyée — votre agence a été alertée.",
   "hsSosSendFailedMessage": "Impossible d'envoyer l'alerte SOS — vérifiez votre connexion et réessayez.",
   "hsSosAcknowledgedMessage": "Votre alerte SOS a été prise en compte par votre agence.",
+  "hsRejectionApprovedMessage": "Votre demande d'annulation d'un encaissement a été approuvée.",
+  "hsRejectionDeniedMessage": "Votre demande d'annulation d'un encaissement a été refusée : {reason}",
   "hsNewCollection": "Nouvel encaissement",
   "hsMyRoute": "Mon itinéraire",
   "hsSponsorClientActivation": "Parrainer l'activation d'un client",

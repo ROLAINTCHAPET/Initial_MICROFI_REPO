@@ -21,6 +21,30 @@ class PendingReconciliationLine {
       );
 }
 
+class CollectionRejectionRequest {
+  final String id;
+  final String collectionId;
+  final String reason;
+  final String status;
+  final String? decisionReason;
+
+  CollectionRejectionRequest({
+    required this.id,
+    required this.collectionId,
+    required this.reason,
+    required this.status,
+    required this.decisionReason,
+  });
+
+  factory CollectionRejectionRequest.fromJson(Map<String, dynamic> json) => CollectionRejectionRequest(
+        id: json['id'] as String,
+        collectionId: json['collectionId'] as String,
+        reason: json['reason'] as String,
+        status: json['status'] as String,
+        decisionReason: json['decisionReason'] as String?,
+      );
+}
+
 /// A cashier has physically counted this cash, but it still occupies the agent's own escrow
 /// ceiling until they confirm it themselves (or it auto-expires server-side) — see
 /// CollectionReconciliationStatus's doc on the backend. There's no push infrastructure in this
@@ -44,5 +68,13 @@ class ReconciliationRepository {
   Future<void> requestCollectionRejection(String collectionId, String reason) async {
     final client = ApiClient(token: token);
     await client.post('/agents/me/collections/$collectionId/reject-request', {'reason': reason});
+  }
+
+  /// Same polling pattern as everything else here — the mobile app has no way to learn a
+  /// manager/admin decided this agent's void request except by asking.
+  Future<List<CollectionRejectionRequest>> listMyRejectionRequests() async {
+    final client = ApiClient(token: token);
+    final json = await client.get('/agents/me/collection-rejection-requests') as List<dynamic>;
+    return json.map((e) => CollectionRejectionRequest.fromJson(e as Map<String, dynamic>)).toList();
   }
 }

@@ -728,7 +728,7 @@ class OfjServiceTest {
         when(collectionRepository.findDistinctPendingConfirmationLineIdsByAgent(agentId)).thenReturn(List.of(lineId));
         when(ofjAgentLineRepository.findAllById(List.of(lineId))).thenReturn(List.of(line));
         when(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(eq(lineId), any())).thenReturn(7000L);
-        when(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(eq(lineId), any())).thenReturn(3L);
+        when(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(eq(lineId), any())).thenReturn(3L);
 
         List<com.microfi.shared.dto.PendingReconciliationLineResponse> pending = ofjService.listPendingConfirmationLines(agentId);
 

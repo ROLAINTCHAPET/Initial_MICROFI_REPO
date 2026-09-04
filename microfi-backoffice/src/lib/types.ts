@@ -83,6 +83,7 @@ export interface OfjAgentLineResponse {
   deltaXaf: number;
   resolved: boolean;
   pendingConfirmationCount: number;
+  rejectedCount: number;
 }
 
 export interface OfjSummaryResponse {

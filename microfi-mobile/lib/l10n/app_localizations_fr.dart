@@ -341,6 +341,15 @@ class AppLocalizationsFr extends AppLocalizations {
       'Votre alerte SOS a été prise en compte par votre agence.';
 
   @override
+  String get hsRejectionApprovedMessage =>
+      'Votre demande d\'annulation d\'un encaissement a été approuvée.';
+
+  @override
+  String hsRejectionDeniedMessage(String reason) {
+    return 'Votre demande d\'annulation d\'un encaissement a été refusée : $reason';
+  }
+
+  @override
   String get hsNewCollection => 'Nouvel encaissement';
 
   @override

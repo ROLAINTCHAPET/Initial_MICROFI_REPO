@@ -335,6 +335,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your SOS was acknowledged by your branch.';
 
   @override
+  String get hsRejectionApprovedMessage =>
+      'Your request to void a collection was approved.';
+
+  @override
+  String hsRejectionDeniedMessage(String reason) {
+    return 'Your request to void a collection was denied: $reason';
+  }
+
+  @override
   String get hsNewCollection => 'New Collection';
 
   @override

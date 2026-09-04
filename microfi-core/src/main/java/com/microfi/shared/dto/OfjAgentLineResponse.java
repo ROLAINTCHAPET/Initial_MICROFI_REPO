@@ -18,6 +18,8 @@ public class OfjAgentLineResponse {
     private long deltaXaf;
     /** true if delta >= 0 (surplus/exact) or a variance debt has been recorded for a shortage. */
     private boolean resolved;
-    /** Collections under this line still awaiting the agent's own confirmation (see CollectionReconciliationStatus) — distinct from {@link #resolved}, which is purely about the physical count matching, not about the agent's sign-off. */
+    /** Collections under this line still awaiting the agent's own confirmation (see CollectionReconciliationStatus) — distinct from {@link #resolved}, which is purely about the physical count matching, not about the agent's sign-off. Excludes any collection whose rejection request has since been approved. */
     private long pendingConfirmationCount;
+    /** Collections under this line voided by an approved rejection request — takes priority over {@link #pendingConfirmationCount} in the UI, since a rejected collection is no longer "awaiting" anything. */
+    private long rejectedCount;
 }

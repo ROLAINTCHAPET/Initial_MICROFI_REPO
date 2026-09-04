@@ -35,6 +35,7 @@ import com.microfi.transactions.repository.OfjSessionRepository;
 import com.microfi.transactions.repository.VarianceDebtRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -249,7 +250,7 @@ public class OfjService {
                 .map(lineId -> PendingReconciliationLineResponse.builder()
                         .lineId(lineId)
                         .totalXaf(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
-                        .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                        .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
                         .lastCountedAt(linesById.get(lineId) != null ? linesById.get(lineId).getLastCountedAt() : null)
                         .build())
                 .toList();
@@ -478,11 +479,23 @@ public class OfjService {
     private OfjSession getOrCreateSession(UUID branchId) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         return ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)
-                .orElseGet(() -> ofjSessionRepository.save(OfjSession.builder()
-                        .id(UUID.randomUUID())
-                        .branchId(branchId)
-                        .businessDate(today)
-                        .build()));
+                .orElseGet(() -> {
+                    try {
+                        return ofjSessionRepository.save(OfjSession.builder()
+                                .id(UUID.randomUUID())
+                                .branchId(branchId)
+                                .businessDate(today)
+                                .build());
+                    } catch (DataIntegrityViolationException raceLostToAnotherRequest) {
+                        // Two branch-summary requests can both miss the findBy... lookup above in
+                        // the same instant (no session yet) and both try to create today's first
+                        // one; the DB's (branch_id, business_date) unique constraint lets only one
+                        // insert win. The loser just re-reads what the winner created instead of
+                        // surfacing a 500 for something that isn't actually an error.
+                        return ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)
+                                .orElseThrow(() -> raceLostToAnotherRequest);
+                    }
+                });
     }
 
     /**
@@ -574,8 +587,9 @@ public class OfjService {
                 .physicalTotalXaf(line.getPhysicalTotalXaf())
                 .deltaXaf(line.getDeltaXaf())
                 .resolved(isResolved(line))
-                .pendingConfirmationCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatus(
+                .pendingConfirmationCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(
                         line.getId(), CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                .rejectedCount(collectionRepository.countByReconciledInLineIdAndVoidedAtIsNotNull(line.getId()))
                 .build();
     }
 

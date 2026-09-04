@@ -29,8 +29,14 @@ function isoDaysAgo(days: number) {
 // A single badge, not "Resolved" plus a separate note — a physically-balanced count that the
 // agent hasn't confirmed yet isn't actually done, so showing "Resolved" alongside it read as
 // contradictory. Reuses the PENDING badge's styling with a more specific label rather than adding
-// a whole new BadgeStatus variant just for this one combination.
+// a whole new BadgeStatus variant just for this one combination. Rejected takes priority over
+// pending-confirmation: once an agent's rejection request is approved, that collection is no
+// longer "awaiting" anything — it's a settled outcome, and dropped from pendingConfirmationCount
+// server-side (see CollectionRepository), so a line can't show both at once anyway.
 function lineStatusBadge(line: OfjAgentLineResponse, dict: Dictionary) {
+  if (line.rejectedCount > 0) {
+    return <Badge status="DENIED" label={t(dict.ofj.rejectedCollections, { count: line.rejectedCount })} />;
+  }
   if (line.resolved && line.pendingConfirmationCount > 0) {
     return <Badge status="PENDING" label={t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })} />;
   }

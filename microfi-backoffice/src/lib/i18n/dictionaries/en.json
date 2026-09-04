@@ -429,6 +429,7 @@
     "pageSubtitle": "Digital cash-desk reconciliation, read-only from the Back-Office.",
     "noBranches": "No branches exist yet. Create one first.",
     "awaitingAgentConfirmation": "{count} awaiting agent confirmation",
+    "rejectedCollections": "{count} rejected",
     "viewingBranch": "Viewing branch",
     "branchFallback": "Branch",
     "reconcileCash": "Reconcile Cash",

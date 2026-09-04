@@ -20,6 +20,7 @@ import '../route/route_screen.dart';
 import 'agent_profile.dart';
 import 'branch_notice_repository.dart';
 import 'branch_repository.dart';
+import 'collection_rejection_notification_cache.dart';
 import 'contact_branch.dart';
 import 'home_repository.dart';
 import 'reconciliation_confirm_screen.dart';
@@ -64,6 +65,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _pendingConfirmationCount = 0;
   Timer? _confirmationPollTimer;
 
+  Timer? _rejectionDecisionPollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -85,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _sosPollTimer?.cancel();
     _noticePollTimer?.cancel();
     _confirmationPollTimer?.cancel();
+    _rejectionDecisionPollTimer?.cancel();
     super.dispose();
   }
 
@@ -116,6 +120,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _noticePollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkBranchNotices());
       _checkPendingConfirmations();
       _confirmationPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPendingConfirmations());
+      _checkRejectionDecisions();
+      _rejectionDecisionPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkRejectionDecisions());
       if (pending.isNotEmpty && await ConnectivityService.instance.isOnline()) _syncNow();
     } catch (e) {
       if (!mounted) return;
@@ -326,6 +332,39 @@ class _HomeScreenState extends State<HomeScreen> {
       final lines = await ReconciliationRepository(widget.token).listMyPendingConfirmations();
       if (!mounted) return;
       setState(() => _pendingConfirmationCount = lines.length);
+    } catch (_) {
+      // Best-effort — silently retried on the next poll/screen load.
+    }
+  }
+
+  // Same no-push-infrastructure reasoning as SOS/branch-notices/pending-confirmations above — an
+  // agent who asked to void a collection for error has no way to learn a manager/admin decided it
+  // except by polling. Scoped to APPROVED/DENIED only (never PENDING): the notification is about
+  // the *decision*, and CollectionRejectionNotificationCache's persisted diff (same reasoning as
+  // SosAckNotificationCache) is what stops the same decision from being announced again after
+  // AppShell rebuilds this screen from scratch on a tab switch.
+  Future<void> _checkRejectionDecisions() async {
+    final profile = _profile;
+    if (profile == null) return;
+    try {
+      final requests = await ReconciliationRepository(widget.token).listMyRejectionRequests();
+      if (!mounted) return;
+
+      final decided = requests.where((r) => r.status == 'APPROVED' || r.status == 'DENIED').toList();
+      final newlyDecided = await CollectionRejectionNotificationCache(profile.id)
+          .diffNewlyDecided(decided.map((r) => r.id).toList());
+      if (newlyDecided.isEmpty || !mounted) return;
+
+      final l10n = AppLocalizations.of(context)!;
+      for (final request in decided.where((r) => newlyDecided.contains(r.id))) {
+        if (!mounted) return;
+        final message = request.status == 'APPROVED'
+            ? l10n.hsRejectionApprovedMessage
+            : l10n.hsRejectionDeniedMessage(request.decisionReason ?? '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: MicrofiColors.secondary),
+        );
+      }
     } catch (_) {
       // Best-effort — silently retried on the next poll/screen load.
     }

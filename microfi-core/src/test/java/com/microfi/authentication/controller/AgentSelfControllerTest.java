@@ -46,6 +46,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(controllers = AgentSelfController.class)
@@ -384,5 +385,25 @@ class AgentSelfControllerTest {
                 .bodyValue("{\"reason\":\"\"}")
                 .exchange()
                 .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void myCollectionRejectionRequestsReturnsOnlyThisAgentsRequestsWithDecisionDetails() {
+        UUID requestId = UUID.randomUUID();
+        UUID collectionId = UUID.randomUUID();
+        when(collectionRejectionService.list(eq(java.util.List.of(agentId)), isNull())).thenReturn(java.util.List.of(
+                CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId).agentId(agentId)
+                        .reason("Wrong amount entered").status(CollectionRejectionStatus.DENIED)
+                        .decisionReason("Not enough evidence").requestedAt(java.time.Instant.now()).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/collection-rejection-requests")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(requestId.toString())
+                .jsonPath("$[0].status").isEqualTo("DENIED")
+                .jsonPath("$[0].decisionReason").isEqualTo("Not enough evidence");
     }
 }

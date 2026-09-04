@@ -9,8 +9,10 @@ import com.microfi.shared.dto.MiddlewareTransactionReversalResult;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionStatus;
+import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.repository.CollectionRejectionRequestRepository;
 import com.microfi.transactions.repository.CollectionRepository;
+import com.microfi.transactions.repository.OfjAgentLineRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,6 +40,8 @@ class CollectionRejectionServiceTest {
     @Mock
     private CollectionRepository collectionRepository;
     @Mock
+    private OfjAgentLineRepository ofjAgentLineRepository;
+    @Mock
     private ClientDirectoryService clientDirectoryService;
     @Mock
     private CbsClientService cbsClientService;
@@ -55,7 +59,7 @@ class CollectionRejectionServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new CollectionRejectionService(collectionRejectionRequestRepository, collectionRepository,
-                clientDirectoryService, cbsClientService, smsGatewayFactory);
+                ofjAgentLineRepository, clientDirectoryService, cbsClientService, smsGatewayFactory);
         when(collectionRejectionRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -164,6 +168,29 @@ class CollectionRejectionServiceTest {
         CollectionRejectionRequest result = service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
 
         assertThat(result.getStatus()).isEqualTo(CollectionRejectionStatus.APPROVED);
+    }
+
+    @Test
+    void approveDebitsTheReconciliationLinesStoredTotalsByTheVoidedAmount() {
+        UUID requestId = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        CollectionRejectionRequest request = CollectionRejectionRequest.builder().id(requestId).collectionId(collectionId)
+                .agentId(agentId).status(CollectionRejectionStatus.PENDING).build();
+        Collection pendingConfirmation = collection().reconciledInLineId(lineId).build();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .collectionsTotalXaf(20000L).digitalTotalXaf(20000L).build();
+        when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(pendingConfirmation));
+        when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
+        when(ofjAgentLineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(requestId, "proofs/abc.pdf", UUID.randomUUID());
+
+        ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
+        verify(ofjAgentLineRepository).save(captor.capture());
+        assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(15000L);
+        assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(15000L);
     }
 
     @Test

@@ -6,8 +6,10 @@ import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.domain.CollectionRejectionStatus;
+import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.repository.CollectionRejectionRequestRepository;
 import com.microfi.transactions.repository.CollectionRepository;
+import com.microfi.transactions.repository.OfjAgentLineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -35,6 +37,7 @@ public class CollectionRejectionService {
 
     private final CollectionRejectionRequestRepository collectionRejectionRequestRepository;
     private final CollectionRepository collectionRepository;
+    private final OfjAgentLineRepository ofjAgentLineRepository;
     private final ClientDirectoryService clientDirectoryService;
     private final CbsClientService cbsClientService;
     private final SmsGatewayFactory smsGatewayFactory;
@@ -81,10 +84,28 @@ public class CollectionRejectionService {
         collection.setVoidedAt(now);
         collectionRepository.save(collection);
 
+        // The line's collectionsTotalXaf/digitalTotalXaf are running totals stamped once at
+        // reconcile() time (see OfjService#reconcile), not recomputed live from Collection rows —
+        // an approved rejection must debit them here or the branch's OFJ summary keeps counting
+        // cash that's since been voided, whether the agent had already confirmed it or was still
+        // waiting to (pendingConfirmationCount is filtered dynamically instead, since it's derived
+        // fresh on every read rather than stored).
+        if (collection.getReconciledInLineId() != null) {
+            ofjAgentLineRepository.findById(collection.getReconciledInLineId()).ifPresent(line -> {
+                line.setCollectionsTotalXaf(nz(line.getCollectionsTotalXaf()) - collection.getAmountXaf());
+                line.setDigitalTotalXaf(line.getDigitalTotalXaf() - collection.getAmountXaf());
+                ofjAgentLineRepository.save(line);
+            });
+        }
+
         if (collection.getExportedAt() != null && collection.getCbsTransactionRef() != null) {
             reverseAndNotifyClient(collection);
         }
         return request;
+    }
+
+    private static long nz(Long value) {
+        return value == null ? 0L : value;
     }
 
     public CollectionRejectionRequest deny(UUID requestId, String decisionReason, UUID reviewerId) {

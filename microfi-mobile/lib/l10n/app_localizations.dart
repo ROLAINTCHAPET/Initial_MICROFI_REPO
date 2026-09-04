@@ -644,6 +644,18 @@ abstract class AppLocalizations {
   /// **'Your SOS was acknowledged by your branch.'**
   String get hsSosAcknowledgedMessage;
 
+  /// Home screen — SnackBar shown when a manager/admin approves this agent's collection-rejection request.
+  ///
+  /// In en, this message translates to:
+  /// **'Your request to void a collection was approved.'**
+  String get hsRejectionApprovedMessage;
+
+  /// Home screen — SnackBar shown when a manager/admin denies this agent's collection-rejection request.
+  ///
+  /// In en, this message translates to:
+  /// **'Your request to void a collection was denied: {reason}'**
+  String hsRejectionDeniedMessage(String reason);
+
   /// Home screen — primary CTA button to start a new collection.
   ///
   /// In en, this message translates to:

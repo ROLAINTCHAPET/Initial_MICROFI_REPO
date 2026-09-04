@@ -215,16 +215,34 @@ public class AgentSelfController {
                             .detailsKey("COLLECTION_REJECTION_REQUESTED_DETAIL")
                             .detailsParam1(request.getReason())
                             .build());
-                    return CollectionRejectionRequestResponse.builder()
-                            .id(result.getId())
-                            .collectionId(result.getCollectionId())
-                            .agentId(result.getAgentId())
-                            .reason(result.getReason())
-                            .requestedAt(result.getRequestedAt())
-                            .status(result.getStatus().name())
-                            .hasProof(false)
-                            .build();
+                    return toRejectionResponse(result);
                 }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private CollectionRejectionRequestResponse toRejectionResponse(CollectionRejectionRequest r) {
+        return CollectionRejectionRequestResponse.builder()
+                .id(r.getId())
+                .collectionId(r.getCollectionId())
+                .agentId(r.getAgentId())
+                .reason(r.getReason())
+                .requestedAt(r.getRequestedAt())
+                .status(r.getStatus().name())
+                .reviewedBy(r.getReviewedBy())
+                .reviewedAt(r.getReviewedAt())
+                .decisionReason(r.getDecisionReason())
+                .hasProof(r.getProofPath() != null)
+                .build();
+    }
+
+    @GetMapping("/collection-rejection-requests")
+    @Operation(summary = "My Collection Rejection Requests", description = "This agent's own void requests, most recent first — lets the mobile app show whether a pending request was approved or denied, since there's no push notification infrastructure and the app must poll for the outcome (same pattern as branch-notices/pending-confirmations).")
+    public Flux<CollectionRejectionRequestResponse> myCollectionRejectionRequests(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMapMany(agent -> Mono.fromCallable(() -> collectionRejectionService.list(List.of(agent.getId()), null))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable))
+                .map(this::toRejectionResponse);
     }
 
     @PatchMapping("/pin")

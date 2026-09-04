@@ -89,12 +89,19 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
      * OfjAgentLine} row (see {@code OfjService#reconcile}'s find-or-create), so a line can end up
      * mixing an earlier, already-{@code CONFIRMED} batch with a newer {@code
      * PENDING_AGENT_CONFIRMATION} one under the same id. The pending-confirmations screen must show
-     * only what's actually still awaiting the agent, not the line's whole history.
+     * only what's actually still awaiting the agent, not the line's whole history. Excludes voided
+     * rows: approving a rejection request never changes {@code reconciliationStatus} (see
+     * CollectionRejectionService#approve), only stamps {@code voidedAt} — without this filter a
+     * collection whose rejection was just approved would keep counting as "awaiting confirmation"
+     * forever instead of dropping off the line's pending count.
      */
-    long countByReconciledInLineIdAndReconciliationStatus(UUID lineId, CollectionReconciliationStatus status);
+    long countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(UUID lineId, CollectionReconciliationStatus status);
+
+    /** Collections under this line whose rejection request was approved — drives the /ofj "Rejected" badge, taking priority over the plain pending-confirmation count. */
+    long countByReconciledInLineIdAndVoidedAtIsNotNull(UUID lineId);
 
     @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
-            + "WHERE c.reconciledInLineId = :lineId AND c.reconciliationStatus = :status")
+            + "WHERE c.reconciledInLineId = :lineId AND c.reconciliationStatus = :status AND c.voidedAt IS NULL")
     long sumByReconciledInLineIdAndReconciliationStatus(@Param("lineId") UUID lineId, @Param("status") CollectionReconciliationStatus status);
 
     /** Distinct lines still awaiting this agent's confirmation — AgentReconciliationController's pending-confirmations list. */
