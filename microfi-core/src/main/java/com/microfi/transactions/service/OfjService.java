@@ -9,6 +9,7 @@ import com.microfi.cbsclient.CbsClientService;
 import com.microfi.savings.service.ActivationCashLine;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
+import com.microfi.shared.dto.AdminPendingConfirmationResponse;
 import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.EndDayResponse;
@@ -261,6 +262,37 @@ public class OfjService {
                         .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
                         .lastCountedAt(linesById.get(lineId) != null ? linesById.get(lineId).getLastCountedAt() : null)
                         .build())
+                .toList();
+    }
+
+    /**
+     * Branch-wide equivalent of {@link #listPendingConfirmationLines} — the Back-Office "En
+     * attente" view (a dedicated queue, distinct from the badge shown on an already-resolved
+     * line, so a manager isn't left guessing what "N en attente de confirmation" actually refers
+     * to). Same per-line, not per-collection scoping, for the same reason.
+     */
+    public List<AdminPendingConfirmationResponse> listPendingConfirmationsForBranch(UUID branchId) {
+        List<UUID> agentIds = agentDirectoryService.findAgentIdsByBranch(branchId);
+        if (agentIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> lineIds = collectionRepository.findDistinctPendingConfirmationLineIdsByAgentIn(agentIds);
+        if (lineIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, OfjAgentLine> linesById = ofjAgentLineRepository.findAllById(lineIds).stream()
+                .collect(Collectors.toMap(OfjAgentLine::getId, l -> l));
+        return lineIds.stream()
+                .map(lineId -> {
+                    OfjAgentLine line = linesById.get(lineId);
+                    return AdminPendingConfirmationResponse.builder()
+                            .lineId(lineId)
+                            .agentId(line != null ? line.getAgentId() : null)
+                            .totalXaf(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                            .collectionCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(lineId, CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
+                            .lastCountedAt(line != null ? line.getLastCountedAt() : null)
+                            .build();
+                })
                 .toList();
     }
 

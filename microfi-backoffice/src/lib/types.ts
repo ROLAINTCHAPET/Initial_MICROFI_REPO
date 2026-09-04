@@ -86,6 +86,14 @@ export interface OfjAgentLineResponse {
   rejectedCount: number;
 }
 
+export interface AdminPendingConfirmationResponse {
+  lineId: string;
+  agentId: string;
+  totalXaf: number;
+  collectionCount: number;
+  lastCountedAt: string | null;
+}
+
 export interface OfjSummaryResponse {
   sessionId: string;
   branchId: string;

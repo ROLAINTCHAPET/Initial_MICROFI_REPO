@@ -7,7 +7,7 @@ import { Badge } from "@/components/Badge";
 import { Icon, type IconName } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import type { ReactNode } from "react";
-import type { AgentResponse, BranchResponse, OfjAgentLineResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
+import type { AdminPendingConfirmationResponse, AgentResponse, BranchResponse, OfjAgentLineResponse, OfjPendingLineResponse, OfjSummaryResponse, VarianceDebtResponse } from "@/lib/types";
 import { OfjExportButtons, type OfjExportRow } from "./OfjExportButtons";
 import { VarianceExportButtons, type VarianceExportRow } from "./VarianceExportButtons";
 import { BranchSelector } from "./BranchSelector";
@@ -18,7 +18,7 @@ import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 import { t } from "@/lib/i18n/format";
 
-type Tab = "summary" | "history" | "variance";
+type Tab = "summary" | "waiting" | "history" | "variance";
 
 function isoDaysAgo(days: number) {
   const d = new Date();
@@ -51,12 +51,13 @@ export default async function OfjOversightPage({
   const dict = getDictionary(await getLocale());
   const TABS: { key: Tab; label: string; icon: IconName }[] = [
     { key: "summary", label: dict.ofj.tabs.summary, icon: "reports" },
+    { key: "waiting", label: dict.ofj.tabs.waiting, icon: "schedule" },
     { key: "history", label: dict.ofj.tabs.history, icon: "history" },
     { key: "variance", label: dict.ofj.tabs.variance, icon: "warning" },
   ];
   const [session, branches] = await Promise.all([getSession(), api.get<BranchResponse[]>("/admin/branches")]);
   const params = await searchParams;
-  const tab: Tab = params.tab === "history" || params.tab === "variance" ? params.tab : "summary";
+  const tab: Tab = params.tab === "waiting" || params.tab === "history" || params.tab === "variance" ? params.tab : "summary";
   const openOnly = params.openOnly === "true";
   const from = params.from ?? isoDaysAgo(30);
   const to = params.to ?? isoDaysAgo(0);
@@ -127,6 +128,7 @@ export default async function OfjOversightPage({
       {tab === "summary" && (
         <SummaryView branchId={branchId} branchLabel={branch ? `${branch.name} (${branch.code})` : branchId} agentById={agentById} canRecordVariance={canRecordVariance} generatedBy={generatedBy} />
       )}
+      {tab === "waiting" && <WaitingView branchId={branchId} agentById={agentById} />}
       {tab === "history" && (
         <HistoryView branchId={branchId} branchLabel={branch ? `${branch.name} (${branch.code})` : branchId} agentById={agentById} canRecordVariance={canRecordVariance} from={from} to={to} generatedBy={generatedBy} />
       )}
@@ -297,6 +299,38 @@ async function SummaryView({
           </Tbody>
         </Table>
         {agentsReporting === 0 && <EmptyState>{dict.ofj.summary.noActivity}</EmptyState>}
+      </SectionCard>
+    </div>
+  );
+}
+
+async function WaitingView({ branchId, agentById }: { branchId: string; agentById: Map<string, AgentResponse> }) {
+  const dict = getDictionary(await getLocale());
+  const pending = await api.get<AdminPendingConfirmationResponse[]>(`/ofj/${branchId}/pending-confirmations`);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionCard icon="schedule" title={dict.ofj.waiting.title}>
+        <p className="text-sm text-on-surface-variant -mt-2">{dict.ofj.waiting.subtitle}</p>
+        <Table>
+          <Thead>
+            <Th>{dict.dashboard.colAgent}</Th>
+            <Th>{dict.ofj.waiting.colAmount}</Th>
+            <Th>{dict.ofj.waiting.colCollections}</Th>
+            <Th>{dict.ofj.waiting.colWaitingSince}</Th>
+          </Thead>
+          <Tbody>
+            {pending.map((line) => (
+              <Tr key={line.lineId}>
+                <Td className="font-medium text-on-surface">{agentLabel(agentById, line.agentId)}</Td>
+                <Td>{line.totalXaf.toLocaleString()} XAF</Td>
+                <Td>{line.collectionCount.toLocaleString()}</Td>
+                <Td className="text-on-surface-variant">{line.lastCountedAt ? new Date(line.lastCountedAt).toLocaleString() : "—"}</Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+        {pending.length === 0 && <EmptyState>{dict.ofj.waiting.noResults}</EmptyState>}
       </SectionCard>
     </div>
   );

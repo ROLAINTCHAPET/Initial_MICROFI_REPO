@@ -365,7 +365,10 @@
       "shortageUnresolvedNotice": "A shortage will remain unresolved until a manager records it as a variance debt from End of Day Oversight.",
       "selectAgentPrompt": "Select an agent from the queue to begin reconciliation.",
       "todaysValidated": "Today's Validated",
-      "noValidatedLinesYet": "No validated lines yet today."
+      "noValidatedLinesYet": "No validated lines yet today.",
+      "waitingConfirmation": "Waiting Confirmation",
+      "waitingConfirmationCount": "{count} awaiting the agent's own confirmation",
+      "noneWaitingConfirmation": "Nothing is currently awaiting an agent's confirmation."
     }
   },
   "sos": {
@@ -437,8 +440,17 @@
     "businessDate": "Business date: {date}",
     "tabs": {
       "summary": "Today's Summary",
+      "waiting": "Awaiting Confirmation",
       "history": "History",
       "variance": "Variance Debts"
+    },
+    "waiting": {
+      "title": "Reconciled, Awaiting Agent Confirmation",
+      "subtitle": "The cashier has physically counted this cash — it stays here, still occupying the agent's escrow ceiling, until the agent confirms it themselves.",
+      "colAmount": "Amount",
+      "colCollections": "Collections",
+      "colWaitingSince": "Waiting Since",
+      "noResults": "Nothing is currently awaiting an agent's confirmation."
     },
     "summary": {
       "agentsReporting": "Agents Reporting",

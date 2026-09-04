@@ -365,7 +365,10 @@
       "shortageUnresolvedNotice": "Un déficit restera non résolu tant qu'un chef d'agence ne l'aura pas enregistré comme un écart à recouvrer depuis la Supervision de fin de journée.",
       "selectAgentPrompt": "Sélectionnez un agent dans la file pour commencer le rapprochement.",
       "todaysValidated": "Validés aujourd'hui",
-      "noValidatedLinesYet": "Aucune ligne validée aujourd'hui."
+      "noValidatedLinesYet": "Aucune ligne validée aujourd'hui.",
+      "waitingConfirmation": "En attente de confirmation",
+      "waitingConfirmationCount": "{count} en attente de la confirmation de l'agent",
+      "noneWaitingConfirmation": "Rien n'est actuellement en attente de confirmation d'un agent."
     }
   },
   "sos": {
@@ -437,8 +440,17 @@
     "businessDate": "Date d'exercice : {date}",
     "tabs": {
       "summary": "Résumé du jour",
+      "waiting": "En attente de confirmation",
       "history": "Historique",
       "variance": "Dettes pour écart"
+    },
+    "waiting": {
+      "title": "Réconciliés, en attente de confirmation de l'agent",
+      "subtitle": "Le caissier a physiquement compté ces fonds — ils restent ici, occupant toujours le plafond d'encaisse de l'agent, jusqu'à ce que l'agent les confirme lui-même.",
+      "colAmount": "Montant",
+      "colCollections": "Encaissements",
+      "colWaitingSince": "En attente depuis",
+      "noResults": "Rien n'est actuellement en attente de confirmation d'un agent."
     },
     "summary": {
       "agentsReporting": "Agents ayant reporté",

@@ -136,15 +136,32 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
             + "WHERE c.reconciledInLineId = :lineId AND c.reconciliationStatus = :status AND c.voidedAt IS NULL")
     long sumByReconciledInLineIdAndReconciliationStatus(@Param("lineId") UUID lineId, @Param("status") CollectionReconciliationStatus status);
 
-    /** Distinct lines still awaiting this agent's confirmation — AgentReconciliationController's pending-confirmations list. */
+    /**
+     * Distinct lines still awaiting this agent's confirmation — AgentReconciliationController's
+     * pending-confirmations list. {@code voidedAt IS NULL} matters here specifically: approving a
+     * rejection request never changes the rejected collection's own {@code reconciliationStatus}
+     * (see CollectionRejectionService#approve, which only stamps {@code voidedAt}) — without this
+     * filter, a collection that was {@code PENDING_AGENT_CONFIRMATION} at the moment its rejection
+     * was approved would leave a permanent "ghost" line here forever: the count/sum queries
+     * already exclude it correctly, but the line itself would still surface with nothing real left
+     * in it, showing the agent a phantom "awaiting confirmation" they have nothing to act on.
+     */
     @Query("SELECT DISTINCT c.reconciledInLineId FROM Collection c "
-            + "WHERE c.agentId = :agentId AND c.reconciliationStatus = com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION")
+            + "WHERE c.agentId = :agentId AND c.reconciliationStatus = com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION "
+            + "AND c.voidedAt IS NULL")
     List<UUID> findDistinctPendingConfirmationLineIdsByAgent(@Param("agentId") UUID agentId);
 
-    /** Every line, across every agent/branch, still awaiting confirmation — CollectionConfirmationExpiryJob filters this down by the line's own age. */
+    /** Every line, across every agent/branch, still awaiting confirmation — CollectionConfirmationExpiryJob filters this down by the line's own age. See {@link #findDistinctPendingConfirmationLineIdsByAgent}'s doc for why voidedAt IS NULL matters here too. */
     @Query("SELECT DISTINCT c.reconciledInLineId FROM Collection c "
-            + "WHERE c.reconciliationStatus = com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION")
+            + "WHERE c.reconciliationStatus = com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION "
+            + "AND c.voidedAt IS NULL")
     List<UUID> findDistinctPendingConfirmationLineIds();
+
+    /** Branch-wide equivalent of {@link #findDistinctPendingConfirmationLineIdsByAgent} — backs the Back-Office "En attente" view (OfjService#listPendingConfirmationsForBranch). Same voidedAt IS NULL reasoning. */
+    @Query("SELECT DISTINCT c.reconciledInLineId FROM Collection c "
+            + "WHERE c.agentId IN :agentIds AND c.reconciliationStatus = com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION "
+            + "AND c.voidedAt IS NULL")
+    List<UUID> findDistinctPendingConfirmationLineIdsByAgentIn(@Param("agentIds") List<UUID> agentIds);
 
     /** UC-11: an agent's collections for a specific calendar day, for the tracking map's route/transaction markers — deliberately date-scoped, unrelated to reconciliation status. */
     List<Collection> findByAgentIdInAndCollectedAtBetween(List<UUID> agentIds, Instant start, Instant end);

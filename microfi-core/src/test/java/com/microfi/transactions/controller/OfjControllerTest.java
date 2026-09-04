@@ -113,6 +113,24 @@ class OfjControllerTest {
     }
 
     @Test
+    void testPendingConfirmations() {
+        UUID agentId = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        when(ofjService.listPendingConfirmationsForBranch(branchId)).thenReturn(List.of(
+                com.microfi.shared.dto.AdminPendingConfirmationResponse.builder().lineId(lineId).agentId(agentId).totalXaf(7000).collectionCount(3).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .get()
+                .uri("/api/v1/ofj/" + branchId + "/pending-confirmations")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].lineId").isEqualTo(lineId.toString())
+                .jsonPath("$[0].agentId").isEqualTo(agentId.toString())
+                .jsonPath("$[0].totalXaf").isEqualTo(7000);
+    }
+
+    @Test
     void testHistory() {
         when(ofjService.listHistory(branchId)).thenReturn(List.of(
                 OfjSummaryResponse.builder().sessionId(UUID.randomUUID()).branchId(branchId).status("CLOSED").agentLines(List.of()).build()));

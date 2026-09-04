@@ -822,6 +822,34 @@ class OfjServiceTest {
     }
 
     @Test
+    void listPendingConfirmationsForBranchReturnsPendingTotalsAcrossAgents() {
+        UUID lineId = UUID.randomUUID();
+        OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
+                .lastCountedAt(Instant.now()).build();
+        when(agentDirectoryService.findAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(collectionRepository.findDistinctPendingConfirmationLineIdsByAgentIn(List.of(agentId))).thenReturn(List.of(lineId));
+        when(ofjAgentLineRepository.findAllById(List.of(lineId))).thenReturn(List.of(line));
+        when(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(eq(lineId), any())).thenReturn(7000L);
+        when(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(eq(lineId), any())).thenReturn(3L);
+
+        List<com.microfi.shared.dto.AdminPendingConfirmationResponse> pending = ofjService.listPendingConfirmationsForBranch(branchId);
+
+        assertThat(pending).hasSize(1);
+        assertThat(pending.get(0).getLineId()).isEqualTo(lineId);
+        assertThat(pending.get(0).getAgentId()).isEqualTo(agentId);
+        assertThat(pending.get(0).getTotalXaf()).isEqualTo(7000L);
+        assertThat(pending.get(0).getCollectionCount()).isEqualTo(3L);
+        assertThat(pending.get(0).getLastCountedAt()).isEqualTo(line.getLastCountedAt());
+    }
+
+    @Test
+    void listPendingConfirmationsForBranchReturnsEmptyWhenBranchHasNoAgents() {
+        when(agentDirectoryService.findAgentIdsByBranch(branchId)).thenReturn(List.of());
+
+        assertThat(ofjService.listPendingConfirmationsForBranch(branchId)).isEmpty();
+    }
+
+    @Test
     void confirmReconciliationMarksAgentConfirmedForOwnLine() {
         UUID lineId = UUID.randomUUID();
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId).build();

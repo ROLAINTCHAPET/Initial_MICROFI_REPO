@@ -6,6 +6,7 @@ import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.domain.AdminRole;
+import com.microfi.shared.dto.AdminPendingConfirmationResponse;
 import com.microfi.shared.dto.ExportBatchResponse;
 import com.microfi.shared.dto.ExportRequest;
 import com.microfi.shared.dto.OfjAgentLineResponse;
@@ -70,6 +71,18 @@ public class OfjController {
                 .flatMapMany(caller -> {
                     AdminAccess.requireBranchScope(caller, branchId);
                     return Mono.fromCallable(() -> ofjService.listPendingAgents(branchId))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(Flux::fromIterable);
+                });
+    }
+
+    @GetMapping("/pending-confirmations")
+    @Operation(summary = "Pending Agent Confirmations Queue", description = "Reconciliation lines the cashier has physically counted but that still need the agent's own sign-off before the cash stops occupying their escrow ceiling — a dedicated \"En attente\" view, distinct from the badge already shown on an already-resolved line. Any Back-Office role, own branch only.")
+    public Flux<AdminPendingConfirmationResponse> pendingConfirmations(@PathVariable UUID branchId, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMapMany(caller -> {
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    return Mono.fromCallable(() -> ofjService.listPendingConfirmationsForBranch(branchId))
                             .subscribeOn(Schedulers.boundedElastic())
                             .flatMapMany(Flux::fromIterable);
                 });

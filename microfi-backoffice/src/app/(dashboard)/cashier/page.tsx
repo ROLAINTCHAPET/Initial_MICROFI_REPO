@@ -6,7 +6,7 @@ import { Icon } from "@/components/Icon";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import type { AgentResponse, BranchResponse, OfjPendingLineResponse, OfjSummaryResponse } from "@/lib/types";
 import { CashierBranchSelector } from "./CashierBranchSelector";
-import { ReconcileWorkspace, type QueueLine, type ValidatedLine } from "./ReconcileWorkspace";
+import { ReconcileWorkspace, type QueueLine, type ValidatedLine, type WaitingConfirmationLine } from "./ReconcileWorkspace";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getLocale } from "@/lib/i18n/locale";
 
@@ -46,8 +46,16 @@ export default async function CashierPortalPage({
     ...pending.map((p) => ({ lineId: `pending-${p.agentId}`, agentId: p.agentId, agentLabel: label(p.agentId), digitalTotalXaf: p.digitalTotalXaf })),
   ];
 
+  // A resolved line (physical count matches digital) isn't actually DONE until the agent also
+  // signs off — see CollectionReconciliationStatus's doc. Splitting these into their own section,
+  // shown before "Today's Validated", is what stops a cashier from reading "resolved" as "nothing
+  // left to do here" when the agent's own confirmation is still outstanding.
+  const waitingConfirmation: WaitingConfirmationLine[] = summary.agentLines
+    .filter((l) => l.resolved && l.pendingConfirmationCount > 0)
+    .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), physicalTotalXaf: l.physicalTotalXaf, pendingConfirmationCount: l.pendingConfirmationCount }));
+
   const validated: ValidatedLine[] = summary.agentLines
-    .filter((l) => l.resolved)
+    .filter((l) => l.resolved && l.pendingConfirmationCount === 0)
     .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), physicalTotalXaf: l.physicalTotalXaf, deltaXaf: l.deltaXaf }));
 
   return (
@@ -71,7 +79,7 @@ export default async function CashierPortalPage({
           </div>
         )}
       </div>
-      <ReconcileWorkspace branchId={branchId} queue={queue} validated={validated} />
+      <ReconcileWorkspace branchId={branchId} queue={queue} waitingConfirmation={waitingConfirmation} validated={validated} />
     </div>
   );
 }

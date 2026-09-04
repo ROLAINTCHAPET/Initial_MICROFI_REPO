@@ -22,13 +22,22 @@ export interface ValidatedLine {
   deltaXaf: number;
 }
 
+export interface WaitingConfirmationLine {
+  lineId: string;
+  agentLabel: string;
+  physicalTotalXaf: number;
+  pendingConfirmationCount: number;
+}
+
 export function ReconcileWorkspace({
   branchId,
   queue,
+  waitingConfirmation,
   validated,
 }: {
   branchId: string;
   queue: QueueLine[];
+  waitingConfirmation: WaitingConfirmationLine[];
   validated: ValidatedLine[];
 }) {
   const router = useRouter();
@@ -204,7 +213,30 @@ export function ReconcileWorkspace({
         )}
       </div>
 
-      <div className="w-full lg:w-72 shrink-0 bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] overflow-hidden">
+      <div className="w-full lg:w-72 shrink-0 flex flex-col gap-6">
+        <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] overflow-hidden">
+          <div className="px-5 py-4 border-b-2 border-outline-variant bg-surface-container-low">
+            <h2 className="flex items-center gap-2 font-bold text-on-surface">
+              <Icon name="schedule" className="size-5 text-primary" />
+              {dict.cashier.reconcile.waitingConfirmation}
+            </h2>
+          </div>
+          <div className="p-4 flex flex-col gap-2">
+            {waitingConfirmation.map((item) => (
+              <div key={item.lineId} className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-sm)] p-3 flex flex-col gap-1">
+                <span className="font-semibold text-xs text-on-surface-variant">{item.agentLabel}</span>
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-sm text-primary">{item.physicalTotalXaf.toLocaleString()} XAF</span>
+                  <Icon name="schedule" className="size-5 text-outline" />
+                </div>
+                <span className="text-xs text-on-surface-variant">{t(dict.cashier.reconcile.waitingConfirmationCount, { count: item.pendingConfirmationCount })}</span>
+              </div>
+            ))}
+            {waitingConfirmation.length === 0 && <p className="text-sm text-on-surface-variant p-2">{dict.cashier.reconcile.noneWaitingConfirmation}</p>}
+          </div>
+        </div>
+
+        <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-md)] overflow-hidden">
         <div className="px-5 py-4 border-b-2 border-outline-variant bg-surface-container-low">
           <h2 className="flex items-center gap-2 font-bold text-on-surface">
             <Icon name="check-circle" className="size-5 text-primary" />
@@ -222,6 +254,7 @@ export function ReconcileWorkspace({
             </div>
           ))}
           {validated.length === 0 && <p className="text-sm text-on-surface-variant p-2">{dict.cashier.reconcile.noValidatedLinesYet}</p>}
+        </div>
         </div>
       </div>
     </div>
