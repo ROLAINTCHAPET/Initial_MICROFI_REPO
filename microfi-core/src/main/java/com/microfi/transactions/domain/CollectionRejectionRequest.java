@@ -42,8 +42,17 @@ public class CollectionRejectionRequest {
     @Column(nullable = false)
     private String reason;
 
-    /** Snapshot of {@code Collection#amountXaf} at request time — the amount the agent says is wrong, kept even if the collection itself were ever inspected later, so the reviewer always sees exactly what was recorded without a second lookup. */
-    private long actualAmountXaf;
+    /**
+     * Snapshot of {@code Collection#amountXaf} at request time — the amount the agent says is
+     * wrong, kept even if the collection itself were ever inspected later, so the reviewer always
+     * sees exactly what was recorded without a second lookup. Boxed (not primitive {@code long|})
+     * so Hibernate's {@code ddl-auto=update} can add this column onto a table that already has
+     * rows — a plain {@code NOT NULL} primitive column has no value to backfill existing rows
+     * with, and {@code ddl-auto=update} silently skips adding it rather than erroring, which is
+     * exactly what happened here the first time this shipped (see OfjAgentLine#collectionsTotalXaf
+     * for the same precedent). Null only on rows created before this field existed.
+     */
+    private Long actualAmountXaf;
 
     /** What the agent says the amount should actually have been — optional, since not every rejection reason is amount-related (wrong client, duplicate entry, etc.). */
     private Long expectedAmountXaf;

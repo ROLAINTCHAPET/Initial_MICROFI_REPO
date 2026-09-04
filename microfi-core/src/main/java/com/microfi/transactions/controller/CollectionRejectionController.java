@@ -156,7 +156,7 @@ public class CollectionRejectionController {
                 .collectionId(r.getCollectionId())
                 .agentId(r.getAgentId())
                 .reason(r.getReason())
-                .actualAmountXaf(r.getActualAmountXaf())
+                .actualAmountXaf(r.getActualAmountXaf() == null ? 0L : r.getActualAmountXaf())
                 .expectedAmountXaf(r.getExpectedAmountXaf())
                 .requestedAt(r.getRequestedAt())
                 .status(r.getStatus().name())
