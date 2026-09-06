@@ -1,0 +1,124 @@
+name: CI
+
+# Replaces .gitlab-ci.yml, which is GitLab configuration sitting on a GitHub remote and so has
+# never run anything -- its jobs are placeholder `echo`s in any case. Until this workflow, the
+# ~550 tests in this repository executed nowhere.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch makes the in-flight run redundant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: microfi-core tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 21 to match <java.version> and the Dockerfiles. The build also works on newer JDKs
+      # now that Lombok is declared in annotationProcessorPaths, but CI should build what ships.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test
+        working-directory: microfi-core
+        run: ./mvnw -B --no-transfer-progress test
+
+      # Keep the surefire XML from a failed run. First-party action on purpose: a report
+      # plugin that annotates the PR needs checks:write, which fails outright on repositories
+      # whose default token is read-only -- a CI setup that breaks on arrival helps nobody.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-microfi-core
+          path: microfi-core/target/surefire-reports/
+          if-no-files-found: ignore
+
+  middleware:
+    name: microfi-middleware tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test
+        working-directory: microfi-middleware
+        run: ./mvnw -B --no-transfer-progress test
+
+      # Keep the surefire XML from a failed run. First-party action on purpose: a report
+      # plugin that annotates the PR needs checks:write, which fails outright on repositories
+      # whose default token is read-only -- a CI setup that breaks on arrival helps nobody.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-microfi-middleware
+          path: microfi-middleware/target/surefire-reports/
+          if-no-files-found: ignore
+
+  mobile:
+    name: microfi-mobile tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pubspec.yaml requires Dart SDK ^3.12.2, which this Flutter version ships. Pinned rather
+      # than floating on `stable`: a Flutter release that bumps Dart past what the lockfile
+      # resolves would fail here for reasons unrelated to the change being tested.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        working-directory: microfi-mobile
+        run: flutter pub get
+
+      # test/ only. integration_test/ drives a real device or emulator (SQLCipher storage,
+      # receipt printing) and cannot run on a bare runner.
+      - name: Test
+        working-directory: microfi-mobile
+        run: flutter test test/
+
+  backoffice:
+    name: microfi-backoffice lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: microfi-backoffice/package-lock.json
+
+      - name: Install
+        working-directory: microfi-backoffice
+        run: npm ci
+
+      # Lint, not tests: this module has no test files at all, which is worth fixing given it
+      # drives escrow top-ups, variance write-offs and rejection approvals. Until it has some,
+      # this is the only automated check standing over it.
+      - name: Lint
+        working-directory: microfi-backoffice
+        run: npm run lint
