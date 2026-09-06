@@ -126,7 +126,7 @@ consumers:
     jwt_secrets:
       - key: microfi-core
         algorithm: HS384
-        # Must be byte-identical to application.security.jwt.secret-key in microfi-core's
-        # application.properties (or the MICROFI_JWT_SECRET env var if overridden) — both sides
+        # Must be byte-identical to the MICROFI_JWT_SECRET env var given to microfi-core (see
+        # docker-compose.yml), which is what application.security.jwt.secret-key reads — both sides
         # now derive the HMAC key from this string's raw UTF-8 bytes (see JwtService#getSignInKey).
         secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"

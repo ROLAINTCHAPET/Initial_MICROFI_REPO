@@ -68,6 +68,11 @@ services:
       - COLLECTION_RECORD_CONSUMER_CONCURRENCY=5
       - COLLECTION_RECORD_CONSUMER_MAX_CONCURRENCY=20
       - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
+      # JWT signing key. Must stay byte-identical to the consumer secret in kong/kong.yml, which
+      # verifies the signature before Core sees the request. This is the development value and is
+      # public (it is committed in this repo) -- Core logs a warning at startup while it is in use.
+      # Generate a fresh one and update both places before any real deployment.
+      - MICROFI_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
       # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
       # Change these before any real deployment.
       - ADMIN_BOOTSTRAP_LOGIN=admin
