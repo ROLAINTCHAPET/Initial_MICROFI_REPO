@@ -112,6 +112,17 @@ services:
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES=true
+      # Same fix as microfi-core above, which this service was missed by: spring-boot-starter-amqp
+      # is on the classpath (see pom.xml), so Boot auto-configures RabbitHealthIndicator even
+      # though nothing here consumes a queue yet — Core calls this service over REST, not AMQP.
+      # Left unset, that indicator probes localhost:5672 inside this container, fails, and drags
+      # /actuator/health to DOWN (503) — breaking healthchecks and uptime probes while the service
+      # is in fact serving CBS calls perfectly well. Pointing it at the real broker also leaves the
+      # door open for the queue-based Core->MW design described in architecture.txt section 3.5.
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=microfi
+      - SPRING_RABBITMQ_PASSWORD=microfi_password
       - CBS_VENDOR=mock
       - CBS_ENDPOINT=
     ports:
