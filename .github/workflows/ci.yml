@@ -76,10 +76,18 @@ jobs:
           if-no-files-found: ignore
 
   mobile:
-    name: microfi-mobile tests
+    name: microfi-mobile tests and APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Gradle needs a JDK, and the runner image's default is not something to inherit silently:
+      # AGP 9.0.1 and Kotlin 2.3.20 want a modern one, and 21 is what Flutter picks locally
+      # (Android Studio's bundled JBR), so pin the same here.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
       # pubspec.yaml requires Dart SDK ^3.12.2, which this Flutter version ships. Pinned rather
       # than floating on `stable`: a Flutter release that bumps Dart past what the lockfile
@@ -99,6 +107,26 @@ jobs:
       - name: Test
         working-directory: microfi-mobile
         run: flutter test test/
+
+      # Without this the first APK build on a runner spends ~13 minutes resolving the dependency
+      # graph for 20+ plugins. Keyed on the Gradle files and the pub lockfile, since those are
+      # what change the graph.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('microfi-mobile/android/**/*.gradle*', 'microfi-mobile/android/gradle/wrapper/gradle-wrapper.properties', 'microfi-mobile/pubspec.lock') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # The unit tests above compile no Android code at all, so they cannot catch a build that
+      # does not assemble: `compileSdk = 37` sat committed here for months resolving to a platform
+      # hash Google does not publish, and `flutter test` stayed green throughout. Only an actual
+      # assemble exercises the AGP/SDK/plugin version constraints against each other.
+      - name: Build debug APK
+        working-directory: microfi-mobile
+        run: flutter build apk --debug
 
   backoffice:
     name: microfi-backoffice lint
