@@ -71,7 +71,14 @@ Core `127.0.0.1:8080` (loopback only — go through Kong unless you are delibera
 around it). The middleware publishes **no** host port: it has no authentication of its own, so
 reach it with `docker compose exec microfi-middleware …`, not a port mapping.
 
+Both Maven builds work on JDK 21 (what the Docker images use, and what `<java.version>` targets)
+and on later JDKs. Lombok is declared as an explicit `annotationProcessorPaths` entry in both poms
+because JDK 23+ no longer runs annotation processors that are only on the classpath — without that
+entry, a local build on a newer JDK fails with a wall of "cannot find symbol" errors on
+Lombok-generated methods while the Docker build stays green.
+
 `.gitlab-ci.yml` is placeholder echoes only — CI does not actually build or test anything yet.
+Note it is GitLab config on a GitHub remote, so nothing runs it at all.
 
 ## Request path and the JWT contract
 
