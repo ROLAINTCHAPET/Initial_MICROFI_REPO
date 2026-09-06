@@ -71,6 +71,10 @@ Core `127.0.0.1:8080` (loopback only — go through Kong unless you are delibera
 around it). The middleware publishes **no** host port: it has no authentication of its own, so
 reach it with `docker compose exec microfi-middleware …`, not a port mapping.
 
+The mobile app needs **Flutter ≥ 3.44** (`pubspec.lock` pins Dart ≥ 3.12.2); CI runs 3.47.2. On an
+older SDK `flutter pub get` fails outright with a version-solving error, before any test runs, so
+an out-of-date toolchain looks like a broken project rather than a stale install.
+
 Both Maven builds work on JDK 21 (what the Docker images use, and what `<java.version>` targets)
 and on later JDKs. Lombok is declared as an explicit `annotationProcessorPaths` entry in both poms
 because JDK 23+ no longer runs annotation processors that are only on the classpath — without that
