@@ -67,7 +67,9 @@ Once the stack is up (host ports are deliberately offset to avoid clashing with 
 stacks — check `docker compose ps` rather than assuming the service's default):
 Back-office `:3000`, API gateway `:8000`, Grafana `:3300` (admin/admin), Prometheus `:9091`,
 Loki `:3101`, Tempo `:3200`, RabbitMQ management `:25672`, Postgres `:15432`, Redis `:16379`,
-Core direct `:8080`, Middleware direct `:18081`.
+Core `127.0.0.1:8080` (loopback only — go through Kong unless you are deliberately debugging
+around it). The middleware publishes **no** host port: it has no authentication of its own, so
+reach it with `docker compose exec microfi-middleware …`, not a port mapping.
 
 `.gitlab-ci.yml` is placeholder echoes only — CI does not actually build or test anything yet.
 
@@ -78,9 +80,11 @@ directly, so gateway auth/rate-limiting/CORS are always exercised. Kong validate
 Core's `JwtAuthenticationFilter` validates it again and resolves the concrete principal
 (defense in depth).
 
-The HMAC secret is duplicated in two places and **must stay byte-identical**:
-`application.security.jwt.secret-key` in `microfi-core/src/main/resources/application.properties`
-and the consumer `secret` in `kong/kong.yml`. Both derive the key from the raw UTF-8 bytes.
+The HMAC secret lives in two places and **must stay byte-identical**: the `MICROFI_JWT_SECRET`
+environment variable given to Core (`docker-compose.yml`, read by
+`application.security.jwt.secret-key`) and the consumer `secret` in `kong/kong.yml`. Both derive
+the key from the raw UTF-8 bytes. There is no default — Core refuses to start on a blank secret
+(`JwtService#validateSecretKey`) and warns loudly while the committed development value is in use.
 Algorithm is pinned to **HS384** and issuer to `microfi-core` (`JwtService.ISSUER`) because Kong
 looks up the consumer by the `iss` claim and rejects other algorithms. Changing any of the three
 breaks every request with a 401 that looks like a Core bug.
@@ -179,9 +183,11 @@ Single PostgreSQL 16 instance, two schemas: `core` and `mw` (created by `init.sq
 There is **no migration tool** — `spring.jpa.hibernate.ddl-auto=update` generates the schema, so
 entity changes are the schema changes; check what an entity edit implies for existing rows.
 
-Both services default to **H2 in-memory** in `application.properties`; Postgres is only reached
-when `docker-compose.yml`'s `SPRING_DATASOURCE_*` env vars override it. Running `spring-boot:run`
-locally gives you a throwaway database.
+There is **no datasource default**. Both services take `SPRING_DATASOURCE_URL` (and credentials)
+from the environment and refuse to start without one, and H2 is test-scoped so a production image
+cannot silently fall back to an in-memory database. Running `spring-boot:run` outside Compose
+therefore needs a real Postgres URL — that is deliberate: the previous H2 default let a
+misconfigured service start, accept collections, and drop the ledger on restart.
 
 Money is `long` XAF in the smallest unit — never floating point, never `BigDecimal`. Timestamps are
 `Instant` / `TIMESTAMPTZ` in UTC. Financial facts are not soft-deleted; status enums plus append-only
