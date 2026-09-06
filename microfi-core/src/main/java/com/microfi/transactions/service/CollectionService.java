@@ -178,6 +178,14 @@ public class CollectionService {
      * shrinking their usable ceiling for the rest of the day after every reconciliation.
      */
     public void enforceEscrowCeiling(UUID agentId, long amountXaf) {
+        // Serialise this whole check-then-insert for one agent. Read and insert are separate
+        // statements, so without the lock two concurrent collections both read the same
+        // pre-insert total, both find room under the ceiling, and both commit — the BR-03 bypass
+        // the STRIDE matrix anticipates for offline sync bursts, and CollectionRecordListener
+        // runs a pool of consumers precisely so bursts arrive concurrently. The lock is released
+        // at commit, by which point this collection is counted.
+        escrowService.lockForCeilingCheck(agentId);
+
         EscrowResponse escrow = escrowService.getStatus(agentId);
         Instant now = Instant.now();
         long cumulativeUnreconciled = collectionRepository.sumUnreconciledByAgent(agentId, now)
