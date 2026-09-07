@@ -13,6 +13,7 @@ import com.microfi.shared.dto.EscrowResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -96,6 +97,18 @@ public class EscrowService {
                 .validUntil(validUntil)
                 .build());
         return toResponse(account);
+    }
+
+    /**
+     * Takes the agent's escrow row for update, so that concurrent BR-03 ceiling checks for that
+     * agent run one at a time instead of all reading the same pre-insert total and all passing.
+     * Must be called inside the caller's transaction (hence {@code MANDATORY}) — a lock released
+     * before the collection is inserted would protect nothing.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockForCeilingCheck(UUID agentId) {
+        escrowAccountRepository.findByAgentIdForUpdate(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No escrow account for agent: " + agentId));
     }
 
     private EscrowAccount findAccountOrThrow(UUID agentId) {

@@ -68,6 +68,11 @@ services:
       - COLLECTION_RECORD_CONSUMER_CONCURRENCY=5
       - COLLECTION_RECORD_CONSUMER_MAX_CONCURRENCY=20
       - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
+      # JWT signing key. Must stay byte-identical to the consumer secret in kong/kong.yml, which
+      # verifies the signature before Core sees the request. This is the development value and is
+      # public (it is committed in this repo) -- Core logs a warning at startup while it is in use.
+      # Generate a fresh one and update both places before any real deployment.
+      - MICROFI_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
       # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
       # Change these before any real deployment.
       - ADMIN_BOOTSTRAP_LOGIN=admin
@@ -91,7 +96,12 @@ services:
     volumes:
       - registration_documents:/data/registration-documents
     ports:
-      - "8080:8080"
+      # Loopback-only, same reasoning as Kong's admin API below. Published on 0.0.0.0 this port
+      # let any host on the network reach Core *around* the gateway, making every Kong control
+      # optional: the jwt plugin, the 600/min budget, and the deliberately tighter 5/min budget on
+      # the OTP reset paths. Kong reaches Core as microfi-core:8080 over the Docker network and is
+      # unaffected; this mapping now only serves local debugging.
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
     depends_on:
       - postgres
@@ -112,10 +122,26 @@ services:
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES=true
+      # Same fix as microfi-core above, which this service was missed by: spring-boot-starter-amqp
+      # is on the classpath (see pom.xml), so Boot auto-configures RabbitHealthIndicator even
+      # though nothing here consumes a queue yet — Core calls this service over REST, not AMQP.
+      # Left unset, that indicator probes localhost:5672 inside this container, fails, and drags
+      # /actuator/health to DOWN (503) — breaking healthchecks and uptime probes while the service
+      # is in fact serving CBS calls perfectly well. Pointing it at the real broker also leaves the
+      # door open for the queue-based Core->MW design described in architecture.txt section 3.5.
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=microfi
+      - SPRING_RABBITMQ_PASSWORD=microfi_password
       - CBS_VENDOR=mock
       - CBS_ENDPOINT=
-    ports:
-      - "18081:8081"
+    # Deliberately publishes no host port. This service has no authentication of any kind -- no
+    # Spring Security on the classpath, no filter, no API key -- because kong.yml correctly
+    # declines to route it and architecture.txt section 3.5 calls it "called by Core only". A host
+    # mapping contradicted exactly that: an unauthenticated POST to /mw/v1/transactions/post,
+    # /mw/v1/escrow/credit or /mw/v1/fees/split reaches the CBS ledger. Core still reaches it as
+    # microfi-middleware:8081 over the Docker network. To debug it, use
+    # `docker compose exec microfi-middleware ...` rather than re-adding a mapping.
     restart: unless-stopped
     depends_on:
       - postgres

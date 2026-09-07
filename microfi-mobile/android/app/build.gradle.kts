@@ -6,9 +6,16 @@ plugins {
 
 android {
     namespace = "com.microfi.microfi_mobile"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // permission_handler_android requires its dependents to compile against API 37 or later, so
+    // Flutter's default (36) is not enough here. But API 37 ships only in minor-versioned form --
+    // android-37.0/37.1/37.2, the same way android-36.1 does -- and Google publishes no plain
+    // "android-37". A bare `compileSdk = 37`, which is how this was previously written (assigned
+    // twice, silently overriding flutter.compileSdkVersion on the line above), therefore fails
+    // with "Failed to find target with hash string 'android-37'" even once Platform 37.0 is
+    // installed. AGP 9 expresses a minor-versioned platform as the two properties below.
     compileSdk = 37
+    compileSdkMinor = 0
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
