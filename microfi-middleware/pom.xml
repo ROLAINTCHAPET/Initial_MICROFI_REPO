@@ -83,10 +83,15 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- test scope, not runtime: on the runtime classpath Spring Boot will happily
+		     auto-configure an in-memory database when SPRING_DATASOURCE_URL is missing, so a
+		     misconfigured deployment starts, serves, and silently discards every record it
+		     writes. Keeping H2 off the production classpath makes that impossible rather than
+		     merely discouraged; tests still get an embedded database from it. -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -122,6 +127,26 @@
 
 	<build>
 		<plugins>
+			<!-- Lombok has to be named as an annotation processor explicitly. Since JDK 23 javac no
+			     longer runs processors that are merely present on the classpath, so on a newer JDK
+			     than this project targets every @Getter/@Builder/@RequiredArgsConstructor silently
+			     produced nothing and the build failed with ~190 "cannot find symbol" errors on
+			     generated methods. The Docker image builds on JDK 21 and was unaffected, which is
+			     why this only ever bit local builds. Declaring the processor path keeps the build
+			     working on 21 and on later JDKs alike. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
