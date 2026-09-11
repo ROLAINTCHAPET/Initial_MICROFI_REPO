@@ -222,7 +222,7 @@ class CollectionRejectionServiceTest {
     }
 
     @Test
-    void approveRequeuesUnexportedSiblingsBackToUnreconciled() {
+    void approveRequeuesOnlyStillPendingSiblingsAndLeavesAnEarlierConfirmedSiblingAlone() {
         UUID requestId = UUID.randomUUID();
         UUID lineId = UUID.randomUUID();
         UUID reviewerId = UUID.randomUUID();
@@ -233,13 +233,16 @@ class CollectionRejectionServiceTest {
                 .amountXaf(2000).collectedAt(java.time.Instant.now()).deviceTxId("tx2")
                 .reconciledInLineId(lineId).reconciliationStatus(com.microfi.transactions.domain.CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION)
                 .build();
+        // Reuses the same OfjAgentLine id from an earlier, already-settled same-day sweep (see
+        // OfjService#reconcile) — must be left completely untouched by a rejection on a totally
+        // different, still-pending batch that merely happens to share the line.
         Collection alreadyConfirmedSibling = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(UUID.randomUUID())
                 .amountXaf(3000).collectedAt(java.time.Instant.now()).deviceTxId("tx3")
                 .reconciledInLineId(lineId).reconciliationStatus(com.microfi.transactions.domain.CollectionReconciliationStatus.CONFIRMED)
                 .reconciledAt(java.time.Instant.now()).confirmedBy(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT)
                 .build();
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(agentId)
-                .collectionsTotalXaf(10000L).digitalTotalXaf(10000L).build();
+                .collectionsTotalXaf(10000L).digitalTotalXaf(10000L).physicalTotalXaf(10000L).deltaXaf(0L).build();
         when(collectionRejectionRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
         when(collectionRepository.findById(collectionId)).thenReturn(Optional.of(rejected));
         when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -254,24 +257,29 @@ class CollectionRejectionServiceTest {
 
         assertThat(stillPendingSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.UNRECONCILED);
         assertThat(stillPendingSibling.getReconciledInLineId()).isNull();
-        assertThat(alreadyConfirmedSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.UNRECONCILED);
-        assertThat(alreadyConfirmedSibling.getReconciledInLineId()).isNull();
-        assertThat(alreadyConfirmedSibling.getReconciledAt()).isNull();
-        assertThat(alreadyConfirmedSibling.getConfirmedBy()).isNull();
+        // Regression: this must NOT be reset — it's from an earlier, already-settled sweep on the
+        // same recycled line id, not part of the batch the rejected collection actually belongs to.
+        assertThat(alreadyConfirmedSibling.getReconciliationStatus()).isEqualTo(com.microfi.transactions.domain.CollectionReconciliationStatus.CONFIRMED);
+        assertThat(alreadyConfirmedSibling.getReconciledInLineId()).isEqualTo(lineId);
+        assertThat(alreadyConfirmedSibling.getReconciledAt()).isNotNull();
+        assertThat(alreadyConfirmedSibling.getConfirmedBy()).isEqualTo(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT);
 
         ArgumentCaptor<OfjAgentLine> captor = ArgumentCaptor.forClass(OfjAgentLine.class);
-        // One combined debit — the rejected collection's own 5000 plus the two requeued siblings'
-        // 2000+3000 — not two separate saves: 10000 - 5000 - 2000 - 3000 = 0.
+        // One combined debit — the rejected collection's own 5000 plus the still-pending sibling's
+        // 2000 only, never the already-confirmed 3000: 10000 - 5000 - 2000 = 3000.
         verify(ofjAgentLineRepository, org.mockito.Mockito.times(1)).save(captor.capture());
-        assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(0L);
-        assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(0L);
-        // Regression: nothing legitimately confirmed remains on the line at all (digitalTotalXaf
-        // dropped to 0) — physicalTotalXaf/deltaXaf must be zeroed too, or the line would keep
-        // showing a stale physical count as if it were still validated against something real.
-        assertThat(captor.getValue().getPhysicalTotalXaf()).isEqualTo(0L);
+        assertThat(captor.getValue().getCollectionsTotalXaf()).isEqualTo(3000L);
+        assertThat(captor.getValue().getDigitalTotalXaf()).isEqualTo(3000L);
+        // The already-confirmed 3000 is still legitimately reconciled against the line — the
+        // physical count/delta must be left alone, not zeroed.
+        assertThat(captor.getValue().getPhysicalTotalXaf()).isEqualTo(10000L);
         assertThat(captor.getValue().getDeltaXaf()).isEqualTo(0L);
         verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
                 "COLLECTION_REJECTION_SIBLINGS_REQUEUED".equals(entry.getEventType())));
+        // The requeued 2000 was already physically counted in the sweep this rejection undoes —
+        // carried forward so the agent's next reconcile doesn't read it as a fresh shortage.
+        // Never the already-confirmed 3000, which was never touched.
+        verify(agentDirectoryService).addCarriedPhysicalXaf(agentId, 2000L);
     }
 
     /**

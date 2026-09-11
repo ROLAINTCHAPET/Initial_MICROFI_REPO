@@ -61,13 +61,14 @@ public class AdminUserManagementController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create Back-Office Account", description = "ADMIN can create any role anywhere; BRANCH_MANAGER can only create BRANCH_CASHIER within their own branch.")
+    @Operation(summary = "Create Back-Office Account", description = "ADMIN can create any role anywhere and it's active immediately; BRANCH_MANAGER can only create BRANCH_CASHIER within their own branch, and that account starts PENDING_APPROVAL — it can't log in until an ADMIN approves it (see PATCH /{id}/approve).")
     public Mono<AdminUserResponse> create(@Valid @RequestBody CreateAdminUserRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
                     AdminUser callerUser = caller.getAdminUser();
+                    boolean managerCreated = callerUser.getRole() == AdminRole.BRANCH_MANAGER;
 
-                    if (callerUser.getRole() == AdminRole.BRANCH_MANAGER) {
+                    if (managerCreated) {
                         if (request.getRole() != AdminRole.BRANCH_CASHIER) {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch managers can only create BRANCH_CASHIER accounts");
                         }
@@ -75,7 +76,23 @@ public class AdminUserManagementController {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch managers can only create accounts within their own branch");
                         }
                     }
-                    return toResponse(adminUserEnrollmentService.create(request));
+                    return toResponse(adminUserEnrollmentService.create(request, managerCreated));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PatchMapping("/{id}/approve")
+    @Operation(summary = "Approve Manager-Created Account", description = "ADMIN only — a BRANCH_MANAGER can never approve their own or another manager's creation, even one in their own branch. Activates an account still PENDING_APPROVAL.")
+    public Mono<AdminUserResponse> approve(@PathVariable UUID id, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminUser target = findOrThrow(id);
+                    if (target.getStatus() != AdminUserStatus.PENDING_APPROVAL) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "This account is not awaiting approval (status: " + target.getStatus() + ")");
+                    }
+                    target.setStatus(AdminUserStatus.ACTIVE);
+                    AdminUser saved = adminUserRepository.save(target);
+                    auditTarget(caller, "ADMIN_USER_APPROVED", target, "ADMIN_USER_APPROVED_DETAIL", null);
+                    return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -111,17 +128,23 @@ public class AdminUserManagementController {
     }
 
     @PatchMapping("/{id}/status")
-    @Operation(summary = "Suspend / Reactivate Back-Office Account")
+    @Operation(summary = "Suspend / Reactivate Back-Office Account", description = "A BRANCH_MANAGER can suspend/reactivate an already-active account in their own branch, but can never touch one still PENDING_APPROVAL — that must go through PATCH /{id}/approve, ADMIN only, or the manager could otherwise just activate their own creation directly and bypass the approval gate entirely.")
     public Mono<AdminUserResponse> updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateAdminUserStatusRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
                     if (request.getStatus() == AdminUserStatus.DELETED) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use DELETE /{id}/delete to delete an account, not this endpoint");
                     }
+                    if (request.getStatus() == AdminUserStatus.PENDING_APPROVAL) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PENDING_APPROVAL is only ever set automatically at creation, not via this endpoint");
+                    }
                     AdminUser target = findOrThrow(id);
                     AdminAccess.requireBranchScope(caller, target.getBranchId());
                     if (target.getStatus() == AdminUserStatus.DELETED) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has been deleted and can no longer be suspended or reactivated");
+                    }
+                    if (target.getStatus() == AdminUserStatus.PENDING_APPROVAL && caller.getAdminUser().getRole() == AdminRole.BRANCH_MANAGER) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account is awaiting admin approval — a branch manager cannot activate it directly");
                     }
                     target.setStatus(request.getStatus());
                     AdminUser saved = adminUserRepository.save(target);

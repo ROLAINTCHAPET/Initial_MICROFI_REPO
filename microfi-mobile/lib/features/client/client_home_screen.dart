@@ -30,6 +30,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   bool _loading = true;
   bool _confirmingPayment = false;
 
+  ClientBroadcastMessage? _broadcast;
+  String? _dismissedBroadcastId;
+
   @override
   void initState() {
     super.initState();
@@ -53,12 +56,37 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         _recent = (results[1] as List<ClientHistoryEntry>).take(10).toList();
         _recentCollections = (results[2] as List<ClientRecentCollection>).take(10).toList();
       });
+      _checkBroadcasts();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // ADMIN/BRANCH_MANAGER announcement — no push infrastructure in this app (SMS carries the
+  // urgency), so this is refreshed on load/pull-to-refresh rather than a background poll like the
+  // agent app's Home screen, since the client app isn't left open in the background the same way.
+  Future<void> _checkBroadcasts() async {
+    try {
+      final broadcasts = await _repository.fetchBroadcasts();
+      if (!mounted || broadcasts.isEmpty) return;
+      final latest = broadcasts.first;
+      if (latest.id == _dismissedBroadcastId) return;
+      setState(() => _broadcast = latest);
+    } catch (_) {
+      // Best-effort — silently retried on the next load/pull-to-refresh.
+    }
+  }
+
+  void _dismissBroadcast() {
+    final broadcast = _broadcast;
+    if (broadcast == null) return;
+    setState(() {
+      _dismissedBroadcastId = broadcast.id;
+      _broadcast = null;
+    });
   }
 
   Future<void> _confirmPayment() async {
@@ -128,56 +156,116 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(profile.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
-                    const SizedBox(height: 1),
-                    Text(profile.mfiMemberNo, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
-                    const SizedBox(height: 2),
-                    // Confirms which MFI this session belongs to — MICROFI serves several MFIs,
-                    // each its own separate deployment, so this is the client's own signal that
-                    // they're using the right institution's app.
-                    Text(profile.mfiName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
-                  ],
-                ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [MicrofiColors.primary, MicrofiColors.primaryContainer],
               ),
-              _TokenStatusPill(status: profile.tokenStatus),
-            ],
+              boxShadow: MicrofiShadows.soft,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  child: const Icon(Icons.menu_book_rounded, color: MicrofiColors.primary, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(profile.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 1),
+                      Text(profile.mfiMemberNo, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75))),
+                      const SizedBox(height: 3),
+                      // Confirms which MFI this session belongs to — MICROFI serves several MFIs,
+                      // each its own separate deployment, so this is the client's own signal that
+                      // they're using the right institution's app.
+                      Text(profile.mfiName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: MicrofiColors.secondaryFixed)),
+                    ],
+                  ),
+                ),
+                _TokenStatusPill(status: profile.tokenStatus),
+              ],
+            ),
           ),
+          if (_broadcast != null) ...[
+            const SizedBox(height: MicrofiSpacing.gapLg),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: MicrofiColors.primaryContainer,
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle),
+                    child: const Icon(Icons.campaign_outlined, size: 15, color: Colors.white),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_broadcast!.message, style: const TextStyle(fontSize: 12.5, color: Colors.white))),
+                  InkWell(
+                    onTap: _dismissBroadcast,
+                    borderRadius: BorderRadius.circular(MicrofiRadius.full),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (profile.tokenStatus != 'ACTIVE') ...[
             const SizedBox(height: MicrofiSpacing.gapLg),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(MicrofiSpacing.card),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: MicrofiColors.tertiaryFixed.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                border: Border.all(color: MicrofiColors.tertiaryFixedDim, width: MicrofiBorders.width),
+                color: MicrofiColors.tertiaryFixed,
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.hourglass_top, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
-                      const SizedBox(width: 6),
-                      Text(
-                        profile.tokenStatus == 'EXPIRED' ? l10n.chRenewalNeeded : l10n.chActivationPending,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+                        child: const Icon(Icons.hourglass_top_rounded, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          profile.tokenStatus == 'EXPIRED' ? l10n.chRenewalNeeded : l10n.chActivationPending,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   Text(
                     l10n.chConfirmOncePaidMessage,
                     style: const TextStyle(fontSize: 11, color: MicrofiColors.onTertiaryFixedVariant),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
@@ -195,23 +283,28 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             const SizedBox(height: MicrofiSpacing.gapLg),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(MicrofiSpacing.card),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: MicrofiColors.tertiaryFixed.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                border: Border.all(color: MicrofiColors.tertiaryFixedDim, width: MicrofiBorders.width),
+                color: MicrofiColors.tertiaryFixed,
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.schedule, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
-                      const SizedBox(width: 6),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+                        child: const Icon(Icons.schedule_rounded, size: 16, color: MicrofiColors.onTertiaryFixedVariant),
+                      ),
+                      const SizedBox(width: 8),
                       Text(l10n.chJustCollected, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.onTertiaryFixedVariant)),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   Text(
                     l10n.chRecordedReflectedMessage,
                     style: const TextStyle(fontSize: 11, color: MicrofiColors.onTertiaryFixedVariant),
@@ -242,12 +335,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClientReceiptScanScreen())),
-              icon: const Icon(Icons.qr_code_scanner, size: 18),
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
               label: Text(l10n.chScanReceiptFromAgent, style: const TextStyle(fontSize: 13)),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
-              ),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
             ),
           ),
           const SizedBox(height: MicrofiSpacing.gap),
@@ -262,32 +352,43 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   actions: [FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonOk))],
                 ),
               ),
-              icon: const Icon(Icons.info_outline, size: 16),
+              icon: const Icon(Icons.info_outline_rounded, size: 16),
               label: Text(l10n.chTopUpInfo, style: const TextStyle(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: MicrofiColors.primary,
-                side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
-              ),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.chRecentContributions, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-              TextButton(onPressed: _openHistory, child: Text(l10n.chViewAll, style: const TextStyle(fontSize: 13))),
+              Text(l10n.chRecentContributions, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+              TextButton(onPressed: _openHistory, child: Text(l10n.chViewAll, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
             ],
           ),
-          const Divider(color: MicrofiColors.outlineVariant, height: 1),
-          if (_recent.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(l10n.chNoContributionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
-            )
-          else
-            ..._recent.map((e) => _ContributionRow(entry: e)),
+          const SizedBox(height: 4),
+          Container(
+            decoration: BoxDecoration(
+              color: MicrofiColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              boxShadow: MicrofiShadows.soft,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _recent.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 28),
+                    child: Center(
+                      child: Text(l10n.chNoContributionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < _recent.length; i++) ...[
+                        _ContributionRow(entry: _recent[i]),
+                        if (i < _recent.length - 1) Divider(height: 1, indent: 58, color: MicrofiColors.outlineVariant.withValues(alpha: 0.5)),
+                      ],
+                    ],
+                  ),
+          ),
         ],
       ),
     );
@@ -320,26 +421,26 @@ class _ContributionRow extends StatelessWidget {
     final local = entry.date.toLocal();
     final date = '${local.day}/${local.month} ${TimeOfDay.fromDateTime(local).format(context)}';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 38,
+            height: 38,
             decoration: const BoxDecoration(color: MicrofiColors.secondaryContainer, shape: BoxShape.circle),
-            child: const Icon(Icons.arrow_downward, color: MicrofiColors.onSecondaryContainer, size: 16),
+            child: const Icon(Icons.arrow_downward_rounded, color: MicrofiColors.onSecondaryContainer, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.type, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                Text(entry.type, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
                 Text(date, style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
               ],
             ),
           ),
-          Text(l10n.hsAmountCollectedPlus(_fmt(entry.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+          Text(l10n.hsAmountCollectedPlus(_fmt(entry.amountXaf)), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
         ],
       ),
     );
@@ -365,21 +466,20 @@ class _TokenStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final active = status == 'ACTIVE';
-    final color = active ? MicrofiColors.secondary : (status == 'EXPIRED' ? MicrofiColors.error : MicrofiColors.outline);
+    final dotColor = active ? MicrofiColors.secondaryFixed : (status == 'EXPIRED' ? MicrofiColors.errorContainer : Colors.white70);
     final label = active ? l10n.chStatusActive : (status == 'EXPIRED' ? l10n.chStatusExpired : l10n.chStatusNotActivated);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(MicrofiRadius.full),
-        border: Border.all(color: color),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
           const SizedBox(width: 5),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+          Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white)),
         ],
       ),
     );

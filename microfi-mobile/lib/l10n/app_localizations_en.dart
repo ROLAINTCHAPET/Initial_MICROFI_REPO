@@ -291,6 +291,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get csGeofenceBlockedOfflineMessage =>
+      'You appear to be outside your assigned collection zone (based on your last connection — reconnect for a fresh check, or contact your branch).';
+
+  @override
+  String get csScheduleBlockedOfflineMessage =>
+      'You\'re outside your branch\'s collection hours (based on your last connection — reconnect for a fresh check, or contact your branch).';
+
+  @override
   String get csCouldNotPrintReceipt => 'Could not print the receipt.';
 
   @override
@@ -374,6 +382,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hsMyRoute => 'My Route';
 
   @override
+  String get hsQuickActionsSectionLabel => 'QUICK ACTIONS';
+
+  @override
   String get hsSponsorClientActivation => 'Sponsor Client Activation';
 
   @override
@@ -418,6 +429,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String hsAmountCollectedPlus(String amount) {
     return '+$amount XAF';
   }
+
+  @override
+  String get hsGreeting => 'Welcome back,';
 
   @override
   String get hsStatusActive => 'Online';
@@ -1054,6 +1068,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcConfirmDialogTitle => 'Confirm Reconciliation';
 
   @override
+  String get rcEnterPinToConfirmLabel => 'Enter your PIN to confirm';
+
+  @override
   String rcConfirmDialogMessage(String amount, int count) {
     return 'Confirm the cashier\'s count of $amount XAF across $count collection(s) matches what you actually collected?';
   }
@@ -1088,4 +1105,51 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get rcRejectionReasonRequired =>
       'Please explain why this should be rejected.';
+
+  @override
+  String get cshReportAgentMenuItem => 'Report My Agent';
+
+  @override
+  String get craTitle => 'Report My Agent';
+
+  @override
+  String get craIntro =>
+      'If your agent asked for a bribe, took the wrong amount, or behaved inappropriately, let us know. Your admin will review this.';
+
+  @override
+  String get craAgentLabel => 'Which agent?';
+
+  @override
+  String craAgentOption(String date) {
+    return 'Agent from your collection on $date';
+  }
+
+  @override
+  String get craNoAgentsMessage =>
+      'You don\'t have any recorded collections yet, so there\'s no agent to report.';
+
+  @override
+  String get craReasonLabel => 'What happened?';
+
+  @override
+  String get craReasonHint => 'Describe what happened…';
+
+  @override
+  String get craReasonRequired => 'Please describe what happened.';
+
+  @override
+  String get craSubmitButton => 'Submit Report';
+
+  @override
+  String get craSubmitting => 'Submitting…';
+
+  @override
+  String get craSuccessTitle => 'Report Submitted';
+
+  @override
+  String get craSuccessMessage =>
+      'Thank you. Your admin has been notified and will review this.';
+
+  @override
+  String get craFailedTitle => 'Could Not Submit Report';
 }

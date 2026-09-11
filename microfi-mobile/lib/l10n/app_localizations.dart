@@ -572,6 +572,18 @@ abstract class AppLocalizations {
   /// **'This would push you to {projected} / {ceiling} XAF, over your daily ceiling (based on your last connection — reconnect for a fresh check, or contact your branch).'**
   String csCeilingExceedOfflineMessage(String projected, String ceiling);
 
+  /// Collection stepper — offline-path geofence check failed, using the last-known assigned geofence snapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'You appear to be outside your assigned collection zone (based on your last connection — reconnect for a fresh check, or contact your branch).'**
+  String get csGeofenceBlockedOfflineMessage;
+
+  /// Collection stepper — offline-path schedule-window check failed, using the last-known branch hours snapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re outside your branch\'s collection hours (based on your last connection — reconnect for a fresh check, or contact your branch).'**
+  String get csScheduleBlockedOfflineMessage;
+
   /// Collection stepper — generic (non-PrinterUnavailable) print failure.
   ///
   /// In en, this message translates to:
@@ -704,6 +716,12 @@ abstract class AppLocalizations {
   /// **'My Route'**
   String get hsMyRoute;
 
+  /// Home screen — small section divider label above the quick-action grid.
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK ACTIONS'**
+  String get hsQuickActionsSectionLabel;
+
   /// Home screen — button opening the sponsor-activation flow.
   ///
   /// In en, this message translates to:
@@ -775,6 +793,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'+{amount} XAF'**
   String hsAmountCollectedPlus(String amount);
+
+  /// Home screen — small greeting line above the agent's name in the header.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back,'**
+  String get hsGreeting;
 
   /// Home screen — agent status pill when active.
   ///
@@ -1922,6 +1946,12 @@ abstract class AppLocalizations {
   /// **'Confirm Reconciliation'**
   String get rcConfirmDialogTitle;
 
+  /// Reconciliation confirmation screen — PIN field label inside the confirm dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PIN to confirm'**
+  String get rcEnterPinToConfirmLabel;
+
   /// Reconciliation confirmation screen — confirm dialog body.
   ///
   /// In en, this message translates to:
@@ -1987,6 +2017,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please explain why this should be rejected.'**
   String get rcRejectionReasonRequired;
+
+  /// Client shell account menu — item opening the misconduct-report screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Report My Agent'**
+  String get cshReportAgentMenuItem;
+
+  /// Client report-agent screen — title.
+  ///
+  /// In en, this message translates to:
+  /// **'Report My Agent'**
+  String get craTitle;
+
+  /// Client report-agent screen — intro explaining the purpose.
+  ///
+  /// In en, this message translates to:
+  /// **'If your agent asked for a bribe, took the wrong amount, or behaved inappropriately, let us know. Your admin will review this.'**
+  String get craIntro;
+
+  /// Client report-agent screen — agent picker label.
+  ///
+  /// In en, this message translates to:
+  /// **'Which agent?'**
+  String get craAgentLabel;
+
+  /// Client report-agent screen — one agent picker option, identified by the date of a collection they made.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent from your collection on {date}'**
+  String craAgentOption(String date);
+
+  /// Client report-agent screen — empty state when the client has no collection history at all.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have any recorded collections yet, so there\'s no agent to report.'**
+  String get craNoAgentsMessage;
+
+  /// Client report-agent screen — reason field label.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened?'**
+  String get craReasonLabel;
+
+  /// Client report-agent screen — reason field placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe what happened…'**
+  String get craReasonHint;
+
+  /// Client report-agent screen — validation message for a blank reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Please describe what happened.'**
+  String get craReasonRequired;
+
+  /// Client report-agent screen — submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Report'**
+  String get craSubmitButton;
+
+  /// Client report-agent screen — submit button loading label.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting…'**
+  String get craSubmitting;
+
+  /// Client report-agent screen — success dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Submitted'**
+  String get craSuccessTitle;
+
+  /// Client report-agent screen — success dialog message.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you. Your admin has been notified and will review this.'**
+  String get craSuccessMessage;
+
+  /// Client report-agent screen — error dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Could Not Submit Report'**
+  String get craFailedTitle;
 }
 
 class _AppLocalizationsDelegate

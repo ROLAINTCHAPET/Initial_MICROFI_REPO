@@ -120,11 +120,11 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                       const SizedBox(height: 18),
                     ],
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: MicrofiColors.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                        border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                        boxShadow: MicrofiShadows.soft,
                       ),
                       child: Form(
                         key: _formKey,
@@ -171,11 +171,11 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                             if (_error != null) ...[
                               const SizedBox(height: 12),
                               Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: MicrofiColors.errorContainer, borderRadius: BorderRadius.circular(MicrofiRadius.sm)),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(color: MicrofiColors.errorContainer, borderRadius: BorderRadius.circular(MicrofiRadius.md)),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline, color: MicrofiColors.onErrorContainer, size: 16),
+                                    const Icon(Icons.error_outline_rounded, color: MicrofiColors.onErrorContainer, size: 16),
                                     const SizedBox(width: 6),
                                     Expanded(child: Text(_error!, style: const TextStyle(fontSize: 12, color: MicrofiColors.onErrorContainer))),
                                   ],

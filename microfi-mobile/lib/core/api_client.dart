@@ -63,10 +63,14 @@ class ApiClient {
     _decode(response);
   }
 
-  /// For POST endpoints that reply 204 No Content and take no meaningful body — mirrors
-  /// patchNoContent's reasoning (post()'s return type expects a decoded JSON object back).
-  Future<void> postNoContent(String path) async {
-    final response = await http.post(Uri.parse('$baseUrl$path'), headers: _headers).timeout(_timeout);
+  /// For POST endpoints that reply 204 No Content — mirrors patchNoContent's reasoning (post()'s
+  /// return type expects a decoded JSON object back). `body` is optional since most callers of
+  /// this take no meaningful body at all; pass one for an endpoint like confirm-reconciliation,
+  /// which needs the agent's PIN in the request.
+  Future<void> postNoContent(String path, [Map<String, dynamic>? body]) async {
+    final response = await http
+        .post(Uri.parse('$baseUrl$path'), headers: _headers, body: body != null ? jsonEncode(body) : null)
+        .timeout(_timeout);
     _decode(response);
   }
 

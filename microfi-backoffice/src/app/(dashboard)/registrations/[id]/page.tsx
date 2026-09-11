@@ -56,7 +56,12 @@ export default async function RegistrationApplicationDetailPage({ params }: { pa
   const branch = branches.find((b) => b.id === application.branchId);
   const badgeStatus = STATUS_BADGE[application.status];
   const badgeLabel = dict.registrations.applicationStatus[application.status];
-  const canReview = session?.role === "ADMIN";
+  // Mirrors RegistrationApplicationController#requireManagerCanDecide exactly: ADMIN reviews
+  // anything; a BRANCH_MANAGER reviews AGENT/BRANCH_CASHIER applications in their own branch only
+  // — never a fellow BRANCH_MANAGER application, which always still needs an ADMIN.
+  const canReview =
+    session?.role === "ADMIN" ||
+    (session?.role === "BRANCH_MANAGER" && session.branchId === application.branchId && application.targetRole !== "BRANCH_MANAGER");
 
   return (
     <div className="max-w-3xl mx-auto w-full flex flex-col gap-6">

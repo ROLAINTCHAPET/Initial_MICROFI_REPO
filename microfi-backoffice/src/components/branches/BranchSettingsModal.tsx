@@ -20,6 +20,7 @@ export function BranchSettingsModal({
   maxCashiers,
   requireImei,
   defaultCeilingPct,
+  requireClientActivation,
 }: {
   branchId: string;
   branchName: string;
@@ -30,6 +31,7 @@ export function BranchSettingsModal({
   maxCashiers: number;
   requireImei: boolean;
   defaultCeilingPct: number;
+  requireClientActivation: boolean;
 }) {
   const dict = useDictionary();
   const [open, setOpen] = useState(false);
@@ -48,7 +50,7 @@ export function BranchSettingsModal({
         {/* Remounts on every open with a fresh key so a stale edit from a previous open (or new
             props after a save elsewhere refreshed the page) never lingers in local form state. */}
         <BranchSettingsForm
-          key={`${open}-${openTime}-${closeTime}-${phone}-${maxCashiers}-${requireImei}-${defaultCeilingPct}`}
+          key={`${open}-${openTime}-${closeTime}-${phone}-${maxCashiers}-${requireImei}-${defaultCeilingPct}-${requireClientActivation}`}
           branchId={branchId}
           openTime={openTime}
           closeTime={closeTime}
@@ -57,6 +59,7 @@ export function BranchSettingsModal({
           maxCashiers={maxCashiers}
           requireImei={requireImei}
           defaultCeilingPct={defaultCeilingPct}
+          requireClientActivation={requireClientActivation}
           onCancel={() => setOpen(false)}
           onSaved={() => setOpen(false)}
         />

@@ -130,7 +130,7 @@ export default async function AgentDetailPage({
               <div className="flex flex-col md:flex-row gap-6 items-center">
                 <div className="flex-1 text-center md:text-left">
                   <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">{dict.agents.detail.collectedTodayXaf}</div>
-                  <div className="text-display text-primary">{escrow.cumulativeTodayXaf.toLocaleString()}</div>
+                  <div className="text-display text-primary">{escrow.collectedTodayXaf.toLocaleString()}</div>
                 </div>
 
                 <div className="flex-1 w-full max-w-sm">

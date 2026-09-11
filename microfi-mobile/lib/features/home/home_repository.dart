@@ -21,6 +21,13 @@ class HomeRepository {
     return EscrowStatus.fromJson(json);
   }
 
+  /// The caller's own assigned geofence — backs [LocalGeofenceCache] so an offline collection can
+  /// be checked against it before a receipt is handed over, not only at sync.
+  Future<AgentGeofence> fetchGeofence() async {
+    final json = await _client.get('/agents/me/geofence') as Map<String, dynamic>;
+    return AgentGeofence.fromJson(json);
+  }
+
   /// Replaces the transaction PIN — both the mandatory first-time replacement of the
   /// admin-assigned starting PIN and any later voluntary change go through this same call.
   Future<AgentProfile> changePin({required String currentPin, required String newPin}) async {

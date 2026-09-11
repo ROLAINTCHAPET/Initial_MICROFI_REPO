@@ -267,6 +267,13 @@ public class ClientActivationService {
         activationRequest.setStatus(ActivationRequestStatus.COMPLETED);
         activationRequestRepository.save(activationRequest);
 
+        // "Portefeuille client": the agent who just sponsored this activation becomes (or stays)
+        // this client's portfolio owner — see Branch#requireClientPortfolio. Always overwrites,
+        // so a renewal sponsored by a different agent than the original activation hands the
+        // portfolio to whoever most recently vouched for this client.
+        client.setAssignedAgentId(activationRequest.getAgentId());
+        clientProfileRepository.save(client);
+
         return ClientActivationResponse.builder()
                 .clientId(client.getId())
                 .status("ACTIVE")

@@ -192,8 +192,17 @@ public class CollectionRejectionService {
      * the rejected collection itself (see {@link #debitLine}).
      */
     private List<Collection> requeueUnexportedSiblings(UUID lineId, UUID agentId, UUID reviewerId, String reviewerLabel) {
+        // Scoped to PENDING_AGENT_CONFIRMATION specifically, not merely "not voided/not exported":
+        // a repeat same-day cashier sweep reuses the same OfjAgentLine row, so this shared lineId
+        // can carry an earlier, already-CONFIRMED batch alongside the newer one the rejected
+        // collection actually belongs to. Without this filter, rejecting one still-pending
+        // collection reset EVERY unexported sibling on the line back to UNRECONCILED — including
+        // cash the agent had already confirmed in a completely separate, already-settled sweep —
+        // a real bug caught live: a validated 5000 vanished from "Validated" and reappeared in the
+        // uncounted queue purely because a later 2000 from a different batch got rejected.
         List<Collection> siblings = collectionRepository.findByReconciledInLineId(lineId).stream()
-                .filter(c -> c.getVoidedAt() == null && c.getExportedAt() == null)
+                .filter(c -> c.getVoidedAt() == null && c.getExportedAt() == null
+                        && c.getReconciliationStatus() == CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION)
                 .toList();
         if (siblings.isEmpty()) {
             return siblings;
@@ -206,6 +215,11 @@ public class CollectionRejectionService {
             sibling.setConfirmedBy(null);
         }
         collectionRepository.saveAll(siblings);
+        // This cash was already physically handed over and counted in the sweep being undone —
+        // fold it into the agent's next reconcile automatically (Agent#carriedPhysicalXaf) so the
+        // cashier isn't expected to re-enter cash they already have, which otherwise reads as a
+        // shortage for exactly this amount.
+        agentDirectoryService.addCarriedPhysicalXaf(agentId, resetAmountXaf);
 
         auditService.record(AuditLogEntry.builder()
                 .category(AuditCategory.FINANCIAL)

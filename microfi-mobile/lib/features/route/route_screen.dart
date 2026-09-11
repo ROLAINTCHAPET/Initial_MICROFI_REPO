@@ -86,7 +86,7 @@ class _RouteScreenState extends State<RouteScreen> {
           padding: const EdgeInsets.all(24),
           children: [
             const SizedBox(height: 80),
-            const Icon(Icons.map_outlined, color: MicrofiColors.outlineVariant, size: 48),
+            Icon(Icons.map_outlined, color: MicrofiColors.outline.withValues(alpha: 0.6), size: 48),
             const SizedBox(height: 12),
             Center(child: Text(l10n.rtNoGpsOrCollections, style: const TextStyle(color: MicrofiColors.onSurfaceVariant))),
           ],
@@ -99,40 +99,48 @@ class _RouteScreenState extends State<RouteScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         itemCount: events.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 2),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final e = events[index];
           final time = TimeOfDay.fromDateTime(e.time.toLocal()).format(context);
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Icon(
-                    e.isCollection ? Icons.payments : Icons.circle,
-                    size: e.isCollection ? 16 : 8,
-                    color: e.isCollection ? MicrofiColors.secondary : MicrofiColors.outlineVariant,
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: MicrofiColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(MicrofiRadius.md),
+              boxShadow: MicrofiShadows.softSmall,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: (e.isCollection ? MicrofiColors.secondary : MicrofiColors.primary).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  Container(width: 2, height: 32, color: MicrofiColors.outlineVariant),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Icon(
+                    e.isCollection ? Icons.payments_rounded : Icons.location_on_rounded,
+                    size: 18,
+                    color: e.isCollection ? MicrofiColors.secondary : MicrofiColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         e.isCollection ? l10n.rtCollectionLine(_fmt(e.amountXaf!)) : l10n.rtGpsPing,
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: e.isCollection ? MicrofiColors.secondary : MicrofiColors.onSurface),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: e.isCollection ? MicrofiColors.secondary : MicrofiColors.onSurface),
                       ),
                       Text(l10n.rtTimeLatLonLine(time, e.lat.toStringAsFixed(4), e.lon.toStringAsFixed(4)), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),

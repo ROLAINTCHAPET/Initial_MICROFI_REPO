@@ -52,7 +52,13 @@ export default async function RegistrationsPage({
     api.get<BranchResponse[]>("/admin/branches"),
   ]);
   const branchById = new Map(branches.map((b) => [b.id, b]));
-  const canReview = session?.role === "ADMIN";
+  // Mirrors RegistrationApplicationController#requireManagerCanDecide: ADMIN reviews anything;
+  // BRANCH_MANAGER reviews AGENT/BRANCH_CASHIER applications (branch scope is already applied
+  // server-side by the list endpoint above) — never a fellow BRANCH_MANAGER application, which
+  // always still needs an ADMIN.
+  function canReview(application: RegistrationApplicationResponse) {
+    return session?.role === "ADMIN" || (session?.role === "BRANCH_MANAGER" && application.targetRole !== "BRANCH_MANAGER");
+  }
   const canSubmit = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
   const canExport = session?.role === "ADMIN" || session?.role === "BRANCH_MANAGER";
   const submittedCount = allApplications.filter((a) => a.status === "SUBMITTED").length;
@@ -152,7 +158,7 @@ export default async function RegistrationsPage({
                     <p className="text-xs text-danger-red mt-2">{t(dict.registrations.reasonPrefix, { reason: application.rejectionReason })}</p>
                   )}
                 </Link>
-                {application.status === "SUBMITTED" && canReview && (
+                {application.status === "SUBMITTED" && canReview(application) && (
                   <div className="flex items-center gap-2 shrink-0">
                     <ApproveButton applicationId={application.id} login={application.login} targetRole={application.targetRole} />
                     <RejectApplicationModal applicationId={application.id} />

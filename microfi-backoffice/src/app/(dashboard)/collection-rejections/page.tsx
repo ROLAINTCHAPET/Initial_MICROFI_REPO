@@ -2,6 +2,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeaderContext";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { Table, Thead, Th, Tbody, Tr, Td, EmptyState } from "@/components/Table";
 import { Badge } from "@/components/Badge";
 import type { AgentResponse, BranchResponse, CollectionRejectionRequestResponse } from "@/lib/types";
@@ -61,6 +62,7 @@ export default async function CollectionRejectionsPage({
 
   return (
     <div className="max-w-6xl mx-auto w-full flex flex-col gap-4">
+      <AutoRefresh />
       <PageHeader title={dict.sidebar.collectionRejections} subtitle={dict.collectionRejections.subtitle} />
 
       <div className="flex items-center justify-between gap-4 flex-wrap">

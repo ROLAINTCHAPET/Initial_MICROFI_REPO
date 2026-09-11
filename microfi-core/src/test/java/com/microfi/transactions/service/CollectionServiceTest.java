@@ -319,6 +319,106 @@ class CollectionServiceTest {
                 .hasMessageContaining("409");
     }
 
+    // Branch#requireClientActivation is off by default — a mocked
+    // effectiveRequireClientActivationForAgent already returns false with no stubbing, so every
+    // other test in this class implicitly covers "default lets an unactivated client through."
+
+    @Test
+    void rejectsUnactivatedClientWhenBranchRequiresActivation() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)).thenReturn(true);
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "This client hasn't completed activation yet"))
+                .when(activationDirectoryService).requireActivatedClient(clientId);
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void allowsActivatedClientWhenBranchRequiresActivation() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+        when(agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)).thenReturn(true);
+        // requireActivatedClient is a mock and does nothing by default — an activated client.
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        assertThat(response.getAmountXaf()).isEqualTo(5000);
+        verify(activationDirectoryService).requireActivatedClient(clientId);
+    }
+
+    // Branch#requireClientPortfolio is off by default — a mocked
+    // effectiveRequireClientPortfolioForAgent already returns false with no stubbing, so every
+    // other test in this class implicitly covers "default lets any client through."
+
+    @Test
+    void rejectsCollectionWhenClientBelongsToAnotherAgentsPortfolio() {
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).thenReturn(true);
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "This client belongs to another agent's portfolio"))
+                .when(clientDirectoryService).requireInPortfolio(agentId, clientId);
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+
+        org.mockito.Mockito.verify(collectionRepository, org.mockito.Mockito.never()).save(any());
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo("COLLECTION_REJECTED_PORTFOLIO");
+        assertThat(captor.getValue().getActorType()).isEqualTo(AuditActorType.AGENT);
+        assertThat(captor.getValue().getAgentId()).isEqualTo(agentId);
+        assertThat(captor.getValue().getStatus()).isEqualTo(com.microfi.audit.domain.AuditStatus.FAILED);
+    }
+
+    @Test
+    void doesNotAuditWhenPortfolioCheckFailsForAnUnrelatedReason() {
+        // Only a FORBIDDEN (wrong-agent) rejection is a "portefeuille client" security event — a
+        // 404 (unknown client, already validated earlier by requireActiveClient in practice) must
+        // not be miscategorized as one.
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).thenReturn(true);
+        doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"))
+                .when(clientDirectoryService).requireInPortfolio(agentId, clientId);
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, validRequest(5000, List.of(line(5000, 1)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+
+        verify(auditService, never()).record(any());
+    }
+
+    @Test
+    void allowsUnassignedClientWhenBranchRequiresPortfolio() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+        when(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).thenReturn(true);
+        // requireInPortfolio is a mock and does nothing by default — an unassigned/own client.
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request);
+
+        assertThat(response.getAmountXaf()).isEqualTo(5000);
+        verify(clientDirectoryService).requireInPortfolio(agentId, clientId);
+    }
+
+    @Test
+    void skipsPortfolioCheckWhenBranchDoesNotRequireIt() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request);
+
+        verify(clientDirectoryService, never()).requireInPortfolio(any(), any());
+    }
+
     @Test
     void rejectsMissingDenominationBreakdownWhenRequired() {
         when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, "DEV-TX-1")).thenReturn(Optional.empty());
@@ -414,5 +514,32 @@ class CollectionServiceTest {
         assertThat(results.get(0).getAmountXaf()).isEqualTo(7000);
         assertThat(results.get(1).getClientName()).isEqualTo("Jean Client");
         assertThat(results.get(1).getAmountXaf()).isEqualTo(3000);
+    }
+
+    @Test
+    void findByClientsAndRangeResolvesNamesAndMfiMemberNosAndOrdersNewestFirst() {
+        Instant from = Instant.parse("2026-08-01T00:00:00Z");
+        Instant to = Instant.parse("2026-09-01T00:00:00Z");
+        UUID otherClientId = UUID.randomUUID();
+        UUID otherAgentId = UUID.randomUUID();
+        Collection earlier = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(3000).lat(4.05).lon(9.70).collectedAt(from.plusSeconds(3600)).deviceTxId("DEV-TX-1").build();
+        Collection later = Collection.builder().id(UUID.randomUUID()).agentId(otherAgentId).clientId(otherClientId)
+                .amountXaf(7000).lat(4.05).lon(9.70).collectedAt(from.plusSeconds(7200)).deviceTxId("DEV-TX-2").build();
+        when(collectionRepository.findByClientIdInAndCollectedAtBetween(eq(List.of(clientId, otherClientId)), eq(from), eq(to)))
+                .thenReturn(List.of(earlier, later));
+        when(clientDirectoryService.findFullNames(any())).thenReturn(java.util.Map.of(
+                clientId, "Jean Client", otherClientId, "Marie Client"));
+        when(clientDirectoryService.findMfiMemberNos(any())).thenReturn(java.util.Map.of(
+                clientId, "M-001", otherClientId, "M-002"));
+
+        List<CollectionResponse> results = collectionService.findByClientsAndRange(List.of(clientId, otherClientId), from, to);
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getClientName()).isEqualTo("Marie Client");
+        assertThat(results.get(0).getClientMfiMemberNo()).isEqualTo("M-002");
+        assertThat(results.get(0).getAgentId()).isEqualTo(otherAgentId);
+        assertThat(results.get(1).getClientName()).isEqualTo("Jean Client");
+        assertThat(results.get(1).getClientMfiMemberNo()).isEqualTo("M-001");
     }
 }

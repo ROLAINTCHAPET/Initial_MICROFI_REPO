@@ -46,12 +46,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             </div>
             <h2 className="text-h2 text-on-surface truncate">{client.fullName}</h2>
           </div>
-          <Badge status={client.status} />
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge status={client.cbsSynced ? "SYNCED" : "PENDING"} label={client.cbsSynced ? dict.clients.detail.cbsSynced : dict.clients.detail.cbsPending} />
+            <Badge status={client.status} />
+          </div>
         </div>
         <div className="space-y-3 pt-3 border-t border-outline-variant">
           <InfoField label={dict.clients.detail.memberNo} value={client.mfiMemberNo} />
+          <InfoField label={dict.clients.detail.email} value={client.email ?? "N/A"} />
           <InfoField label={dict.clients.detail.phone} value={client.phone} />
           <InfoField label={dict.clients.detail.branch} value={branch?.name ?? "N/A"} />
+          <InfoField label={dict.clients.detail.credentials} value={client.hasCredentials ? dict.common.yes : dict.common.no} />
         </div>
       </div>
 

@@ -36,6 +36,7 @@
       "SYNCED": "Synchronisé",
       "PENDING": "En attente",
       "PENDING_CEILING": "Plafond en attente",
+      "PENDING_APPROVAL": "Approbation en attente",
       "BLOCKED": "Bloqué",
       "ACTIVE": "Actif",
       "SUSPENDED": "Suspendu",
@@ -68,6 +69,7 @@
   "export": {
     "pdf": "Exporter en PDF",
     "excel": "Exporter en Excel",
+    "csv": "Exporter en CSV",
     "from": "Du",
     "to": "Au",
     "apply": "Appliquer",
@@ -84,8 +86,11 @@
     "geolocation": "Géolocalisation",
     "endOfDayOversight": "Clôture de journée",
     "sosConsole": "Console SOS",
+    "branches": "Agences",
     "registrations": "Inscriptions",
     "collectionRejections": "Rejets d'encaissements",
+    "misconductReports": "Signalements d'agents",
+    "broadcasts": "Messages diffusés",
     "audit": "Audit",
     "settings": "Paramètres"
   },
@@ -307,15 +312,36 @@
     "colMemberNo": "N° de membre",
     "colPhone": "Téléphone",
     "colStatus": "Statut",
+    "colCbsSync": "Synchro CBS",
     "exportTitle": "Clients",
     "noClients": "Aucun client trouvé pour cette agence.",
     "noMatches": "Aucun client ne correspond à cette recherche.",
     "backToClients": "Retour aux clients",
+    "createModal": {
+      "title": "Créer un client",
+      "recoveryHint": "Pour un client qui existe déjà dans le CBS mais qui n'a jamais été intégré à MICROFI — par exemple si une synchronisation automatique l'a manqué. Ne crée rien dans le CBS lui-même.",
+      "accountNumberLabel": "Numéro de compte CBS",
+      "nameLabel": "Nom complet",
+      "emailLabel": "Email",
+      "phoneLabel": "Téléphone",
+      "setCredentialsLabel": "Définir les identifiants de connexion maintenant",
+      "setCredentialsHint": "Permet à ce client de se connecter immédiatement au lieu d'attendre l'auto-activation. Laissez décoché pour qu'il définisse lui-même son identifiant/code PIN plus tard.",
+      "loginLabel": "Identifiant",
+      "pinLabel": "Code PIN",
+      "submit": "Créer le client",
+      "created": "Créé",
+      "failedToCreate": "Échec de la création du client",
+      "restrictedMessage": "La création d'un client est réservée à un administrateur ou à un chef d'agence."
+    },
     "detail": {
       "memberNo": "N° de membre",
+      "email": "Email",
       "phone": "Téléphone",
       "branch": "Agence",
       "status": "Statut",
+      "credentials": "Identifiants de connexion définis",
+      "cbsSynced": "Synchronisé CBS",
+      "cbsPending": "Synchro CBS en attente",
       "transactionsTitle": "Transactions"
     },
     "transactions": {
@@ -331,7 +357,13 @@
       "reconciled": "Reconcilié",
       "notReconciled": "Pas encore rapproché",
       "unknownAgent": "Agent inconnu",
-      "exportTitle": "Transactions du client"
+      "exportTitle": "Transactions du client",
+      "colClient": "Client",
+      "colAccountNumber": "Numéro de compte",
+      "allClientsTitle": "Exporter les transactions de tous les clients",
+      "allClientsSubtitle": "Chaque encaissement pour chaque client de cette agence sur la période choisie — le CSV est formaté pour une importation par lots dans le CBS ; Excel/PDF pour un rapport prêt pour l'audit.",
+      "exportTitleAllClients": "Transactions de tous les clients",
+      "resultSummary": "{count} transaction(s), {value} XAF au total"
     }
   },
   "settings": {
@@ -433,12 +465,62 @@
     "decisionReasonPrefix": "Motif : ",
     "allBranchesScope": "Toutes les agences"
   },
+  "ofjExportAlerts": {
+    "completedToast": "{branch} : l'export planifié de clôture a transmis {count} collecte(s) au CBS"
+  },
+  "misconductReports": {
+    "subtitle": "Signalement d'un client indiquant que son agent pourrait avoir mal agi, en attente de votre examen.",
+    "noResults": "Aucun signalement dans ce filtre.",
+    "newReportToast": "Nouveau signalement concernant {agent}",
+    "colAgent": "Agent",
+    "colClient": "Client signalant",
+    "colReason": "Motif",
+    "colReportedAt": "Signalé",
+    "colStatus": "Statut",
+    "tooltipPending": "{count} signalement(s) en attente d'examen",
+    "tooltipNone": "Aucun signalement en attente d'examen",
+    "filterAll": "Tous",
+    "filterPending": "En attente",
+    "filterReviewed": "Traités",
+    "markReviewedButton": "Marquer comme traité",
+    "markingReviewed": "Marquage en cours…",
+    "failedToMarkReviewed": "Échec du marquage"
+  },
+  "broadcasts": {
+    "pageSubtitle": "Envoyez une annonce à tous les clients ou tous les agents. Elle est visible dans leur application et envoyée par SMS.",
+    "composeTitle": "Envoyer un message diffusé",
+    "audienceLabel": "Destinataires",
+    "audienceClients": "Tous les clients",
+    "audienceAgents": "Tous les agents",
+    "scopeLabel": "Portée",
+    "scopeOwnBranch": "Mon agence uniquement",
+    "scopeNetworkWide": "Tout le réseau",
+    "scopeOneBranch": "Une agence",
+    "branchLabel": "Agence",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Rédigez votre annonce…",
+    "sendButton": "Envoyer",
+    "sending": "Envoi en cours…",
+    "sent": "Message diffusé à {count} destinataire(s)",
+    "failedToSend": "Échec de l'envoi",
+    "historyTitle": "Diffusions récentes",
+    "noHistory": "Aucune diffusion envoyée pour le moment.",
+    "colAudience": "Destinataires",
+    "colScope": "Portée",
+    "colMessage": "Message",
+    "colSentBy": "Envoyé par",
+    "colSentAt": "Envoyé",
+    "colRecipients": "Destinataires",
+    "networkWide": "Tout le réseau"
+  },
   "ofj": {
     "pageTitle": "Supervision de fin de journée",
     "pageSubtitle": "Rapprochement de caisse numérique, en lecture seule depuis le Back-Office.",
     "noBranches": "Aucune agence n'existe encore. Veuillez d'abord en créer une.",
     "awaitingAgentConfirmation": "{count} en attente de confirmation de l'agent",
     "rejectedCollections": "{count} rejetée(s)",
+    "rejectedAmountWithExpected": "{actual} XAF enregistrés, l'agent indique {expected} XAF",
+    "rejectedAmountNoExpected": "{actual} XAF annulés",
     "viewingBranch": "Agence consultée",
     "branchFallback": "Agence",
     "reconcileCash": "Effectuer la réconciliation",
@@ -556,7 +638,12 @@
       "suspendAccount": "Suspendre le compte",
       "reactivateAccount": "Réactiver le compte",
       "suspendDescription": "Bloquer temporairement l'accès au système.",
-      "reactivateDescription": "Restaurer l'accès de ce compte au système."
+      "reactivateDescription": "Restaurer l'accès de ce compte au système.",
+      "approveAccount": "Approuver le compte",
+      "approveDescription": "Activer ce compte créé par un responsable d'agence afin qu'il puisse se connecter.",
+      "failedToApprove": "Échec de l'approbation du compte",
+      "awaitingApproval": "En attente d'approbation",
+      "awaitingApprovalDescription": "Ce compte a été créé par un responsable d'agence et ne peut pas se connecter tant qu'un administrateur ne l'a pas approuvé."
     },
     "resetPassword": {
       "failedToReset": "Échec de la réinitialisation du mot de passe",
@@ -867,6 +954,9 @@
     }
   },
   "branches": {
+    "pageTitle": "Agences",
+    "pageSubtitle": "Les horaires et la configuration de chaque agence, au même endroit.",
+    "accessDenied": "Seuls un administrateur ou un responsable d'agence peuvent consulter les agences.",
     "directory": {
       "filterPlaceholder": "Filtrer les agences…",
       "title": "Répertoire des agences",
@@ -885,7 +975,8 @@
       "colHours": "Horaires",
       "colMaxCashiers": "Caissiers max.",
       "colRequireImei": "Nécessite un appareil associé",
-      "colDefaultCeilingPct": "Plafond par défaut (%)"
+      "colDefaultCeilingPct": "Plafond par défaut (%)",
+      "colRequireClientActivation": "Nécessite l'activation du client"
     },
     "workspace": {
       "scheduleSaved": "Nouveaux horaires enregistrés"
@@ -903,6 +994,8 @@
       "defaultCeilingHint": "Plafond du compte séquestre accordé par XAF de dépôt de garantie lors du financement du compte séquestre d'un agent : 100 % accorde un plafond égal au dépôt, 150 % accorde 1,5 fois ce montant. S'applique à chaque future recharge pour les agents de cette agence ; une dérogation manuelle ou une recharge individuelle peut toujours être utilisée pour ajuster un agent donné, indépendamment de cette valeur par défaut.",
       "requireImeiLabel": "Exiger un appareil associé pour les nouveaux agents",
       "requireImeiHint": "Désactivez cette option si les agents de cette agence utilisent leur propre téléphone pour les encaissements. Les nouveaux agents pourront être enregistrés sans appareil associé. Les agents déjà enregistrés ne sont pas concernés.",
+      "requireClientActivationLabel": "Exiger l'activation du client avant tout encaissement",
+      "requireClientActivationHint": "Désactivé par défaut : un agent peut encaisser auprès de n'importe quel client, activé ou non. Activez cette option pour bloquer l'encaissement tant que le client n'a pas terminé son activation (parrainage, paiement des frais et émission du jeton).",
       "saved": "Enregistré",
       "saveSettings": "Enregistrer les paramètres"
     },

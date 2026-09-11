@@ -106,7 +106,7 @@ export default async function TeamMemberDetailPage({
       )}
 
       {tab === "administration" ? (
-        <AdminUserAdministrationPanel user={user} canDelete={canDelete} />
+        <AdminUserAdministrationPanel user={user} canDelete={canDelete} isAdmin={session?.role === "ADMIN"} />
       ) : (
       <div className="bg-surface-container-lowest border-2 border-outline-variant rounded-xl p-6">
         <div className="flex items-center gap-4 mb-6 pb-6 border-b-2 border-outline-variant">

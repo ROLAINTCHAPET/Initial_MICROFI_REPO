@@ -296,6 +296,14 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get csGeofenceBlockedOfflineMessage =>
+      'Vous semblez être en dehors de votre zone de collecte assignée (d\'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).';
+
+  @override
+  String get csScheduleBlockedOfflineMessage =>
+      'Vous êtes en dehors des heures de collecte de votre agence (d\'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).';
+
+  @override
   String get csCouldNotPrintReceipt => 'Impossible d\'imprimer le reçu.';
 
   @override
@@ -380,6 +388,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hsMyRoute => 'Mon itinéraire';
 
   @override
+  String get hsQuickActionsSectionLabel => 'ACTIONS RAPIDES';
+
+  @override
   String get hsSponsorClientActivation =>
       'Parrainer l\'activation d\'un client';
 
@@ -426,6 +437,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String hsAmountCollectedPlus(String amount) {
     return '+$amount XAF';
   }
+
+  @override
+  String get hsGreeting => 'Bon retour,';
 
   @override
   String get hsStatusActive => 'En ligne';
@@ -1075,6 +1089,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get rcConfirmDialogTitle => 'Confirmer la réconciliation';
 
   @override
+  String get rcEnterPinToConfirmLabel =>
+      'Entrez votre code confidentiel pour confirmer';
+
+  @override
   String rcConfirmDialogMessage(String amount, int count) {
     return 'Confirmer que le comptage du caissier de $amount XAF sur $count encaissement(s) correspond à ce que vous avez réellement encaissé ?';
   }
@@ -1111,4 +1129,51 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get rcRejectionReasonRequired =>
       'Veuillez expliquer pourquoi cet encaissement devrait être rejeté.';
+
+  @override
+  String get cshReportAgentMenuItem => 'Signaler mon agent';
+
+  @override
+  String get craTitle => 'Signaler mon agent';
+
+  @override
+  String get craIntro =>
+      'Si votre agent a demandé un pot-de-vin, pris le mauvais montant, ou s\'est comporté de façon inappropriée, faites-le-nous savoir. Votre administration examinera ce signalement.';
+
+  @override
+  String get craAgentLabel => 'Quel agent ?';
+
+  @override
+  String craAgentOption(String date) {
+    return 'Agent de votre encaissement du $date';
+  }
+
+  @override
+  String get craNoAgentsMessage =>
+      'Vous n\'avez encore aucun encaissement enregistré, il n\'y a donc aucun agent à signaler.';
+
+  @override
+  String get craReasonLabel => 'Que s\'est-il passé ?';
+
+  @override
+  String get craReasonHint => 'Décrivez ce qui s\'est passé…';
+
+  @override
+  String get craReasonRequired => 'Veuillez décrire ce qui s\'est passé.';
+
+  @override
+  String get craSubmitButton => 'Envoyer le signalement';
+
+  @override
+  String get craSubmitting => 'Envoi en cours…';
+
+  @override
+  String get craSuccessTitle => 'Signalement envoyé';
+
+  @override
+  String get craSuccessMessage =>
+      'Merci. Votre administration a été notifiée et examinera ce signalement.';
+
+  @override
+  String get craFailedTitle => 'Échec de l\'envoi du signalement';
 }

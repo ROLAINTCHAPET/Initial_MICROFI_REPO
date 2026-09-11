@@ -151,6 +151,28 @@ class AdminAuthenticationControllerTest {
     }
 
     @Test
+    void testLoginPendingApprovalAccountRejected() {
+        AdminLoginRequest req = new AdminLoginRequest();
+        req.setLogin("admin");
+        req.setPassword("ChangeMe123!");
+        com.microfi.authentication.AdminUserDetails details = new com.microfi.authentication.AdminUserDetails(adminUser(AdminUserStatus.PENDING_APPROVAL));
+
+        when(adminUserDetailsService.findByUsername("admin")).thenReturn(Mono.just((UserDetails) details));
+
+        webTestClient.post()
+                .uri("/api/v1/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getDetailsKey()).isEqualTo("LOGIN_FAILED_ACCOUNT_PENDING_APPROVAL");
+        assertThat(captor.getValue().getStatus()).isEqualTo(AuditStatus.FAILED);
+    }
+
+    @Test
     void testLoginUnknownUserRejected() {
         AdminLoginRequest req = new AdminLoginRequest();
         req.setLogin("ghost");

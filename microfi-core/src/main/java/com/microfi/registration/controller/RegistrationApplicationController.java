@@ -5,11 +5,13 @@ import com.microfi.audit.domain.AuditCategory;
 import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AdminAccess;
+import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.AdminRole;
 import com.microfi.registration.domain.RegistrationApplication;
 import com.microfi.registration.domain.RegistrationApplicationStatus;
 import com.microfi.registration.domain.RegistrationAvailabilityField;
 import com.microfi.registration.domain.RegistrationDocumentType;
+import com.microfi.registration.domain.RegistrationTargetRole;
 import com.microfi.registration.service.DocumentStorageService;
 import com.microfi.registration.service.RegistrationApplicationService;
 import com.microfi.shared.dto.ApproveRegistrationApplicationRequest;
@@ -37,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -136,34 +139,43 @@ public class RegistrationApplicationController {
     }
 
     @PatchMapping("/{id}/approve")
-    @Operation(summary = "Approve Registration Application", description = "Provisions the real Agent/AdminUser account (via the same enrollment logic AgentManagementController/AdminUserManagementController use — no auto-assigned escrow ceiling, agents still start PENDING_CEILING until a real top-up) and sends a best-effort activation SMS. The response's tempPassword/tempPin are returned exactly once here and never persisted or retrievable again — treat as sensitive. ADMIN only.")
+    @Operation(summary = "Approve Registration Application", description = "Provisions the real Agent/AdminUser account (via the same enrollment logic AgentManagementController/AdminUserManagementController use — no auto-assigned escrow ceiling, agents still start PENDING_CEILING until a real top-up) and sends a best-effort activation SMS. The response's tempPassword/tempPin are returned exactly once here and never persisted or retrievable again — treat as sensitive. ADMIN, or BRANCH_MANAGER for an AGENT/BRANCH_CASHIER application in their own branch — a branch-manager application always still needs ADMIN.")
     public Mono<RegistrationApplicationResponse> approve(@PathVariable UUID id,
                                                            @RequestBody(required = false) ApproveRegistrationApplicationRequest request,
                                                            Mono<Authentication> authenticationMono) {
-        return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
-                .flatMap(caller -> registrationApplicationService.approve(id, caller.getAdminUser().getId(),
-                                request != null ? request.getReplaceUserId() : null)
-                        .doOnNext(result -> auditService.record(AuditLogEntry.builder()
-                                .category(AuditCategory.COMPLIANCE)
-                                .eventType("REGISTRATION_APPROVED")
-                                .actorType(AuditActorType.ADMIN)
-                                .actorId(caller.getAdminUser().getId())
-                                .actorLabel(caller.getAdminUser().getLogin())
-                                .actorRole(caller.getAdminUser().getRole())
-                                .branchId(result.application().getBranchId())
-                                .detailsKey("REGISTRATION_APPROVED_DETAIL")
-                                .detailsParam1(result.application().getFirstName() + " " + result.application().getLastName())
-                                .detailsParam2(result.application().getTargetRole().name())
-                                .build())))
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                            RegistrationApplication application = registrationApplicationService.get(id);
+                            AdminAccess.requireBranchScope(caller, application.getBranchId());
+                            requireManagerCanDecide(caller, application);
+                            return application;
+                        }).subscribeOn(Schedulers.boundedElastic())
+                        .flatMap(application -> registrationApplicationService.approve(id, caller.getAdminUser().getId(),
+                                        request != null ? request.getReplaceUserId() : null)
+                                .doOnNext(result -> auditService.record(AuditLogEntry.builder()
+                                        .category(AuditCategory.COMPLIANCE)
+                                        .eventType("REGISTRATION_APPROVED")
+                                        .actorType(AuditActorType.ADMIN)
+                                        .actorId(caller.getAdminUser().getId())
+                                        .actorLabel(caller.getAdminUser().getLogin())
+                                        .actorRole(caller.getAdminUser().getRole())
+                                        .branchId(result.application().getBranchId())
+                                        .detailsKey("REGISTRATION_APPROVED_DETAIL")
+                                        .detailsParam1(result.application().getFirstName() + " " + result.application().getLastName())
+                                        .detailsParam2(result.application().getTargetRole().name())
+                                        .build()))))
                 .map(result -> toResponse(result.application(), result.tempPassword(), result.tempPin()));
     }
 
     @PatchMapping("/{id}/reject")
-    @Operation(summary = "Reject Registration Application", description = "No account is provisioned. ADMIN only.")
+    @Operation(summary = "Reject Registration Application", description = "No account is provisioned. ADMIN, or BRANCH_MANAGER for an AGENT/BRANCH_CASHIER application in their own branch — a branch-manager application always still needs ADMIN.")
     public Mono<RegistrationApplicationResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectRegistrationApplicationRequest request,
                                                           Mono<Authentication> authenticationMono) {
-        return AdminAccess.require(authenticationMono, AdminRole.ADMIN)
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
+                            RegistrationApplication application = registrationApplicationService.get(id);
+                            AdminAccess.requireBranchScope(caller, application.getBranchId());
+                            requireManagerCanDecide(caller, application);
                             RegistrationApplication rejected = registrationApplicationService.reject(id, caller.getAdminUser().getId(), request.getReason());
                             auditService.record(AuditLogEntry.builder()
                                     .category(AuditCategory.COMPLIANCE)
@@ -181,6 +193,19 @@ public class RegistrationApplicationController {
                         })
                         .subscribeOn(Schedulers.boundedElastic()))
                 .map(this::toResponse);
+    }
+
+    /**
+     * A branch-manager can approve/reject their own branch's agent/cashier applications without
+     * an ADMIN — but never a fellow BRANCH_MANAGER application, which stays ADMIN-only regardless
+     * of branch (a manager approving their own peer/successor is a conflict of interest this
+     * compliance gate exists to prevent in the first place).
+     */
+    private void requireManagerCanDecide(AdminUserDetails caller, RegistrationApplication application) {
+        if (caller.getAdminUser().getRole() == AdminRole.BRANCH_MANAGER
+                && application.getTargetRole() == RegistrationTargetRole.BRANCH_MANAGER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only an ADMIN can approve or reject a branch-manager application");
+        }
     }
 
     private RegistrationApplicationResponse toResponse(RegistrationApplication application) {

@@ -2,7 +2,6 @@ package com.microfi.transactions.service;
 
 import com.microfi.config.RabbitMQConfig;
 import com.microfi.events.CollectionGeocodeEvent;
-import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.repository.CollectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Best-effort by construction, same as the synchronous call it replaces: GeocodingService itself
  * already swallows lookup failures/timeouts and returns null rather than throwing, so a bad
  * lookup here just leaves locationName null — it never requeues or dead-letters the message.
+ * <p>
+ * Updates via {@link CollectionRepository#updateLocationName}, never a load+save of the whole
+ * entity: reverse-geocoding a slow/unreachable provider can take several retried seconds, easily
+ * long enough for a cashier to reconcile the very collection this listener is still resolving —
+ * a full-entity save from a stale snapshot taken before that would silently overwrite the
+ * reconciliation with old field values.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,8 +36,7 @@ public class CollectionGeocodeListener {
     @RabbitListener(queues = RabbitMQConfig.COLLECTION_GEOCODE_QUEUE)
     @Transactional
     public void onGeocodeEvent(CollectionGeocodeEvent event) {
-        Collection collection = collectionRepository.findById(event.collectionId()).orElse(null);
-        if (collection == null) {
+        if (!collectionRepository.existsById(event.collectionId())) {
             // Nothing left to update — not expected in practice, but not worth dead-lettering over.
             log.warn("Geocode event for unknown collection {}", event.collectionId());
             return;
@@ -42,7 +46,6 @@ public class CollectionGeocodeListener {
         if (locationName == null) {
             return;
         }
-        collection.setLocationName(locationName);
-        collectionRepository.save(collection);
+        collectionRepository.updateLocationName(event.collectionId(), locationName);
     }
 }

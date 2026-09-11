@@ -21,11 +21,13 @@ export function Header({
   role,
   unresolvedSosCount,
   pendingRejectionCount,
+  pendingMisconductCount,
 }: {
   login: string;
   role: AdminRole;
   unresolvedSosCount: number;
   pendingRejectionCount: number;
+  pendingMisconductCount: number;
 }) {
   const router = useRouter();
   const pageHeader = usePageHeaderValue();
@@ -81,6 +83,18 @@ export function Header({
           {pendingRejectionCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center">
               {pendingRejectionCount}
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/misconduct-reports"
+          className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-[var(--radius-sm)] transition-[background-color,transform] duration-150 ease-out hover:scale-110 active:scale-90"
+          title={pendingMisconductCount > 0 ? t(dict.misconductReports.tooltipPending, { count: pendingMisconductCount }) : dict.misconductReports.tooltipNone}
+        >
+          <Icon name="shield-check" className="size-5" />
+          {pendingMisconductCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center">
+              {pendingMisconductCount}
             </span>
           )}
         </Link>

@@ -8,15 +8,9 @@ export function ceilingUtilizationPct(cumulativeXaf: number, ceilingXaf: number)
   return Math.round(Math.min(cumulativeXaf / ceilingXaf, 1) * 100);
 }
 
-// Compact XAF amount formatting, picking the right unit for the magnitude — never lets a
-// millions-scale value render in K (e.g. 2 626 000 shows as "2.6M XAF", not "2626K XAF").
-export function formatCompactXaf(valueXaf: number): string {
-  if (valueXaf >= 1_000_000) {
-    const millions = Math.round((valueXaf / 1_000_000) * 10) / 10;
-    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M XAF`;
-  }
-  if (valueXaf >= 1000) {
-    return `${Math.round(valueXaf / 1000)}K XAF`;
-  }
-  return `${valueXaf.toLocaleString()} XAF`;
+// Full XAF amount formatting with thousands separators — no K/M abbreviation, so a manager
+// reading a dashboard figure always sees the exact amount (e.g. 2 626 000 shows as
+// "2,626,000 XAF", never a rounded "2.6M XAF").
+export function formatXaf(valueXaf: number): string {
+  return `${valueXaf.toLocaleString("en-US")} XAF`;
 }

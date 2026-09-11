@@ -35,7 +35,12 @@ export default async function AgentsPage() {
       employeeCode: agent.employeeCode,
       branchName: branchById.get(agent.branchId)?.name ?? "N/A",
       status: agent.status,
-      collectedTodayXaf: escrow?.cumulativeTodayXaf ?? null,
+      // Two different figures, deliberately kept separate: cashInHandXaf is the day-agnostic
+      // ceiling-gate basis (drives the progress bar below, must match what BR-03 actually
+      // blocks against), collectedTodayXaf is the true calendar-day total (drives only the
+      // aggregate stat card) — conflating them was the original "Encaissé aujourd'hui" bug.
+      cashInHandXaf: escrow?.cumulativeTodayXaf ?? null,
+      collectedTodayXaf: escrow?.collectedTodayXaf ?? null,
       ceilingXaf: escrow?.effectiveCeilingXaf ?? null,
       pct,
       nearLimit: pct !== null && pct >= 80,

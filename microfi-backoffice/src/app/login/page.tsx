@@ -43,7 +43,7 @@ export default function LoginPage() {
   return (
     <div className="flex-1 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm flex flex-col items-center">
-        <div className="w-16 h-16 rounded-[var(--radius-md)] bg-primary flex items-center justify-center mb-5">
+        <div className="logo-intro w-16 h-16 rounded-[var(--radius-md)] bg-primary flex items-center justify-center mb-5">
           <Icon name="building" className="size-8 text-on-primary" />
         </div>
         <h1 className="text-3xl font-bold text-on-surface text-center">{dict.login.title}</h1>
@@ -73,7 +73,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="text-outline hover:text-on-surface cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90"
+                className="appearance-none inline-flex items-center justify-center text-outline hover:text-on-surface cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90"
                 aria-label={showPassword ? dict.login.hidePassword : dict.login.showPassword}
               >
                 <Icon name={showPassword ? "eye-off" : "eye"} className="size-5" />

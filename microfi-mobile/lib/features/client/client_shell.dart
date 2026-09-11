@@ -8,6 +8,7 @@ import '../auth/role_select_screen.dart';
 import 'client_history_screen.dart';
 import 'client_home_screen.dart';
 import 'client_models.dart';
+import 'client_report_agent_screen.dart';
 import 'client_wallet_screen.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -29,7 +30,7 @@ class _ClientShellState extends State<ClientShell> {
   bool _online = true;
   StreamSubscription<bool>? _connectivitySub;
 
-  static const _icons = [Icons.home, Icons.history, Icons.account_balance_wallet];
+  static const _icons = [Icons.home_rounded, Icons.history_rounded, Icons.account_balance_wallet_rounded];
 
   @override
   void initState() {
@@ -63,24 +64,48 @@ class _ClientShellState extends State<ClientShell> {
       appBar: AppBar(
         backgroundColor: MicrofiColors.primary,
         foregroundColor: MicrofiColors.onPrimary,
-        elevation: 0,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.25),
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(MicrofiRadius.lg), bottomRight: Radius.circular(MicrofiRadius.lg)),
+        ),
         automaticallyImplyLeading: false,
         titleSpacing: 20,
-        title: Text(l10n.cshMyBookletTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0.3)),
+        title: Text(l10n.cshMyBookletTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: 0.3)),
         actions: [
           Tooltip(
             message: _online ? l10n.hsStatusActive : l10n.asOfflineTooltip,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Icon(_online ? Icons.wifi : Icons.wifi_off, color: _online ? MicrofiColors.secondaryFixed : MicrofiColors.tertiaryFixedDim),
+            child: Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(right: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(_online ? Icons.wifi_rounded : Icons.wifi_off_rounded, size: 18, color: _online ? MicrofiColors.secondaryFixed : MicrofiColors.tertiaryFixedDim),
             ),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle_outlined),
+            icon: Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: MicrofiColors.surfaceContainerLowest, shape: BoxShape.circle),
+              child: const Icon(Icons.person_rounded, color: MicrofiColors.primary, size: 18),
+            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
             onSelected: (value) {
-              if (value == 'signout') _signOut();
+              if (value == 'signout') {
+                _signOut();
+              } else if (value == 'report_agent') {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => ClientReportAgentScreen(token: widget.token)));
+              }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'report_agent',
+                child: Row(children: [const Icon(Icons.shield_outlined, size: 20, color: MicrofiColors.primary), const SizedBox(width: 10), Text(l10n.cshReportAgentMenuItem)]),
+              ),
               PopupMenuItem(
                 value: 'signout',
                 child: Row(children: [const Icon(Icons.logout, size: 20, color: MicrofiColors.error), const SizedBox(width: 10), Text(l10n.commonSignOut, style: const TextStyle(color: MicrofiColors.error))]),
@@ -91,23 +116,33 @@ class _ClientShellState extends State<ClientShell> {
         ],
       ),
       body: SafeArea(child: _buildTab()),
-      bottomNavigationBar: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          indicatorColor: MicrofiColors.secondaryFixed,
-          labelTextStyle: WidgetStateProperty.resolveWith(
-            (states) => TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: states.contains(WidgetState.selected) ? MicrofiColors.onSecondaryFixedVariant : MicrofiColors.onSurfaceVariant,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: MicrofiColors.surfaceContainerLowest,
+          borderRadius: const BorderRadius.only(topLeft: Radius.circular(MicrofiRadius.lg), topRight: Radius.circular(MicrofiRadius.lg)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            indicatorColor: MicrofiColors.secondaryFixed,
+            indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.full)),
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: states.contains(WidgetState.selected) ? MicrofiColors.onSecondaryFixedVariant : MicrofiColors.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
-        child: NavigationBar(
-          height: 62,
-          backgroundColor: MicrofiColors.surfaceContainerLowest,
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-          destinations: List.generate(tabs.length, (i) => NavigationDestination(icon: Icon(_icons[i]), label: tabs[i])),
+          child: NavigationBar(
+            height: 64,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+            destinations: List.generate(tabs.length, (i) => NavigationDestination(icon: Icon(_icons[i]), label: tabs[i])),
+          ),
         ),
       ),
     );

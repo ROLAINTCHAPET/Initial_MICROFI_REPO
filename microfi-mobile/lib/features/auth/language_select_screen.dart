@@ -73,25 +73,28 @@ class _LanguageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MicrofiColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(MicrofiRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-              ),
-              const Icon(Icons.chevron_right, color: MicrofiColors.outline),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: MicrofiColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: MicrofiColors.outline),
+              ],
+            ),
           ),
         ),
       ),

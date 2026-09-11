@@ -75,13 +75,18 @@ class _WalletScreenState extends State<WalletScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          Text(l10n.wsWalletTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.wsWalletTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
-            padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: MicrofiColors.primary,
-              borderRadius: BorderRadius.circular(MicrofiRadius.md),
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [MicrofiColors.primary, MicrofiColors.primaryContainer],
+              ),
+              boxShadow: MicrofiShadows.soft,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,36 +94,36 @@ class _WalletScreenState extends State<WalletScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
-                      child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 16),
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle),
+                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 17),
                     ),
                     const SizedBox(width: 10),
                     Text(l10n.wsEscrowWalletBalance, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(_fmt(escrow.balanceXaf), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
+                    Text(_fmt(escrow.balanceXaf), style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800)),
                     const SizedBox(width: 6),
                     const Text('XAF', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(MicrofiRadius.full),
                   child: LinearProgressIndicator(
                     value: baseUtilization,
-                    minHeight: 8,
+                    minHeight: 10,
                     backgroundColor: Colors.white.withValues(alpha: 0.15),
                     valueColor: const AlwaysStoppedAnimation(MicrofiColors.secondaryFixed),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(l10n.wsBaseCeiling(_fmt(escrow.baseCeilingXaf)), style: const TextStyle(color: Colors.white70, fontSize: 11)),
               ],
             ),
@@ -135,22 +140,27 @@ class _WalletScreenState extends State<WalletScreen> {
           if (escrow.activeOverrideReason != null) ...[
             const SizedBox(height: MicrofiSpacing.gapLg),
             Container(
-              padding: const EdgeInsets.all(MicrofiSpacing.card),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: MicrofiColors.tertiaryFixed.withValues(alpha: 0.3),
+                color: MicrofiColors.tertiaryFixed,
                 borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                border: Border.all(color: MicrofiColors.tertiaryFixedDim),
+                boxShadow: MicrofiShadows.softSmall,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+                    child: const Icon(Icons.info_outline_rounded, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.wsActiveWaiver, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
+                        Text(l10n.wsActiveWaiver, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: MicrofiColors.onTertiaryFixedVariant)),
                         const SizedBox(height: 2),
                         Text(escrow.activeOverrideReason!, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
                       ],
@@ -199,11 +209,11 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(MicrofiSpacing.card),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: MicrofiColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

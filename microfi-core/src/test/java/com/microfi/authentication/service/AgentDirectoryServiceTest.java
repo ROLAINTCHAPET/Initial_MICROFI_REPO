@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentDirectoryServiceTest {
@@ -194,6 +195,132 @@ class AgentDirectoryServiceTest {
     }
 
     @Test
+    void effectiveRequireClientActivationForAgentReturnsBranchConfiguredValue() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).requireClientActivation(true).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        assertThat(agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)).isTrue();
+    }
+
+    @Test
+    void effectiveRequireClientActivationForAgentDefaultsToFalseWhenBranchUnconfigured() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        assertThat(agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)).isFalse();
+    }
+
+    @Test
+    void effectiveRequireClientActivationForAgentDefaultsToFalseWhenBranchMissing() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.empty());
+
+        assertThat(agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)).isFalse();
+    }
+
+    @Test
+    void effectiveRequireClientActivationForAgentUnknownAgentThrows404() {
+        when(agentRepository.findById(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentDirectoryService.effectiveRequireClientActivationForAgent(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+    }
+
+    @Test
+    void effectiveRequireClientPortfolioForAgentReturnsBranchConfiguredValue() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).requireClientPortfolio(true).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        assertThat(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).isTrue();
+    }
+
+    @Test
+    void effectiveRequireClientPortfolioForAgentDefaultsToFalseWhenBranchUnconfigured() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        Branch branch = Branch.builder().id(branchId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        assertThat(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).isFalse();
+    }
+
+    @Test
+    void effectiveRequireClientPortfolioForAgentDefaultsToFalseWhenBranchMissing() {
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).branchId(branchId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.empty());
+
+        assertThat(agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)).isFalse();
+    }
+
+    @Test
+    void effectiveRequireClientPortfolioForAgentUnknownAgentThrows404() {
+        when(agentRepository.findById(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+    }
+
+    @Test
+    void addCarriedPhysicalXafSetsItFromNull() {
+        Agent agent = Agent.builder().id(agentId).carriedPhysicalXaf(null).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        agentDirectoryService.addCarriedPhysicalXaf(agentId, 2000L);
+
+        assertThat(agent.getCarriedPhysicalXaf()).isEqualTo(2000L);
+        verify(agentRepository).save(agent);
+    }
+
+    @Test
+    void addCarriedPhysicalXafAccumulatesOnTopOfAnExistingCarry() {
+        Agent agent = Agent.builder().id(agentId).carriedPhysicalXaf(2000L).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        agentDirectoryService.addCarriedPhysicalXaf(agentId, 500L);
+
+        assertThat(agent.getCarriedPhysicalXaf()).isEqualTo(2500L);
+    }
+
+    @Test
+    void consumeCarriedPhysicalXafReturnsAndClearsIt() {
+        Agent agent = Agent.builder().id(agentId).carriedPhysicalXaf(2000L).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        long consumed = agentDirectoryService.consumeCarriedPhysicalXaf(agentId);
+
+        assertThat(consumed).isEqualTo(2000L);
+        assertThat(agent.getCarriedPhysicalXaf()).isNull();
+        verify(agentRepository).save(agent);
+    }
+
+    @Test
+    void consumeCarriedPhysicalXafReturnsZeroWhenNoneOutstanding() {
+        Agent agent = Agent.builder().id(agentId).carriedPhysicalXaf(null).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        long consumed = agentDirectoryService.consumeCarriedPhysicalXaf(agentId);
+
+        assertThat(consumed).isEqualTo(0L);
+        verify(agentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
     void verifyTransactionPinRejectsWhenAgentNotActive() {
         Agent agent = Agent.builder().id(agentId).pinHash("hashed").pinMustChange(false).status(AgentStatus.PENDING_CEILING).build();
         when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
@@ -307,6 +434,41 @@ class AgentDirectoryServiceTest {
         when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
 
         agentDirectoryService.requireDayNotEnded(agentId, Instant.now());
+    }
+
+    @Test
+    void hasEndedDayTodayTrueWhenStampedForTodaysUtcDate() {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        Agent agent = Agent.builder().id(agentId).dayEndedBusinessDate(today).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        assertThat(agentDirectoryService.hasEndedDayToday(agentId)).isTrue();
+    }
+
+    @Test
+    void hasEndedDayTodayFalseWhenStampedForAnEarlierDate() {
+        java.time.LocalDate yesterday = java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1);
+        Agent agent = Agent.builder().id(agentId).dayEndedBusinessDate(yesterday).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        assertThat(agentDirectoryService.hasEndedDayToday(agentId)).isFalse();
+    }
+
+    @Test
+    void hasEndedDayTodayFalseWhenNeverEnded() {
+        Agent agent = Agent.builder().id(agentId).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        assertThat(agentDirectoryService.hasEndedDayToday(agentId)).isFalse();
+    }
+
+    @Test
+    void hasEndedDayTodayUnknownAgentThrows404() {
+        when(agentRepository.findById(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentDirectoryService.hasEndedDayToday(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
     }
 
     @Test

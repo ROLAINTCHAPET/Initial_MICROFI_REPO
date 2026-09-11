@@ -1,10 +1,14 @@
 package com.microfi.savings.service;
 
+import com.microfi.savings.domain.AccessTokenStatus;
 import com.microfi.savings.domain.ActivationRequestStatus;
+import com.microfi.savings.repository.AccessTokenRepository;
 import com.microfi.savings.repository.ActivationPaymentRepository;
 import com.microfi.savings.repository.ActivationRequestRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,10 +28,16 @@ public class ActivationDirectoryService {
 
     private final ActivationPaymentRepository activationPaymentRepository;
     private final ActivationRequestRepository activationRequestRepository;
+    private final AccessTokenRepository accessTokenRepository;
 
     /** UC-16 / BR-03: same reconciliation-sweep semantics as CollectionRepository#sumUnreconciledByAgent — see that Javadoc. */
     public long sumUnreconciled(UUID agentId, Instant cutoff) {
         return activationPaymentRepository.sumUnreconciledByAgent(agentId, cutoff);
+    }
+
+    /** Display-only calendar-day total — see CollectionRepository#sumCollectedTodayByAgent's Javadoc. */
+    public long sumCollectedToday(UUID agentId, Instant startOfDay, Instant endOfDay) {
+        return activationPaymentRepository.sumCollectedTodayByAgent(agentId, startOfDay, endOfDay);
     }
 
     /** Marks exactly the payments {@link #sumUnreconciled} just summed as reconciled. */
@@ -43,6 +53,26 @@ public class ActivationDirectoryService {
      */
     public boolean hasPendingActivation(UUID agentId) {
         return activationRequestRepository.existsByAgentIdAndStatus(agentId, ActivationRequestStatus.PENDING);
+    }
+
+    /**
+     * UC-19 gate (opt-in per branch, see {@code Branch#requireClientActivation}): a client counts
+     * as activated only while their most recent non-revoked token is both {@code ACTIVE} and not
+     * past {@code expiresAt} — a token that lapsed needs renewal (a fresh activation payment)
+     * before this branch will accept more cash for that client, same as a first-time activation.
+     */
+    public boolean isClientActivated(UUID clientId) {
+        return accessTokenRepository.findFirstByClientIdAndStatusOrderByIssuedAtDesc(clientId, AccessTokenStatus.ACTIVE)
+                .filter(token -> token.getExpiresAt() == null || token.getExpiresAt().isAfter(Instant.now()))
+                .isPresent();
+    }
+
+    /** {@code CollectionService.recordCollection}'s gate, only invoked when the agent's branch opts into {@link #isClientActivated}. */
+    public void requireActivatedClient(UUID clientId) {
+        if (!isClientActivated(clientId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This client hasn't completed activation yet — sponsor and complete their activation before collecting cash");
+        }
     }
 
     /** UC-16/18: line-level detail (not just a sum) for posting a branch's activation-fee cash to the CBS on export, same as Collection. */

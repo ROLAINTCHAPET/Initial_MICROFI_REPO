@@ -151,16 +151,22 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                 itemBuilder: (context, index) {
                   final c = _results[index];
                   final busy = _sponsoringId == c.id;
-                  return Card(
+                  return Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: MicrofiColors.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                      side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                      boxShadow: MicrofiShadows.softSmall,
                     ),
-                    elevation: 0,
-                    color: MicrofiColors.surfaceContainerLowest,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: MicrofiColors.onTertiaryFixedVariant.withValues(alpha: 0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.how_to_reg_rounded, color: MicrofiColors.onTertiaryFixedVariant, size: 20),
+                      ),
                       title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
                       subtitle: Text(l10n.csClientSubtitle(c.mfiMemberNo, c.phone)),
                       trailing: c.sponsored
@@ -168,6 +174,7 @@ class _SponsorActivationScreenState extends State<SponsorActivationScreen> {
                               label: Text(l10n.saAwaitingPayment, style: const TextStyle(fontSize: 11)),
                               backgroundColor: MicrofiColors.surfaceContainerHigh,
                               visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.full)),
                             )
                           : busy
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))

@@ -58,6 +58,18 @@ class ClientSelfServiceControllerTest {
     @MockitoBean
     private ClientDetailsService clientDetailsService;
 
+    @MockitoBean
+    private com.microfi.transactions.service.AgentMisconductReportService agentMisconductReportService;
+
+    @MockitoBean
+    private com.microfi.authentication.service.AgentDirectoryService agentDirectoryService;
+
+    @MockitoBean
+    private com.microfi.audit.service.AuditService auditService;
+
+    @MockitoBean
+    private com.microfi.notifications.service.BroadcastMessageService broadcastMessageService;
+
     private final UUID clientId = UUID.randomUUID();
 
     private Authentication clientAuthentication() {

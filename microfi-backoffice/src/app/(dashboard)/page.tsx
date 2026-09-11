@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import { ceilingUtilizationPct, formatCompactXaf } from "@/lib/format";
+import { ceilingUtilizationPct, formatXaf } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeaderContext";
 import { Icon, type IconName } from "@/components/Icon";
 import { Badge } from "@/components/Badge";
@@ -110,6 +110,7 @@ export default async function RegionalDashboardPage() {
     maxCashiers: b.maxCashiers,
     requireImei: b.requireImei,
     defaultCeilingPct: b.defaultCeilingPct,
+    requireClientActivation: b.requireClientActivation,
     canEdit: true, // this section only renders for ADMIN, who can edit every branch
   }));
 
@@ -125,7 +126,7 @@ export default async function RegionalDashboardPage() {
         <StatCard icon="check-circle" label={dict.dashboard.activeAgents} value={activeCount.toLocaleString()} />
         {/* A cashier reconciles cash, they don't oversee escrow funding — same restriction as /tracking. */}
         {session?.role !== "BRANCH_CASHIER" && (
-          <StatCard icon="lock" label={dict.dashboard.totalEscrow} value={formatCompactXaf(totalEscrow)} />
+          <StatCard icon="lock" label={dict.dashboard.totalEscrow} value={formatXaf(totalEscrow)} />
         )}
         <StatCard icon="bell" label={dict.dashboard.unresolvedSos} value={unresolvedSos.length.toLocaleString()} alert={unresolvedSos.length > 0} href="/sos" />
       </div>
@@ -172,6 +173,7 @@ export default async function RegionalDashboardPage() {
                 maxCashiers={homeBranch.maxCashiers}
                 requireImei={homeBranch.requireImei}
                 defaultCeilingPct={homeBranch.defaultCeilingPct}
+                requireClientActivation={homeBranch.requireClientActivation}
               />
             )}
           </div>

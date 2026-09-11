@@ -76,6 +76,17 @@ public class CollectionService {
         requireWithinAssignedGeofence(agentId, request.getLat(), request.getLon());
         clientDirectoryService.requireActiveClient(request.getClientId());
         requireNoPendingActivation(agentId);
+        // Off by default (Branch#requireClientActivation) — an agent can collect from any client
+        // regardless of UC-19 activation status unless their branch's admin/manager opts in.
+        if (agentDirectoryService.effectiveRequireClientActivationForAgent(agentId)) {
+            activationDirectoryService.requireActivatedClient(request.getClientId());
+        }
+        // Off by default (Branch#requireClientPortfolio) — "portefeuille client": once opted in,
+        // an agent may only collect from a client already assigned to them (or from any
+        // still-unassigned client, which this check deliberately lets through regardless).
+        if (agentDirectoryService.effectiveRequireClientPortfolioForAgent(agentId)) {
+            requireInAgentPortfolio(agentId, request.getClientId());
+        }
 
         validateDenominationBreakdown(request);
         enforceEscrowCeiling(agentId, request.getAmountXaf());
@@ -228,6 +239,36 @@ public class CollectionService {
                 .build());
     }
 
+    /** "Portefeuille client" gate — see {@code Branch#requireClientPortfolio}'s doc for the full rule. */
+    private void requireInAgentPortfolio(UUID agentId, UUID clientId) {
+        try {
+            clientDirectoryService.requireInPortfolio(agentId, clientId);
+        } catch (ResponseStatusException e) {
+            if (e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                auditPortfolioRejection(agentId, clientId);
+            }
+            throw e;
+        }
+    }
+
+    /** Same reasoning as {@link #auditGeofenceRejection}: a rejected-at-the-gate attempt with no {@link Collection} row to point to, so this stands alone as its own SECURITY event. */
+    private void auditPortfolioRejection(UUID agentId, UUID clientId) {
+        var agentInfo = agentDirectoryService.findAuditInfo(agentId);
+        String clientName = clientDirectoryService.findReceiptInfo(clientId).fullName();
+        auditService.record(AuditLogEntry.builder()
+                .category(AuditCategory.SECURITY)
+                .eventType("COLLECTION_REJECTED_PORTFOLIO")
+                .actorType(AuditActorType.AGENT)
+                .actorId(agentId)
+                .actorLabel(agentInfo.username())
+                .branchId(agentInfo.branchId())
+                .agentId(agentId)
+                .status(AuditStatus.FAILED)
+                .detailsKey("COLLECTION_REJECTED_PORTFOLIO_DETAIL")
+                .detailsParam1(clientName)
+                .build());
+    }
+
     /**
      * An agent-registered activation payment isn't a finalized {@code ActivationPayment} (and so
      * isn't counted by {@link #enforceEscrowCeiling}) until the client also confirms it — so while
@@ -325,6 +366,43 @@ public class CollectionService {
                         .id(collection.getId())
                         .agentId(collection.getAgentId())
                         .clientId(collection.getClientId())
+                        .amountXaf(collection.getAmountXaf())
+                        .lat(collection.getLat())
+                        .lon(collection.getLon())
+                        .accuracyM(collection.getAccuracyM())
+                        .locationName(collection.getLocationName())
+                        .collectedAt(collection.getCollectedAt())
+                        .reconciledAt(collection.getReconciledAt())
+                        .syncStatus(collection.getSyncStatus())
+                        .deviceTxId(collection.getDeviceTxId())
+                        .terminalId(collection.getTerminalId())
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Bulk counterpart to {@link #findByClientAndRange} — every collection for a whole set of
+     * clients (a branch's entire client roster, from the Back-Office Clients page) within an
+     * arbitrary [from, to) window, newest first. Unlike the single-client version, agent identity
+     * spans many distinct agents here too, but the caller (the Clients page) already has its own
+     * agents list loaded the same way OFJ oversight does, so only client identity is resolved
+     * server-side — mirrors {@link #findByAgentAndRange}'s reasoning, just the other direction.
+     */
+    public List<CollectionResponse> findByClientsAndRange(List<UUID> clientIds, Instant from, Instant to) {
+        List<Collection> collections = collectionRepository.findByClientIdInAndCollectedAtBetween(clientIds, from, to);
+        Map<UUID, String> namesByClientId = clientDirectoryService.findFullNames(
+                collections.stream().map(Collection::getClientId).collect(Collectors.toSet()));
+        Map<UUID, String> mfiMemberNosByClientId = clientDirectoryService.findMfiMemberNos(
+                collections.stream().map(Collection::getClientId).collect(Collectors.toSet()));
+
+        return collections.stream()
+                .sorted(Comparator.comparing(Collection::getCollectedAt).reversed())
+                .map(collection -> CollectionResponse.builder()
+                        .id(collection.getId())
+                        .agentId(collection.getAgentId())
+                        .clientId(collection.getClientId())
+                        .clientName(namesByClientId.get(collection.getClientId()))
+                        .clientMfiMemberNo(mfiMemberNosByClientId.get(collection.getClientId()))
                         .amountXaf(collection.getAmountXaf())
                         .lat(collection.getLat())
                         .lon(collection.getLon())

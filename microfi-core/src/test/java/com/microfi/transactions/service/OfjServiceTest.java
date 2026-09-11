@@ -21,10 +21,12 @@ import com.microfi.shared.dto.VarianceRequest;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionConfirmedBy;
 import com.microfi.transactions.domain.CollectionReconciliationStatus;
+import com.microfi.transactions.domain.CollectionRejectionStatus;
 import com.microfi.transactions.domain.OfjAgentLine;
 import com.microfi.transactions.domain.OfjSession;
 import com.microfi.transactions.domain.OfjSessionStatus;
 import com.microfi.transactions.domain.VarianceDebt;
+import com.microfi.transactions.repository.CollectionRejectionRequestRepository;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.ExportBatchRepository;
 import com.microfi.transactions.repository.OfjAgentLineRepository;
@@ -36,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -51,6 +54,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,6 +75,8 @@ class OfjServiceTest {
     @Mock
     private CollectionRepository collectionRepository;
     @Mock
+    private CollectionRejectionRequestRepository collectionRejectionRequestRepository;
+    @Mock
     private CbsClientService cbsClientService;
     @Mock
     private AgentDirectoryService agentDirectoryService;
@@ -79,6 +86,8 @@ class OfjServiceTest {
     private ClientDirectoryService clientDirectoryService;
     @Mock
     private AuditService auditService;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
 
     private OfjService ofjService;
 
@@ -90,8 +99,8 @@ class OfjServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         ofjService = new OfjService(ofjSessionRepository, ofjAgentLineRepository, ofjPhysicalDenomRepository,
-                varianceDebtRepository, exportBatchRepository, collectionRepository, cbsClientService, agentDirectoryService,
-                activationDirectoryService, clientDirectoryService, auditService);
+                varianceDebtRepository, exportBatchRepository, collectionRepository, collectionRejectionRequestRepository, cbsClientService, agentDirectoryService,
+                activationDirectoryService, clientDirectoryService, auditService, applicationEventPublisher);
         when(ofjSessionRepository.save(any(OfjSession.class))).thenAnswer(inv -> inv.getArgument(0));
         when(ofjAgentLineRepository.save(any(OfjAgentLine.class))).thenAnswer(inv -> inv.getArgument(0));
         when(varianceDebtRepository.save(any(VarianceDebt.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -120,6 +129,40 @@ class OfjServiceTest {
 
         assertThat(summary.getStatus()).isEqualTo("OPEN");
         assertThat(summary.getAgentLines()).isEmpty();
+    }
+
+    /**
+     * A rejected 1000 XAF collection with the agent's own corrected 500 XAF figure must surface on
+     * the /ofj summary row — not just a bare "1 rejected" badge with no amounts, which is what
+     * happened before rejectedActualTotalXaf/rejectedExpectedTotalXaf existed (the line's own
+     * digitalTotalXaf/physicalTotalXaf/deltaXaf all legitimately zero out once the only collection
+     * on the line is voided — see CollectionRejectionService — but that leaves the rejection
+     * invisible without these two fields).
+     */
+    @Test
+    void summaryLineSurfacesRejectedCollectionActualAndExpectedAmounts() {
+        OfjSession session = openSession();
+        when(ofjSessionRepository.findByBranchIdAndBusinessDate(branchId, today)).thenReturn(Optional.of(session));
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(agentId)
+                .digitalTotalXaf(0).physicalTotalXaf(0).deltaXaf(0).build();
+        when(ofjAgentLineRepository.findByOfjId(session.getId())).thenReturn(List.of(line));
+        Collection voided = Collection.builder().id(UUID.randomUUID()).agentId(agentId).amountXaf(1000L)
+                .reconciledInLineId(line.getId()).voidedAt(Instant.now()).build();
+        when(collectionRepository.findByReconciledInLineIdAndVoidedAtIsNotNull(line.getId())).thenReturn(List.of(voided));
+        com.microfi.transactions.domain.CollectionRejectionRequest rejection = com.microfi.transactions.domain.CollectionRejectionRequest.builder()
+                .id(UUID.randomUUID()).collectionId(voided.getId()).agentId(agentId).reason("Wrong amount")
+                .actualAmountXaf(1000L).expectedAmountXaf(500L).status(CollectionRejectionStatus.APPROVED).build();
+        when(collectionRejectionRequestRepository.findByCollectionIdInAndStatus(List.of(voided.getId()), CollectionRejectionStatus.APPROVED))
+                .thenReturn(List.of(rejection));
+
+        OfjSummaryResponse summary = ofjService.getSummary(branchId);
+
+        OfjAgentLineResponse response = summary.getAgentLines().get(0);
+        assertThat(response.getRejectedCount()).isEqualTo(1);
+        assertThat(response.getRejectedActualTotalXaf()).isEqualTo(1000L);
+        assertThat(response.getRejectedExpectedTotalXaf()).isEqualTo(500L);
+        assertThat(response.getDigitalTotalXaf()).isEqualTo(0);
+        assertThat(response.getDeltaXaf()).isEqualTo(0);
     }
 
     @Test
@@ -482,6 +525,49 @@ class OfjServiceTest {
 
         assertThat(response.getAckStatus()).isEqualTo("ACKNOWLEDGED:EXPACK-1");
         assertThat(response.getFormat()).isEqualTo("CSV");
+        verify(applicationEventPublisher, org.mockito.Mockito.never()).publishEvent(any());
+    }
+
+    /**
+     * The manual/admin-triggered export path must never fire the closing-export alert — that
+     * notification is specifically for the unattended scheduled job, not an admin clicking export.
+     */
+    @Test
+    void runScheduledClosingExportPublishesAlertOnlyWhenSomethingWasPosted() {
+        OfjSession open = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.OPEN).build();
+        OfjAgentLine line = OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(open.getId()).agentId(agentId).deltaXaf(0).build();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(open.getId())).thenReturn(List.of(line));
+        UUID clientId = UUID.randomUUID();
+        Collection confirmed = Collection.builder().id(UUID.randomUUID()).agentId(agentId).clientId(clientId)
+                .amountXaf(2000L).collectedAt(Instant.now()).reconciliationStatus(CollectionReconciliationStatus.CONFIRMED).build();
+        when(collectionRepository.findByReconciledInLineIdInAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
+                eq(List.of(line.getId())), eq(CollectionReconciliationStatus.CONFIRMED))).thenReturn(List.of(confirmed));
+        when(clientDirectoryService.findCbsRef(clientId)).thenReturn("CBS-XYZ");
+        when(cbsClientService.postTransactions(any(), anyString()))
+                .thenReturn(Mono.just(MiddlewareTransactionPostResult.builder().success(true).postedReferences(List.of("CBSTX-1")).build()));
+        when(cbsClientService.submitDailyExport(any(), anyString(), anyString()))
+                .thenReturn(Mono.just(MiddlewareExportAck.builder().acknowledged(true).ackReference("EXPACK-1").build()));
+        when(exportBatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ofjService.runScheduledClosingExport(open);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(com.microfi.events.OfjClosingExportCompletedEvent.class);
+        verify(applicationEventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().response().getBranchId()).isEqualTo(branchId);
+        assertThat(captor.getValue().response().getPostedCount()).isEqualTo(1);
+    }
+
+    /** A re-run with nothing new confirmed-and-unexported must never fire the alert either. */
+    @Test
+    void runScheduledClosingExportPublishesNoAlertWhenNothingWasPosted() {
+        OfjSession open = OfjSession.builder().id(UUID.randomUUID()).branchId(branchId).businessDate(today).status(OfjSessionStatus.OPEN).build();
+        when(agentDirectoryService.findActiveAgentIdsByBranch(branchId)).thenReturn(List.of(agentId));
+        when(ofjAgentLineRepository.findByOfjId(open.getId())).thenReturn(List.of());
+
+        ofjService.runScheduledClosingExport(open);
+
+        verify(applicationEventPublisher, org.mockito.Mockito.never()).publishEvent(any());
     }
 
     /**
@@ -856,9 +942,10 @@ class OfjServiceTest {
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
         when(collectionRepository.markAgentConfirmed(eq(lineId), any(), eq(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT))).thenReturn(3);
 
-        ofjService.confirmReconciliation(agentId, lineId);
+        ofjService.confirmReconciliation(agentId, lineId, "1234");
 
         verify(collectionRepository).markAgentConfirmed(eq(lineId), any(Instant.class), eq(com.microfi.transactions.domain.CollectionConfirmedBy.AGENT));
+        verify(agentDirectoryService).verifyTransactionPin(agentId, "1234");
     }
 
     @Test
@@ -867,9 +954,23 @@ class OfjServiceTest {
         OfjAgentLine line = OfjAgentLine.builder().id(lineId).ofjId(UUID.randomUUID()).agentId(UUID.randomUUID()).build();
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
 
-        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId))
+        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId, "1234"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+    }
+
+    /** PIN is checked before the line is even looked up — same precedence CollectionService#recordCollection gives its own PIN check. */
+    @Test
+    void confirmReconciliationRejectsWrongPin() {
+        UUID lineId = UUID.randomUUID();
+        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect PIN"))
+                .when(agentDirectoryService).verifyTransactionPin(agentId, "0000");
+
+        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId, "0000"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("401");
+
+        verify(ofjAgentLineRepository, never()).findById(any());
     }
 
     @Test
@@ -1055,6 +1156,36 @@ class OfjServiceTest {
         assertThat(summary.getReadyTotalXaf()).isEqualTo(9000L);
     }
 
+    /**
+     * Regression guard: "End My Day" is a one-way signal — once the agent has already ended
+     * today, the banner must not resurface on the mobile app just because a late reconciliation
+     * confirmation afterward leaves a little more cash sitting CONFIRMED-and-unexported. That
+     * leftover is swept by the branch's own session close / OfjClosingTimeExportJob instead.
+     */
+    @Test
+    void exportableSummaryReturnsZeroWhenAgentHasAlreadyEndedToday() {
+        when(agentDirectoryService.hasEndedDayToday(agentId)).thenReturn(true);
+
+        ExportableSummaryResponse summary = ofjService.getExportableSummary(agentId);
+
+        assertThat(summary.getReadyCount()).isZero();
+        assertThat(summary.getReadyTotalXaf()).isZero();
+        verify(collectionRepository, org.mockito.Mockito.never())
+                .countByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(any(), any());
+    }
+
+    @Test
+    void exportForAgentConflictWhenAgentHasAlreadyEndedToday() {
+        when(agentDirectoryService.hasEndedDayToday(agentId)).thenReturn(true);
+
+        assertThatThrownBy(() -> ofjService.exportForAgent(agentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+
+        verify(collectionRepository, org.mockito.Mockito.never())
+                .findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(any(), any());
+    }
+
     @Test
     void confirmReconciliationConflictWhenNothingAwaitingConfirmation() {
         UUID lineId = UUID.randomUUID();
@@ -1062,7 +1193,7 @@ class OfjServiceTest {
         when(ofjAgentLineRepository.findById(lineId)).thenReturn(Optional.of(line));
         when(collectionRepository.markAgentConfirmed(eq(lineId), any(), any())).thenReturn(0);
 
-        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId))
+        assertThatThrownBy(() -> ofjService.confirmReconciliation(agentId, lineId, "1234"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
     }

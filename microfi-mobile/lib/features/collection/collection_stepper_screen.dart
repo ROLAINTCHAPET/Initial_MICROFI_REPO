@@ -8,9 +8,13 @@ import '../../core/api_client.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
 import '../../core/device_id_service.dart';
+import '../../core/geofence_math.dart';
 import '../../core/local_ceiling_cache.dart';
+import '../../core/local_geofence_cache.dart';
 import '../../core/local_pin_verifier.dart';
+import '../../core/local_schedule_cache.dart';
 import '../../core/locale_preference.dart';
+import '../../core/schedule_window.dart';
 import '../../core/location.dart';
 import '../../core/offline_receipt_composer.dart';
 import '../../core/printer_service.dart';
@@ -20,6 +24,7 @@ import '../../core/receipt_file_service.dart';
 import 'receipt_qr_screen.dart';
 import '../../core/status_components.dart';
 import '../home/agent_profile.dart';
+import '../home/branch_repository.dart';
 import '../home/contact_branch.dart';
 import '../home/home_repository.dart';
 import 'client.dart';
@@ -76,6 +81,10 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   EscrowStatus? _escrow;
   CeilingSnapshot? _cachedCeiling;
   int _queuedTodayXaf = 0;
+  AgentGeofence? _geofence;
+  GeofenceSnapshot? _cachedGeofence;
+  AgentBranch? _branch;
+  ScheduleSnapshot? _cachedSchedule;
 
   // Step 3 — confirm/submit
   final _pinController = TextEditingController();
@@ -85,8 +94,8 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   bool _queuedOffline = false;
   String? _receiptText;
   ReceiptData? _receiptData;
-  /// Set only for an offline-composed receipt (see _composeOfflineReceipt) — there's no
-  /// server-confirmed CollectionResult.id to key a filename off yet.
+  /// Set only for an offline-queued collection — there's no server-confirmed CollectionResult.id
+  /// to key a filename off yet.
   String? _offlineDeviceTxId;
   QrReceiptPayload? _qrPayload;
   bool _printing = false;
@@ -184,6 +193,40 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       setState(() => _cachedCeiling = cached);
     }
     await _refreshQueuedTodayTotal();
+    await _loadGeofence();
+    await _loadSchedule();
+  }
+
+  /// Same live-fetch/cached-fallback pattern as escrow, just for the assigned geofence polygon —
+  /// refreshed here (not only on Home load) so the check right before an offline submit uses the
+  /// freshest snapshot this screen session can get.
+  Future<void> _loadGeofence() async {
+    try {
+      final geofence = await _homeRepository.fetchGeofence();
+      if (!mounted) return;
+      setState(() => _geofence = geofence);
+      LocalGeofenceCache(widget.agentId).save(geofence);
+    } catch (_) {
+      final cached = await LocalGeofenceCache(widget.agentId).read();
+      if (!mounted) return;
+      setState(() => _cachedGeofence = cached);
+    }
+  }
+
+  /// Same live-fetch/cached-fallback pattern again, for the branch's open/close hours — so an
+  /// offline collection outside business hours can be caught here, before a receipt is handed
+  /// over, instead of only at sync (see AgentDirectoryService#requireWithinScheduleWindow).
+  Future<void> _loadSchedule() async {
+    try {
+      final branch = await BranchRepository(widget.token).fetchMyBranch();
+      if (!mounted) return;
+      setState(() => _branch = branch);
+      LocalScheduleCache(widget.agentId).save(openTime: branch.openTime, closeTime: branch.closeTime);
+    } catch (_) {
+      final cached = await LocalScheduleCache(widget.agentId).read();
+      if (!mounted) return;
+      setState(() => _cachedSchedule = cached);
+    }
   }
 
   /// Neither a live escrow fetch nor the cached snapshot reflects collections still sitting in the
@@ -213,6 +256,37 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     final hasInfo = _escrow != null || _cachedCeiling != null;
     final projected = baseline + _queuedTodayXaf + _total;
     return (ceiling: ceiling, projected: projected, wouldExceed: hasInfo && ceiling > 0 && projected > ceiling, hasInfo: hasInfo);
+  }
+
+  /// Same hasInfo reasoning as [_ceilingCheck]: no live fetch nor cached snapshot ever succeeding
+  /// means this doesn't block — the server still catches it at sync, same as before this feature
+  /// existed. Empty vertices means the agent has no geofence assigned at all (server's own
+  /// "unassigned = unrestricted" default via GeofenceService#isWithinAssignedGeofence) — that's
+  /// hasInfo:true (we DO know their status: unrestricted), not "no info."
+  ({bool isOutsideZone, bool hasInfo}) _geofenceCheck() {
+    final vertices = _geofence?.vertices ?? _cachedGeofence?.vertices;
+    if (vertices == null || _position == null) {
+      return (isOutsideZone: false, hasInfo: false);
+    }
+    if (vertices.isEmpty) {
+      return (isOutsideZone: false, hasInfo: true);
+    }
+    final inside = isInsidePolygon(_position!.latitude, _position!.longitude, vertices);
+    return (isOutsideZone: !inside, hasInfo: true);
+  }
+
+  /// Same hasInfo reasoning as [_ceilingCheck]/[_geofenceCheck]: no live fetch nor cached snapshot
+  /// ever succeeding means this doesn't block — the server still catches it at sync. A branch with
+  /// no configured hours at all (openTime/closeTime both null) is hasInfo:true and never outside
+  /// the window, mirroring the server's own "no schedule configured = unrestricted" default.
+  ({bool isOutsideWindow, bool hasInfo}) _scheduleCheck() {
+    final openTime = _branch?.openTime ?? _cachedSchedule?.openTime;
+    final closeTime = _branch?.closeTime ?? _cachedSchedule?.closeTime;
+    final hasInfo = _branch != null || _cachedSchedule != null;
+    if (!hasInfo) {
+      return (isOutsideWindow: false, hasInfo: false);
+    }
+    return (isOutsideWindow: !isWithinScheduleWindow(openTime, closeTime, DateTime.now()), hasInfo: true);
   }
 
   int get _total => _denominations.fold(0, (sum, d) => sum + d * (_counts[d] ?? 0));
@@ -262,6 +336,33 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         return;
       }
 
+      // Same reasoning as the PIN check above, and same order the server itself checks in
+      // (AgentDirectoryService#requireWithinScheduleWindow runs before the geofence gate in
+      // CollectionService#recordCollection) — blocked here, before the client is handed a
+      // receipt, using the last schedule the server actually confirmed (see LocalScheduleCache).
+      final scheduleCheck = _scheduleCheck();
+      if (scheduleCheck.hasInfo && scheduleCheck.isOutsideWindow) {
+        setState(() {
+          _submitError = l10n.csScheduleBlockedOfflineMessage;
+          _submitting = false;
+        });
+        return;
+      }
+
+      // Same reasoning as the PIN check above: blocked here, before the client is handed a
+      // receipt, using the last geofence the server actually confirmed (see LocalGeofenceCache)
+      // — not after the fact at sync, when the cash is already collected and there's nothing left
+      // to undo. Placed before the ceiling check since "are you even allowed to be here" is the
+      // more fundamental gate.
+      final geofenceCheck = _geofenceCheck();
+      if (geofenceCheck.hasInfo && geofenceCheck.isOutsideZone) {
+        setState(() {
+          _submitError = l10n.csGeofenceBlockedOfflineMessage;
+          _submitting = false;
+        });
+        return;
+      }
+
       // Same reasoning as the PIN check above, applied to BR-03: blocked here, before the client
       // is handed a receipt, using the last ceiling/cumulative the server actually confirmed (see
       // LocalCeilingCache) — not after the fact at sync, when the cash is already collected.
@@ -293,7 +394,8 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         terminalId: terminalId,
       ));
       await _refreshQueuedTodayTotal();
-      await _composeOfflineReceipt(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
+      _offlineDeviceTxId = deviceTxId;
+      await _composeReceiptLocally(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
       await _composeQrPayload(uniqueRef: deviceTxId, collectedAt: collectedAt, lines: lines);
       if (!mounted) return;
       setState(() {
@@ -316,10 +418,14 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         pin: _pinController.text,
       );
       if (!mounted) return;
+      final collectedAt = DateTime.now().toUtc();
       setState(() => _result = result);
       LocalPinVerifier(widget.agentId).seed(_pinController.text);
+      // Composed immediately, not awaited on the server's own response below — see
+      // _composeReceiptLocally's doc for why this is safe and byte-for-byte identical either way.
+      _composeReceiptLocally(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
       _notifyAfterSuccess(result.id);
-      _composeQrPayload(uniqueRef: result.id, collectedAt: DateTime.now().toUtc(), lines: lines);
+      _composeQrPayload(uniqueRef: result.id, collectedAt: collectedAt, lines: lines);
     } on ApiException catch (e) {
       setState(() => _submitError = e.message);
     } catch (_) {
@@ -329,17 +435,14 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     }
   }
 
-  /// UC-09: fires the Flash SMS attempt and fetches the receipt text as soon as the collection
-  /// succeeds — best-effort, since an SMS-gateway failure (e.g. no carrier credentials configured
-  /// yet) must never look like a problem with the collection itself, which already succeeded.
+  /// UC-09: fires the Flash SMS attempt as soon as the collection succeeds — best-effort, since an
+  /// SMS-gateway failure (e.g. no carrier credentials configured yet) must never look like a
+  /// problem with the collection itself, which already succeeded. Its response also carries a
+  /// server-composed receiptText/receiptData, but that's no longer used here: _composeReceiptLocally
+  /// already renders the identical receipt immediately, without waiting on this network round trip.
   Future<void> _notifyAfterSuccess(String collectionId) async {
     try {
-      final result = await _notificationRepository.notifyCollection(collectionId, printedReceipt: false);
-      if (!mounted) return;
-      setState(() {
-        _receiptText = result.receiptText;
-        _receiptData = result.receiptData;
-      });
+      await _notificationRepository.notifyCollection(collectionId, printedReceipt: false);
     } catch (_) {
       // Silent — SMS delivery status isn't something the agent needs to act on here; the
       // Back-Office notification audit log is the place to investigate a failed send.
@@ -387,8 +490,8 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
 
   /// Renders the styled receipt as a PDF and opens it immediately — no printer needed, and no
   /// share sheet — so the agent has proof on the device alongside (or instead of) the physical slip.
-  /// fileNameHint falls back to deviceTxId for an offline-composed receipt, which has no
-  /// server-confirmed collection id yet (see _composeOfflineReceipt) — same purpose, just whichever
+  /// fileNameHint falls back to deviceTxId for an offline-queued collection, which has no
+  /// server-confirmed collection id yet — same purpose, just whichever
   /// unique reference actually exists at this point.
   Future<void> _downloadReceipt() async {
     final receiptData = _receiptData;
@@ -469,13 +572,29 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
           child: Column(
             children: [
               if (_result == null && !_queuedOffline) _StepperHeader(step: _step),
-              Expanded(child: _buildStep()),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(begin: const Offset(0.04, 0), end: Offset.zero).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: KeyedSubtree(key: ValueKey(_stepKey), child: _buildStep()),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  /// Distinguishes every screen AnimatedSwitcher above needs to tell apart — success/queued are
+  /// terminal states outside the 0-2 step count, so they can't collide with a real step number.
+  String get _stepKey => _result != null ? 'success' : (_queuedOffline ? 'queued' : 'step-$_step');
 
   Widget _buildStep() {
     if (_result != null) return _buildSuccess();
@@ -528,19 +647,25 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
             itemCount: _searchResults.length,
             itemBuilder: (context, index) {
               final c = _searchResults[index];
-              return Card(
+              return Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                shape: RoundedRectangleBorder(
+                decoration: BoxDecoration(
+                  color: MicrofiColors.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                  side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                  boxShadow: MicrofiShadows.softSmall,
                 ),
-                elevation: 0,
-                color: MicrofiColors.surfaceContainerLowest,
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(color: MicrofiColors.primary.withValues(alpha: 0.08), shape: BoxShape.circle),
+                    child: const Icon(Icons.person_rounded, color: MicrofiColors.primary, size: 20),
+                  ),
                   title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(l10n.csClientSubtitle(c.mfiMemberNo, c.phone)),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => _selectClient(c),
                 ),
               );
@@ -589,21 +714,27 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         ),
         const SizedBox(height: 12),
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: MicrofiColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+            borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+            boxShadow: MicrofiShadows.soft,
           ),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MicrofiColors.outlineVariant))),
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MicrofiColors.outlineVariant, width: 0.75))),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(l10n.csDenominationBreakdown, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                    const Icon(Icons.payments, color: MicrofiColors.outline),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: MicrofiColors.secondary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.payments_rounded, color: MicrofiColors.secondary, size: 16),
+                    ),
                   ],
                 ),
               ),
@@ -617,16 +748,13 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: const BoxDecoration(
-                  color: MicrofiColors.surfaceContainer,
-                  borderRadius: BorderRadius.only(bottomLeft: Radius.circular(MicrofiRadius.md - 2), bottomRight: Radius.circular(MicrofiRadius.md - 2)),
-                ),
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(color: MicrofiColors.surfaceContainer),
                 child: Column(
                   children: [
                     Text(l10n.csCalculatedTotal, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.5)),
                     const SizedBox(height: 6),
-                    Text(l10n.amountXaf(_fmt(_total)), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                    Text(l10n.amountXaf(_fmt(_total)), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
                   ],
                 ),
               ),
@@ -715,9 +843,19 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         if (_submitError != null) ...[
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: MicrofiColors.errorContainer, borderRadius: BorderRadius.circular(MicrofiRadius.sm)),
-            child: Text(_submitError!, style: const TextStyle(color: MicrofiColors.onErrorContainer)),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: MicrofiColors.errorContainer,
+              borderRadius: BorderRadius.circular(MicrofiRadius.md),
+              boxShadow: MicrofiShadows.softSmall,
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: MicrofiColors.onErrorContainer, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_submitError!, style: const TextStyle(color: MicrofiColors.onErrorContainer))),
+              ],
+            ),
           ),
         ],
         const SizedBox(height: 20),
@@ -819,12 +957,17 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     ];
   }
 
-  /// Builds the same receipt (printable text + structured PDF data) the server would have, using
-  /// only what's already known locally — no network call, since there's no connectivity to make
-  /// one. See OfflineReceiptComposer for why this stays faithful to the backend's own composers.
-  /// Best-effort: a receipt that fails to compose still leaves the collection safely queued —
-  /// this never blocks or fails the collection itself.
-  Future<void> _composeOfflineReceipt({
+  /// Builds the same receipt (printable text + structured PDF data) the server's own
+  /// POST /collections/{id}/notify would return, using only what's already known locally — no
+  /// network round trip. Safe for the ONLINE path too, not just offline: the backend's own
+  /// ReceiptTemplateComposer keys the printed "Unique Ref" off deviceTxId, not the server-assigned
+  /// collection id, so a locally-composed receipt is byte-for-byte identical to the server's
+  /// either way (see OfflineReceiptComposer's doc). Waiting on notifyCollection's response just to
+  /// populate this was a real, user-visible delay before Print/Download/QR appeared — composing it
+  /// immediately here removes that wait entirely instead of just racing it.
+  /// Best-effort: a receipt that fails to compose still leaves the collection safely
+  /// recorded/queued — this never blocks or fails the collection itself.
+  Future<void> _composeReceiptLocally({
     required String deviceTxId,
     required DateTime collectedAt,
     required List<DenominationLine> lines,
@@ -860,13 +1003,15 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         french: french,
       );
       if (!mounted) return;
+      // Don't clobber a receipt that already rendered (e.g. this racing in after the user already
+      // saw and acted on one composed a moment earlier) — first one to land wins, nothing flickers.
+      if (_receiptText != null) return;
       setState(() {
         _receiptText = text;
         _receiptData = data;
-        _offlineDeviceTxId = deviceTxId;
       });
     } catch (_) {
-      // No receipt UI shows up, but the collection is already safely queued regardless.
+      // No receipt UI shows up, but the collection is already safely recorded/queued regardless.
     }
   }
 
@@ -904,20 +1049,20 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       children: [
         const SizedBox(height: 20),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: MicrofiColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            border: Border.all(color: MicrofiColors.tertiaryFixedDim, width: MicrofiBorders.width),
+            color: MicrofiColors.tertiaryFixed,
+            borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+            boxShadow: MicrofiShadows.soft,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 48,
-                height: 44,
-                decoration: const BoxDecoration(color: MicrofiColors.tertiaryFixedDim, shape: BoxShape.circle),
-                child: const Icon(Icons.schedule, color: MicrofiColors.onTertiaryFixedVariant, size: 26),
+                height: 48,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+                child: const Icon(Icons.schedule_rounded, color: MicrofiColors.onTertiaryFixedVariant, size: 26),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1008,16 +1153,17 @@ class _StepDot extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 26,
-          height: 26,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
             color: bg,
             shape: BoxShape.circle,
             border: state == _DotState.pending ? Border.all(color: MicrofiColors.outlineVariant, width: 2) : null,
+            boxShadow: state == _DotState.pending ? null : [BoxShadow(color: bg.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
           ),
           child: Center(
             child: state == _DotState.done
-                ? const Icon(Icons.check, color: Colors.white, size: 14)
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 15)
                 : Text('$number', style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ),
@@ -1165,11 +1311,11 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: MicrofiColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
       ),
       child: child,
     );

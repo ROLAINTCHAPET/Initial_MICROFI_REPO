@@ -95,7 +95,13 @@ class AgentSelfControllerTest {
     private CollectionRejectionService collectionRejectionService;
 
     @MockitoBean
+    private com.microfi.notifications.service.BroadcastMessageService broadcastMessageService;
+
+    @MockitoBean
     private AuditService auditService;
+
+    @MockitoBean
+    private com.microfi.transactions.service.GeofenceService geofenceService;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID branchId = UUID.randomUUID();
@@ -245,6 +251,47 @@ class AgentSelfControllerTest {
     }
 
     @Test
+    void myGeofenceReturnsTheCallingAgentsOwnGeofence() {
+        var vertex = new com.microfi.shared.dto.GeofenceVertexDto();
+        vertex.setLat(4.05);
+        vertex.setLon(9.70);
+        when(geofenceService.getGeofenceOrEmpty(agentId)).thenReturn(
+                com.microfi.shared.dto.GeofenceResponse.builder().agentId(agentId).vertices(List.of(vertex)).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/geofence")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.vertices.length()").isEqualTo(1)
+                .jsonPath("$.vertices[0].lat").isEqualTo(4.05);
+    }
+
+    @Test
+    void myGeofenceReturnsEmptyVerticesWhenNoneAssigned() {
+        when(geofenceService.getGeofenceOrEmpty(agentId)).thenReturn(
+                com.microfi.shared.dto.GeofenceResponse.builder().agentId(agentId).vertices(List.of()).build());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/geofence")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.vertices.length()").isEqualTo(0);
+    }
+
+    @Test
+    void myGeofenceRejectsNonAgentPrincipals() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication()))
+                .get()
+                .uri("/api/v1/agents/me/geofence")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
     void changePinSuccess() {
         Agent saved = buildAgent();
         saved.setPinMustChange(false);
@@ -335,25 +382,59 @@ class AgentSelfControllerTest {
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
                 .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pin\":\"1234\"}")
                 .exchange()
                 .expectStatus().isOk();
 
-        org.mockito.Mockito.verify(ofjService).confirmReconciliation(agentId, lineId);
+        org.mockito.Mockito.verify(ofjService).confirmReconciliation(agentId, lineId, "1234");
         org.mockito.Mockito.verify(auditService).record(org.mockito.ArgumentMatchers.argThat(entry ->
                 entry.getEventType().equals("COLLECTION_RECONCILIATION_CONFIRMED")));
+    }
+
+    @Test
+    void confirmReconciliationRejectsBlankPin() {
+        UUID lineId = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pin\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        org.mockito.Mockito.verifyNoInteractions(ofjService);
     }
 
     @Test
     void confirmReconciliationPropagatesForbiddenFromService() {
         UUID lineId = UUID.randomUUID();
         org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot confirm another agent's reconciliation"))
-                .when(ofjService).confirmReconciliation(agentId, lineId);
+                .when(ofjService).confirmReconciliation(agentId, lineId, "1234");
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
                 .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pin\":\"1234\"}")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void confirmReconciliationPropagatesWrongPinFromService() {
+        UUID lineId = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect PIN"))
+                .when(ofjService).confirmReconciliation(agentId, lineId, "0000");
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
+                .post()
+                .uri("/api/v1/agents/me/reconciliations/" + lineId + "/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"pin\":\"0000\"}")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     @Test

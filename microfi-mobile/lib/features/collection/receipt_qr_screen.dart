@@ -38,10 +38,11 @@ class ReceiptQrScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
-                    borderRadius: BorderRadius.circular(MicrofiRadius.md),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                    boxShadow: MicrofiShadows.soft,
                   ),
                   child: QrImageView(
                     data: QrReceiptSigner.encode(payload),

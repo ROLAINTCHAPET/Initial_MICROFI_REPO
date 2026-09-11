@@ -21,4 +21,6 @@ public class BranchResponse {
     private int maxCashiers;
     private boolean requireImei;
     private int defaultCeilingPct;
+    private boolean requireClientActivation;
+    private boolean requireClientPortfolio;
 }

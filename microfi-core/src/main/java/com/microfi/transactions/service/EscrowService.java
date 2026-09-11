@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -114,6 +117,7 @@ public class EscrowService {
                 .baseCeilingXaf(account.getCeilingXaf())
                 .effectiveCeilingXaf(activeOverride != null ? activeOverride.getTempCeilingXaf() : account.getCeilingXaf())
                 .cumulativeTodayXaf(cumulativeToday(account.getAgentId()))
+                .collectedTodayXaf(collectedToday(account.getAgentId()))
                 .activeOverrideReason(activeOverride != null ? activeOverride.getReason() : null)
                 .overrideValidUntil(activeOverride != null ? activeOverride.getValidUntil() : null)
                 .updatedAt(account.getUpdatedAt())
@@ -125,5 +129,18 @@ public class EscrowService {
         Instant now = Instant.now();
         return collectionRepository.sumUnreconciledByAgent(agentId, now)
                 + activationDirectoryService.sumUnreconciled(agentId, now);
+    }
+
+    /**
+     * The literal "collected today" figure for display (Back-Office agent stats) — deliberately
+     * separate from {@link #cumulativeToday}, which is day-agnostic cash-in-hand for the ceiling
+     * gate. "Today" is UTC calendar day, matching every other "today" in this codebase (see
+     * OfjService's business-date handling).
+     */
+    private long collectedToday(UUID agentId) {
+        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant endOfDay = startOfDay.plus(1, ChronoUnit.DAYS);
+        return collectionRepository.sumCollectedTodayByAgent(agentId, startOfDay, endOfDay)
+                + activationDirectoryService.sumCollectedToday(agentId, startOfDay, endOfDay);
     }
 }

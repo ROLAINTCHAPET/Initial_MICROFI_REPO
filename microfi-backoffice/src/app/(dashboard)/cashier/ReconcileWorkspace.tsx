@@ -18,8 +18,10 @@ export interface QueueLine {
 export interface ValidatedLine {
   lineId: string;
   agentLabel: string;
-  physicalTotalXaf: number;
-  deltaXaf: number;
+  /** Scoped to exactly this line's CONFIRMED collections — never physicalTotalXaf, the line's
+   * whole-day cumulative figure, which a repeat same-day sweep can leave mixed with a newer,
+   * still-pending batch on the very same line. */
+  confirmedTotalXaf: number;
 }
 
 export interface WaitingConfirmationLine {
@@ -250,7 +252,7 @@ export function ReconcileWorkspace({
             <div key={item.lineId} className="bg-surface-container-lowest border-2 border-outline-variant rounded-[var(--radius-sm)] p-3 flex flex-col gap-1">
               <span className="font-semibold text-xs text-on-surface-variant">{item.agentLabel}</span>
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-sm text-primary">{item.physicalTotalXaf.toLocaleString()} XAF</span>
+                <span className="font-semibold text-sm text-primary">{item.confirmedTotalXaf.toLocaleString()} XAF</span>
                 <Icon name="check-circle" className="size-5 text-secondary" />
               </div>
             </div>

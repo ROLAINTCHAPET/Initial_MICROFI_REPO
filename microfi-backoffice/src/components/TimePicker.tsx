@@ -95,7 +95,7 @@ export function TimePicker({ label, value, onChange, disabled = false, id, name 
         </label>
       )}
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">
+        <span className="absolute left-3 inset-y-0 flex items-center text-outline pointer-events-none">
           <Icon name="clock" className="size-5" />
         </span>
         <button

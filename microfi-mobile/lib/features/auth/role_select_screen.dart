@@ -86,39 +86,42 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MicrofiColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(MicrofiRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: MicrofiColors.primaryContainer.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(MicrofiRadius.sm)),
-                child: Icon(icon, color: MicrofiColors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
-                  ],
+    return Container(
+      decoration: BoxDecoration(
+        color: MicrofiColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: MicrofiColors.primary.withValues(alpha: 0.08), shape: BoxShape.circle),
+                  child: Icon(icon, color: MicrofiColors.primary, size: 22),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: MicrofiColors.outline),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: MicrofiColors.outline),
+              ],
+            ),
           ),
         ),
       ),

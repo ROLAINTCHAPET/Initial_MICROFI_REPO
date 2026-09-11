@@ -43,9 +43,46 @@ final ThemeData microfiTheme = ThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
     ),
   ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: MicrofiColors.primary,
+      side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+      minimumSize: const Size.fromHeight(48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+    ),
+  ),
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: MicrofiColors.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+    ),
+  ),
+  // Every showDialog(...) in the app (error/success/PIN prompts, confirm dialogs) inherits this —
+  // one place to make the whole app's dialogs read as softly rounded/friendly instead of Material's
+  // sharp-cornered default, rather than repeating a `shape:` on every AlertDialog call site.
+  dialogTheme: DialogThemeData(
+    backgroundColor: MicrofiColors.surfaceContainerLowest,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.lg)),
+    elevation: 6,
+  ),
+  cardTheme: CardThemeData(
+    color: MicrofiColors.surfaceContainerLowest,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+  ),
   appBarTheme: const AppBarTheme(
     backgroundColor: MicrofiColors.primary,
     foregroundColor: Colors.white,
     elevation: 0,
+  ),
+  // A consistent fade-forward push/pop on every platform, instead of Android's default Material 3
+  // zoom transition (which reads as an abrupt cut on a phone-sized screen) — one place to make
+  // every Navigator.push in the app feel more deliberate, rather than adding a custom transition
+  // to each of the ~30 individual push call sites.
+  pageTransitionsTheme: const PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+      TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+    },
   ),
 );

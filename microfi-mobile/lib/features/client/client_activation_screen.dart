@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/animated_entrance.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import 'client_repository.dart';
@@ -80,11 +81,18 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: const BoxDecoration(color: MicrofiColors.secondary, shape: BoxShape.circle),
-          child: const Icon(Icons.check, color: Colors.white, size: 26),
+        ScaleIn(
+          child: Container(
+            width: 60,
+            height: 60,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: MicrofiColors.secondary,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: MicrofiColors.secondary.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 5))],
+            ),
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
+          ),
         ),
         const SizedBox(height: 14),
         Text(l10n.caCredentialsSetTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
@@ -123,14 +131,23 @@ class _ClientActivationScreenState extends State<ClientActivationScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.all(MicrofiSpacing.card),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: MicrofiColors.surfaceContainerLow,
+            color: MicrofiColors.primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(MicrofiRadius.md),
           ),
-          child: Text(
-            l10n.caIntroMessage,
-            style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline_rounded, color: MicrofiColors.primary, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.caIntroMessage,
+                  style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: MicrofiSpacing.gapLg),

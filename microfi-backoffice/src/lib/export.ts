@@ -69,6 +69,35 @@ export function exportToExcel<T>(filename: string, sheetName: string, meta: Expo
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
 
+/** RFC4180 field quoting — wraps in double quotes (escaping embedded quotes) only when the value actually needs it. */
+function csvField(value: string | number): string {
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/**
+ * Plain CSV export — deliberately just the header row and data rows, no metadata preamble like
+ * {@link exportToExcel}/{@link exportToPdf} print. This format's whole purpose is to be dropped
+ * straight into a CBS batch-import job or a spreadsheet tool without that tool having to skip a
+ * non-tabular header block first; the scope/period/generated-by facts still belong in the
+ * Excel/PDF compliance exports, not here.
+ */
+export function exportToCsv<T>(filename: string, columns: ExportColumn<T>[], rows: T[]) {
+  const lines = [
+    columns.map((c) => csvField(c.header)).join(","),
+    ...rows.map((row) => columns.map((c) => csvField(c.value(row))).join(",")),
+  ];
+  // Leading BOM so Excel (still a common destination even for a "machine" CSV) detects UTF-8
+  // instead of mis-rendering accented names under the default legacy code page.
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * Compliance-style PDF export mirroring the reference COBAC audit report's shape: a dark navy
  * header banner, a metadata box, the data table, and two blank signature lines a compliance

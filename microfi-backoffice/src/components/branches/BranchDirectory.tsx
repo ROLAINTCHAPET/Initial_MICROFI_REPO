@@ -20,6 +20,7 @@ export interface BranchRow {
   maxCashiers: number;
   requireImei: boolean;
   defaultCeilingPct: number;
+  requireClientActivation: boolean;
   canEdit: boolean;
 }
 
@@ -52,13 +53,14 @@ export function BranchDirectory({
     { header: dict.branches.directory.colMaxCashiers, value: (b) => b.maxCashiers },
     { header: dict.branches.directory.colRequireImei, value: (b) => (b.requireImei ? dict.common.yes : dict.common.no) },
     { header: dict.branches.directory.colDefaultCeilingPct, value: (b) => b.defaultCeilingPct },
+    { header: dict.branches.directory.colRequireClientActivation, value: (b) => (b.requireClientActivation ? dict.common.yes : dict.common.no) },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="relative max-w-sm w-full">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-outline pointer-events-none" />
+          <Icon name="search" className="absolute left-3 inset-y-0 my-auto size-5 text-outline pointer-events-none" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -150,6 +152,7 @@ function BranchRowItem({ branch }: { branch: BranchRow }) {
             maxCashiers={branch.maxCashiers}
             requireImei={branch.requireImei}
             defaultCeilingPct={branch.defaultCeilingPct}
+            requireClientActivation={branch.requireClientActivation}
           />
         ) : (
           <span

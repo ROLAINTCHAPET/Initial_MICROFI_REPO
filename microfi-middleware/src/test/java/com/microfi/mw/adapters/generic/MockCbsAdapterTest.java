@@ -27,13 +27,15 @@ class MockCbsAdapterTest {
 
     @Mock
     private MockLedgerEntryRepository ledgerRepository;
+    @Mock
+    private MockCbsMemberRepository memberRepository;
 
     private MockCbsAdapter adapter;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        adapter = new MockCbsAdapter(ledgerRepository);
+        adapter = new MockCbsAdapter(ledgerRepository, memberRepository);
     }
 
     @Test
@@ -115,6 +117,30 @@ class MockCbsAdapterTest {
         var balance = adapter.getBalance("CBS-1");
 
         assertThat(balance.balanceXaf()).isEqualTo(0L);
+    }
+
+    @Test
+    void getMemberReturnsTheSeededMemberByAccountNumber() {
+        MockCbsMember member = MockCbsMember.builder().id(UUID.randomUUID()).accountNumber("M001")
+                .fullName("Jean Client").email("jean@example.com").phone("+237600000001").build();
+        when(memberRepository.findByAccountNumber("M001")).thenReturn(java.util.Optional.of(member));
+
+        var result = adapter.getMember("M001");
+
+        assertThat(result.found()).isTrue();
+        assertThat(result.fullName()).isEqualTo("Jean Client");
+        assertThat(result.email()).isEqualTo("jean@example.com");
+        assertThat(result.phone()).isEqualTo("+237600000001");
+    }
+
+    @Test
+    void getMemberReportsNotFoundForAnUnknownAccountNumber() {
+        when(memberRepository.findByAccountNumber("UNKNOWN")).thenReturn(java.util.Optional.empty());
+
+        var result = adapter.getMember("UNKNOWN");
+
+        assertThat(result.found()).isFalse();
+        assertThat(result.accountNumber()).isEqualTo("UNKNOWN");
     }
 
     @Test

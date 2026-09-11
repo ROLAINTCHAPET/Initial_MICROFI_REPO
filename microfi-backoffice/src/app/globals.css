@@ -219,6 +219,24 @@ dialog.modal-transition[open]::backdrop {
   animation: drawerSlideIn 200ms ease-out both;
 }
 
+/* Periodic brand-mark pulse for the login page's logo — plays its pop-in once on load, then
+   keeps gently pulsing on a loop for as long as the login page is showing (explicit user request,
+   overriding DESIGN.md's default "no decorative motion" for this one deliberate accent). */
+@keyframes logoIntro {
+  0% { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+  60% { opacity: 1; transform: scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.1) rotate(3deg); }
+}
+.logo-intro {
+  animation:
+    logoIntro 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    logoPulse 2.6s ease-in-out 550ms infinite;
+}
+
 /* One-shot confirmation pulse for buttons that just completed a save. */
 @keyframes successPop {
   0% { transform: scale(1); }

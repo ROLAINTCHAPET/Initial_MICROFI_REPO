@@ -39,7 +39,21 @@ class MicrofiColors {
 class MicrofiRadius {
   static const sm = 6.0;
   static const md = 12.0;
+  static const lg = 20.0;
   static const full = 999.0;
+}
+
+/// Soft elevation for the friendlier, less boxy card style introduced on Home — replaces a hard
+/// 2px outline with a subtle shadow so cards read as "lifted" off the app's tiled background
+/// pattern rather than merely outlined against it.
+class MicrofiShadows {
+  static List<BoxShadow> soft = [
+    BoxShadow(color: const Color(0xFF000F22).withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, 6)),
+  ];
+
+  static List<BoxShadow> softSmall = [
+    BoxShadow(color: const Color(0xFF000F22).withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3)),
+  ];
 }
 
 /// Compact spacing/type scale tuned for real phone widths (~360-414 logical px) — the app was

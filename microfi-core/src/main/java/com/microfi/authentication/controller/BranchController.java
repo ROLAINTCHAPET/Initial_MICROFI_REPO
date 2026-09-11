@@ -16,6 +16,8 @@ import com.microfi.shared.dto.BranchDefaultCeilingPctRequest;
 import com.microfi.shared.dto.BranchMaxCashiersRequest;
 import com.microfi.shared.dto.BranchPhoneRequest;
 import com.microfi.shared.dto.BranchRequest;
+import com.microfi.shared.dto.BranchRequireClientActivationRequest;
+import com.microfi.shared.dto.BranchRequireClientPortfolioRequest;
 import com.microfi.shared.dto.BranchRequireImeiRequest;
 import com.microfi.shared.dto.BranchResponse;
 import com.microfi.shared.dto.GeofenceRequest;
@@ -192,6 +194,34 @@ public class BranchController {
                 });
     }
 
+    @PatchMapping("/{id}/require-client-activation")
+    @Operation(summary = "Set Branch Client-Activation Requirement", description = "Whether an agent at this branch may only collect cash from a client who has already completed UC-19 activation. Off by default (an agent can collect from any client regardless of activation status) until an admin/branch-manager opts in. ADMIN or that branch's own BRANCH_MANAGER.")
+    public Mono<BranchResponse> setRequireClientActivation(@PathVariable UUID id, @Valid @RequestBody BranchRequireClientActivationRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> {
+                    AdminAccess.requireBranchScope(caller, id);
+                    return Mono.fromCallable(() -> {
+                        Branch branch = findBranchOrThrow(id);
+                        branch.setRequireClientActivation(request.getRequireClientActivation());
+                        return toResponse(branchRepository.save(branch));
+                    }).subscribeOn(Schedulers.boundedElastic());
+                });
+    }
+
+    @PatchMapping("/{id}/require-client-portfolio")
+    @Operation(summary = "Set Branch Client-Portfolio Requirement", description = "\"Portefeuille client\": whether an agent at this branch may only collect cash from a client already assigned to them. A client with no assigned agent yet stays open to any agent regardless of this setting. Off by default until an admin/branch-manager opts in. ADMIN or that branch's own BRANCH_MANAGER.")
+    public Mono<BranchResponse> setRequireClientPortfolio(@PathVariable UUID id, @Valid @RequestBody BranchRequireClientPortfolioRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> {
+                    AdminAccess.requireBranchScope(caller, id);
+                    return Mono.fromCallable(() -> {
+                        Branch branch = findBranchOrThrow(id);
+                        branch.setRequireClientPortfolio(request.getRequireClientPortfolio());
+                        return toResponse(branchRepository.save(branch));
+                    }).subscribeOn(Schedulers.boundedElastic());
+                });
+    }
+
     @GetMapping
     @Operation(summary = "List Branches", description = "Any Back-Office role.")
     public Flux<BranchResponse> list(Mono<Authentication> authenticationMono) {
@@ -310,6 +340,8 @@ public class BranchController {
                 .maxCashiers(branch.effectiveMaxCashiers())
                 .requireImei(branch.effectiveRequireImei())
                 .defaultCeilingPct(branch.effectiveDefaultCeilingPct())
+                .requireClientActivation(branch.effectiveRequireClientActivation())
+                .requireClientPortfolio(branch.effectiveRequireClientPortfolio())
                 .build();
     }
 

@@ -15,6 +15,7 @@ import java.util.UUID;
 @Builder
 public class ClientRecentCollectionResponse {
     private UUID id;
+    private UUID agentId;
     private long amountXaf;
     private String locationName;
     private Instant collectedAt;

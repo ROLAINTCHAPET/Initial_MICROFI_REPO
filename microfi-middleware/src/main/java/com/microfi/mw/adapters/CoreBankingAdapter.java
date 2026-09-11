@@ -6,6 +6,7 @@ import com.microfi.mw.adapters.dto.EscrowCreditResult;
 import com.microfi.mw.adapters.dto.ExportAckResult;
 import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
+import com.microfi.mw.adapters.dto.MemberLookupResult;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
 import com.microfi.mw.adapters.dto.TransactionReversalResult;
@@ -23,6 +24,14 @@ public interface CoreBankingAdapter {
     String vendor();
 
     MemberVerificationResult verifyMember(String activationId);
+
+    /**
+     * Looks a member up by their CBS account number — the read side of MICROFI's own background
+     * client-mirror sync (a periodic refresh that reconciles {@code core.client_profile} rows
+     * against the real CBS record by account number). Distinct from {@link #verifyMember}, which
+     * resolves an opaque UC-19 activation ID, not an account number.
+     */
+    MemberLookupResult getMember(String accountNumber);
 
     BalanceResult getBalance(String memberId);
 

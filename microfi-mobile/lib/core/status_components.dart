@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'animated_entrance.dart';
 import 'design_tokens.dart';
 import '../l10n/app_localizations.dart';
 
@@ -17,11 +18,11 @@ class SuccessCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(MicrofiSpacing.card),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: MicrofiColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,18 +30,24 @@ class SuccessCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(color: MicrofiColors.secondary, shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle, color: MicrofiColors.onSecondary, size: 22),
+              ScaleIn(
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: MicrofiColors.secondary,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: MicrofiColors.secondary.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                  ),
+                  child: const Icon(Icons.check_circle_rounded, color: MicrofiColors.onSecondary, size: 23),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: MicrofiColors.secondary)),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: MicrofiColors.secondary)),
                     const SizedBox(height: 2),
                     Text(subtitle, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
                   ],
@@ -48,12 +55,12 @@ class SuccessCard extends StatelessWidget {
               ),
             ],
           ),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(color: MicrofiColors.outlineVariant, height: 1)),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: MicrofiColors.outlineVariant, height: 1)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(amountLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              Text(amountValue, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+              Text(amountValue, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
             ],
           ),
         ],
@@ -74,11 +81,11 @@ class EscrowCeilingReachedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
-      padding: const EdgeInsets.all(MicrofiSpacing.card),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: MicrofiColors.errorContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.errorContainer),
+        color: MicrofiColors.errorContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.softSmall,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,10 +94,10 @@ class EscrowCeilingReachedCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 decoration: const BoxDecoration(color: MicrofiColors.error, shape: BoxShape.circle),
-                child: const Icon(Icons.lock, color: MicrofiColors.onError, size: 18),
+                child: const Icon(Icons.lock_rounded, color: MicrofiColors.onError, size: 19),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -143,19 +150,19 @@ class OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
-      padding: const EdgeInsets.all(MicrofiSpacing.card),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: MicrofiColors.tertiaryFixed.withValues(alpha: 0.3),
+        color: MicrofiColors.tertiaryFixed,
         borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.tertiaryFixedDim),
+        boxShadow: MicrofiShadows.softSmall,
       ),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(color: MicrofiColors.tertiaryFixedDim, shape: BoxShape.circle),
-            child: const Icon(Icons.schedule, color: MicrofiColors.onTertiaryFixedVariant, size: 16),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+            child: const Icon(Icons.schedule_rounded, color: MicrofiColors.onTertiaryFixedVariant, size: 17),
           ),
           const SizedBox(width: 10),
           Expanded(

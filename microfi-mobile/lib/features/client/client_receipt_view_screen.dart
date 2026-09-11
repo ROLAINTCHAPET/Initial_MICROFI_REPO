@@ -59,46 +59,70 @@ class _ClientReceiptViewScreenState extends State<ClientReceiptViewScreen> {
           padding: const EdgeInsets.all(MicrofiSpacing.page),
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: MicrofiColors.secondaryContainer,
-                borderRadius: BorderRadius.circular(MicrofiRadius.md),
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [MicrofiColors.secondary, Color(0xFF00483C)],
+                ),
+                boxShadow: MicrofiShadows.soft,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.check_circle, color: MicrofiColors.onSecondaryContainer, size: 36),
-                  const SizedBox(height: 8),
+                  Container(
+                    width: 56,
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
+                    child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 10),
                   Text(
                     l10n.amountXaf(_fmt(p.amountXaf)),
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: MicrofiColors.onSecondaryContainer),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
-                  Text(l10n.crvVerifiedDepositReceipt, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSecondaryContainer)),
+                  Text(l10n.crvVerifiedDepositReceipt, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
                 ],
               ),
             ),
             const SizedBox(height: MicrofiSpacing.gapLg),
-            _ReceiptRow(label: l10n.crvClientLabel, value: p.clientFullName),
-            _ReceiptRow(label: l10n.crvMemberNoLabel, value: p.clientMemberNo),
-            _ReceiptRow(label: l10n.rpAgentLabel, value: '${p.agentFullName} (${p.agentEmployeeCode})'),
-            _ReceiptRow(label: l10n.rpBranchLabel, value: p.branchName),
-            _ReceiptRow(label: l10n.rpDateLabel, value: p.collectedAtIso),
-            _ReceiptRow(label: l10n.crvReferenceLabel, value: p.uniqueRef.substring(0, 8).toUpperCase()),
-            const SizedBox(height: MicrofiSpacing.gapLg),
-            Text(l10n.csDenominationBreakdown, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-            const Divider(color: MicrofiColors.outlineVariant, height: 16),
-            ...p.denominationLines.where((d) => d.quantity > 0).map(
-                  (d) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(l10n.crvDenominationLine(_fmt(d.faceValueXaf), d.quantity), style: const TextStyle(color: MicrofiColors.onSurfaceVariant)),
-                        Text(l10n.amountXaf(_fmt(d.faceValueXaf * d.quantity)), style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: MicrofiColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ReceiptRow(label: l10n.crvClientLabel, value: p.clientFullName),
+                  _ReceiptRow(label: l10n.crvMemberNoLabel, value: p.clientMemberNo),
+                  _ReceiptRow(label: l10n.rpAgentLabel, value: '${p.agentFullName} (${p.agentEmployeeCode})'),
+                  _ReceiptRow(label: l10n.rpBranchLabel, value: p.branchName),
+                  _ReceiptRow(label: l10n.rpDateLabel, value: p.collectedAtIso),
+                  _ReceiptRow(label: l10n.crvReferenceLabel, value: p.uniqueRef.substring(0, 8).toUpperCase()),
+                  const Divider(color: MicrofiColors.outlineVariant, height: 24),
+                  Text(l10n.csDenominationBreakdown, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                  const SizedBox(height: 6),
+                  ...p.denominationLines.where((d) => d.quantity > 0).map(
+                        (d) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(l10n.crvDenominationLine(_fmt(d.faceValueXaf), d.quantity), style: const TextStyle(color: MicrofiColors.onSurfaceVariant)),
+                              Text(l10n.amountXaf(_fmt(d.faceValueXaf * d.quantity)), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+            ),
             const SizedBox(height: MicrofiSpacing.gapLg),
             SizedBox(
               width: double.infinity,

@@ -136,6 +136,39 @@ class EscrowServiceTest {
                 .hasMessageContaining("404");
     }
 
+    /**
+     * The original bug: the Back-Office labelled cumulativeTodayXaf (day-agnostic cash-in-hand,
+     * used for the BR-03 ceiling gate) as "Collected Today." An agent with old unreconciled
+     * backlog but nothing collected today would show a false-positive "today" total under that
+     * mislabeling — collectedTodayXaf must stay independent and reflect the true calendar day.
+     */
+    @Test
+    void collectedTodayIsIndependentOfDayAgnosticCumulativeTotal() {
+        when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 100_000)));
+        // Old backlog cash-in-hand (drives the ceiling gate) — not from today.
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(40_000L);
+        when(activationDirectoryService.sumUnreconciled(any(), any())).thenReturn(0L);
+        // Nothing actually collected today.
+        when(collectionRepository.sumCollectedTodayByAgent(any(), any(), any())).thenReturn(0L);
+        when(activationDirectoryService.sumCollectedToday(any(), any(), any())).thenReturn(0L);
+
+        EscrowResponse response = escrowService.getStatus(agentId);
+
+        assertThat(response.getCumulativeTodayXaf()).isEqualTo(40_000);
+        assertThat(response.getCollectedTodayXaf()).isEqualTo(0);
+    }
+
+    @Test
+    void collectedTodaySumsBothCollectionsAndActivationFees() {
+        when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(0, 100_000)));
+        when(collectionRepository.sumCollectedTodayByAgent(any(), any(), any())).thenReturn(15_000L);
+        when(activationDirectoryService.sumCollectedToday(any(), any(), any())).thenReturn(2_500L);
+
+        EscrowResponse response = escrowService.getStatus(agentId);
+
+        assertThat(response.getCollectedTodayXaf()).isEqualTo(17_500);
+    }
+
     @Test
     void applyCeilingOverrideNotAffectedByBranchCeilingPct() {
         when(escrowAccountRepository.findByAgentId(agentId)).thenReturn(Optional.of(account(50_000, 50_000)));

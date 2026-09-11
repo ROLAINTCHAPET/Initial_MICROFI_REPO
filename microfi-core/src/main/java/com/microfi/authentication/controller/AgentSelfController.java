@@ -10,22 +10,27 @@ import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.AgentSelfService;
+import com.microfi.notifications.service.BroadcastMessageService;
 import com.microfi.notifications.service.MfiSettingsService;
 import com.microfi.notifications.service.NotificationService;
 import com.microfi.shared.dto.AgentResponse;
+import com.microfi.shared.dto.BroadcastMessageResponse;
 import com.microfi.shared.dto.BranchNoticeResponse;
 import com.microfi.shared.dto.BranchResponse;
 import com.microfi.shared.dto.CollectionRejectionRequestResponse;
 import com.microfi.shared.dto.EndDayResponse;
 import com.microfi.shared.dto.ExportableSummaryResponse;
+import com.microfi.shared.dto.GeofenceResponse;
 import com.microfi.shared.dto.MfiNameResponse;
 import com.microfi.shared.dto.ChangeAgentPinRequest;
+import com.microfi.shared.dto.ConfirmReconciliationRequest;
 import com.microfi.shared.dto.PendingReconciliationLineResponse;
 import com.microfi.shared.dto.RequestCollectionRejectionRequest;
 import com.microfi.shared.dto.RouteResponse;
 import com.microfi.shared.dto.SosResponse;
 import com.microfi.transactions.domain.CollectionRejectionRequest;
 import com.microfi.transactions.service.CollectionRejectionService;
+import com.microfi.transactions.service.GeofenceService;
 import com.microfi.transactions.service.OfjService;
 import com.microfi.transactions.service.TrackingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -75,7 +80,9 @@ public class AgentSelfController {
     private final MfiSettingsService mfiSettingsService;
     private final OfjService ofjService;
     private final CollectionRejectionService collectionRejectionService;
+    private final BroadcastMessageService broadcastMessageService;
     private final AuditService auditService;
+    private final GeofenceService geofenceService;
 
     @GetMapping
     @Operation(summary = "Get My Profile", description = "Resolves the caller's own agent record from their JWT — id, branch, phone, IMEI, status, whether the transaction PIN still needs to be set — everything the token itself doesn't carry. Agent principals only.")
@@ -139,6 +146,15 @@ public class AgentSelfController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/geofence")
+    @Operation(summary = "My Geofence", description = "The caller's own assigned collection-zone polygon, if any — empty vertices means unrestricted. Cached client-side (same reasoning as /mfi-name) so an offline collection outside the zone can be blocked before a receipt is handed to the client, rather than only caught later at sync. Agent principals only.")
+    public Mono<GeofenceResponse> myGeofence(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMap(agent -> Mono.fromCallable(() -> geofenceService.getGeofenceOrEmpty(agent.getId()))
+                        .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @GetMapping("/mfi-name")
     @Operation(summary = "MFI Institutional Name", description = "The organization name to print on a receipt (BR-Notif-01's mandatory legal mentions) — cached client-side so an offline collection can still compose a compliant receipt without reaching the server. Agent principals only.")
     public Mono<MfiNameResponse> mfiName(Mono<Authentication> authenticationMono) {
@@ -154,6 +170,16 @@ public class AgentSelfController {
         return authenticationMono
                 .map(this::requireAgent)
                 .flatMapMany(agent -> Mono.fromCallable(() -> notificationService.listRecentNoticesForBranch(agent.getBranchId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(Flux::fromIterable));
+    }
+
+    @GetMapping("/broadcasts")
+    @Operation(summary = "My Broadcast Messages", description = "Recent admin/branch-manager announcements addressed to agents — network-wide or this agent's own branch. Polled the same way branch-notices is (no push infrastructure in this app).")
+    public Flux<BroadcastMessageResponse> myBroadcasts(Mono<Authentication> authenticationMono) {
+        return authenticationMono
+                .map(this::requireAgent)
+                .flatMapMany(agent -> Mono.fromCallable(() -> broadcastMessageService.listForAgents(agent.getBranchId()))
                         .subscribeOn(Schedulers.boundedElastic())
                         .flatMapMany(Flux::fromIterable));
     }
@@ -179,12 +205,12 @@ public class AgentSelfController {
     }
 
     @PostMapping("/reconciliations/{lineId}/confirm")
-    @Operation(summary = "Confirm A Reconciliation", description = "Attests the cashier's physical count for this line was correct — the only thing that actually frees the cash counted from this agent's escrow ceiling. Agent principals only, and only for their own line.")
-    public Mono<Void> confirmReconciliation(@PathVariable UUID lineId, Mono<Authentication> authenticationMono) {
+    @Operation(summary = "Confirm A Reconciliation", description = "Attests the cashier's physical count for this line was correct — the only thing that actually frees the cash counted from this agent's escrow ceiling. Requires the agent's own transaction PIN, same as recording a collection, so confirming genuinely proves it was them. Agent principals only, and only for their own line.")
+    public Mono<Void> confirmReconciliation(@PathVariable UUID lineId, @Valid @RequestBody ConfirmReconciliationRequest request, Mono<Authentication> authenticationMono) {
         return authenticationMono
                 .map(this::requireAgent)
                 .flatMap(agent -> Mono.fromRunnable(() -> {
-                    ofjService.confirmReconciliation(agent.getId(), lineId);
+                    ofjService.confirmReconciliation(agent.getId(), lineId, request.getPin());
                     auditService.record(AuditLogEntry.builder()
                             .category(AuditCategory.FINANCIAL)
                             .eventType("COLLECTION_RECONCILIATION_CONFIRMED")

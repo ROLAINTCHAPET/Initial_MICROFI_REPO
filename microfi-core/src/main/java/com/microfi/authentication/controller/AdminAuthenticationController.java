@@ -50,6 +50,10 @@ public class AdminAuthenticationController {
                         auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_ACCOUNT_DELETED");
                         return Mono.error(new InvalidCredentialsException("Admin account has been deleted"));
                     }
+                    if (adminUser.getStatus() == AdminUserStatus.PENDING_APPROVAL) {
+                        auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_ACCOUNT_PENDING_APPROVAL");
+                        return Mono.error(new InvalidCredentialsException("Account is awaiting admin approval"));
+                    }
                     if (adminUser.getStatus() != AdminUserStatus.ACTIVE) {
                         auditLogin(adminUser, AuditStatus.FAILED, "LOGIN_FAILED_ACCOUNT_SUSPENDED");
                         return Mono.error(new InvalidCredentialsException("Admin account is suspended"));

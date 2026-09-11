@@ -74,4 +74,39 @@ public class Branch {
     public int effectiveDefaultCeilingPct() {
         return defaultCeilingPct != null ? defaultCeilingPct : DEFAULT_CEILING_PCT;
     }
+
+    /**
+     * UC-19: whether an agent at this branch may only collect cash from a client who has
+     * completed activation (a currently-{@code ACTIVE}, unexpired {@link
+     * com.microfi.savings.domain.AccessToken}). Null means {@link
+     * #DEFAULT_REQUIRE_CLIENT_ACTIVATION} applies — off by default, preserving today's behavior
+     * (an agent can already collect from any client regardless of activation status) for every
+     * branch until an admin/branch-manager opts in.
+     */
+    private Boolean requireClientActivation;
+
+    public static final boolean DEFAULT_REQUIRE_CLIENT_ACTIVATION = false;
+
+    public boolean effectiveRequireClientActivation() {
+        return requireClientActivation != null ? requireClientActivation : DEFAULT_REQUIRE_CLIENT_ACTIVATION;
+    }
+
+    /**
+     * "Portefeuille client" — whether an agent at this branch may only collect cash from a client
+     * already assigned to them ({@code ClientProfile#getAssignedAgentId()}). A client gets assigned
+     * automatically the first time an agent sponsors their UC-19 activation to completion; a
+     * manager/admin can also reassign one by hand. A client with no assigned agent yet (bulk-
+     * imported from the CBS, or created directly by an admin/manager) stays open to any agent in
+     * the branch regardless of this setting — the restriction only ever narrows an *existing*
+     * assignment, it never blocks an otherwise-untouched client. Null means {@link
+     * #DEFAULT_REQUIRE_CLIENT_PORTFOLIO} applies — off by default, preserving today's behavior for
+     * every branch until an admin/branch-manager opts in.
+     */
+    private Boolean requireClientPortfolio;
+
+    public static final boolean DEFAULT_REQUIRE_CLIENT_PORTFOLIO = false;
+
+    public boolean effectiveRequireClientPortfolio() {
+        return requireClientPortfolio != null ? requireClientPortfolio : DEFAULT_REQUIRE_CLIENT_PORTFOLIO;
+    }
 }

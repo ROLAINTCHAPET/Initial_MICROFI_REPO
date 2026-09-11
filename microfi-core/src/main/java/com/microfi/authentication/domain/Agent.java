@@ -113,4 +113,17 @@ public class Agent {
      * (no explicit "re-open" action needed).
      */
     private LocalDate dayEndedBusinessDate;
+
+    /**
+     * Cash from a rejection-triggered sibling requeue (see {@code
+     * CollectionRejectionService#requeueUnexportedSiblings}) that's already physically sitting in
+     * this agent's drawer — set the moment a sibling collection gets reset to {@code
+     * UNRECONCILED} so it can be silently folded into that agent's very next {@code
+     * OfjService#reconcile} sweep instead of the cashier being expected to re-enter cash they
+     * already handed over once. A repeat sweep otherwise reads "no new physical cash, since
+     * nothing new actually arrived" as a shortage for exactly the requeued amount — a false
+     * variance debt trigger, not a real one. Null/0 the rest of the time; consumed and reset by
+     * {@code AgentDirectoryService#consumeCarriedPhysicalXaf}.
+     */
+    private Long carriedPhysicalXaf;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/animated_entrance.dart';
 import '../../core/api_client.dart';
 import '../../core/design_tokens.dart';
 import 'auth_repository.dart';
@@ -100,11 +101,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: MicrofiColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                  border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                  borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                  boxShadow: MicrofiShadows.soft,
                 ),
                 child: switch (_step) {
                   _Step.request => _buildRequestStep(l10n),
@@ -160,15 +161,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: MicrofiColors.primaryContainer.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+              color: MicrofiColors.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(MicrofiRadius.md),
             ),
             child: Row(
               children: [
-                const Icon(Icons.sms_outlined, color: MicrofiColors.primary, size: 16),
-                const SizedBox(width: 6),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(color: MicrofiColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.sms_outlined, color: MicrofiColors.primary, size: 15),
+                ),
+                const SizedBox(width: 8),
                 Expanded(child: Text(l10n.fpCodeSentMessage, style: const TextStyle(fontSize: 12, color: MicrofiColors.primary))),
               ],
             ),
@@ -232,7 +238,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.check_circle_outline, color: MicrofiColors.primary, size: 40),
+        Center(
+          child: ScaleIn(
+            child: Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: MicrofiColors.secondary,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: MicrofiColors.secondary.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 5))],
+              ),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 32),
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Text(l10n.fpSuccessMessage, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 18),
@@ -249,14 +269,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: MicrofiColors.errorContainer,
-          borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+          borderRadius: BorderRadius.circular(MicrofiRadius.md),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: MicrofiColors.onErrorContainer, size: 16),
+            const Icon(Icons.error_outline_rounded, color: MicrofiColors.onErrorContainer, size: 16),
             const SizedBox(width: 6),
             Expanded(child: Text(_error!, style: const TextStyle(fontSize: 12, color: MicrofiColors.onErrorContainer))),
           ],

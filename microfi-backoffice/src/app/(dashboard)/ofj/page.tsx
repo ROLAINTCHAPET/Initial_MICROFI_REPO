@@ -35,7 +35,22 @@ function isoDaysAgo(days: number) {
 // server-side (see CollectionRepository), so a line can't show both at once anyway.
 function lineStatusBadge(line: OfjAgentLineResponse, dict: Dictionary) {
   if (line.rejectedCount > 0) {
-    return <Badge status="DENIED" label={t(dict.ofj.rejectedCollections, { count: line.rejectedCount })} />;
+    // The line's own digitalTotalXaf/physicalTotalXaf/deltaXaf legitimately zero out once every
+    // collection on it is voided (see CollectionRejectionService) — without this note, a fully-
+    // rejected line reads as "nothing happened" instead of "something was recorded and corrected".
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge status="DENIED" label={t(dict.ofj.rejectedCollections, { count: line.rejectedCount })} />
+        <p className="text-xs text-on-surface-variant">
+          {line.rejectedExpectedTotalXaf > 0
+            ? t(dict.ofj.rejectedAmountWithExpected, {
+                actual: line.rejectedActualTotalXaf.toLocaleString(),
+                expected: line.rejectedExpectedTotalXaf.toLocaleString(),
+              })
+            : t(dict.ofj.rejectedAmountNoExpected, { actual: line.rejectedActualTotalXaf.toLocaleString() })}
+        </p>
+      </div>
+    );
   }
   if (line.resolved && line.pendingConfirmationCount > 0) {
     return <Badge status="PENDING" label={t(dict.ofj.awaitingAgentConfirmation, { count: line.pendingConfirmationCount })} />;

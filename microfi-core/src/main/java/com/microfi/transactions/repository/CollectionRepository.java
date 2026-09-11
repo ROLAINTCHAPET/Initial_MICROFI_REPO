@@ -20,6 +20,22 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
     Optional<Collection> findByAgentIdAndDeviceTxId(UUID agentId, String deviceTxId);
 
     /**
+     * Scoped to {@code locationName} alone — {@link com.microfi.transactions.service.CollectionGeocodeListener}
+     * used to load+mutate+save the whole entity, which meant Hibernate's default (non-{@code
+     * @DynamicUpdate}) UPDATE wrote back every column from whatever snapshot the listener's
+     * findById captured, including {@code reconciliationStatus}/{@code reconciledInLineId}.
+     * Reverse-geocoding a collection can take several seconds (retries against a slow/unreachable
+     * provider) or simply lands slightly after a cashier reconciles the very collection it's
+     * resolving; either way a load-then-save race that wide silently reverted a collection that
+     * had just been swept into a reconciliation line back to {@code UNRECONCILED}, undoing the
+     * cashier's count with no error anywhere. A single-column update can't clobber a concurrent
+     * change to a different column no matter how it interleaves.
+     */
+    @Modifying
+    @Query("UPDATE Collection c SET c.locationName = :locationName WHERE c.id = :id")
+    void updateLocationName(@Param("id") UUID id, @Param("locationName") String locationName);
+
+    /**
      * UC-16 / BR-03: every collection not yet swept into a reconciliation, regardless of which
      * calendar day it was collected on — both what OfjService#reconcile sums as an agent's
      * digital total, and (via CollectionService#enforceEscrowCeiling) their current cash-in-hand
@@ -31,6 +47,19 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
     @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
             + "WHERE c.agentId = :agentId AND c.reconciledAt IS NULL AND c.voidedAt IS NULL AND c.collectedAt < :cutoff")
     long sumUnreconciledByAgent(@Param("agentId") UUID agentId, @Param("cutoff") Instant cutoff);
+
+    /**
+     * The literal "collected today" figure — every calendar-day collection regardless of
+     * reconciliation status, deliberately distinct from {@link #sumUnreconciledByAgent} (which is
+     * day-agnostic cash-in-hand for the BR-03 ceiling gate, not a display-friendly "today" total).
+     * Using that ceiling figure under a "Collected Today" label was the actual bug: a multi-day
+     * backlog agent showed inflated "today" totals, and an agent who'd already reconciled
+     * everything they collected today showed zero. For display only — never feed this into
+     * ceiling/reconciliation logic, which must stay day-agnostic.
+     */
+    @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
+            + "WHERE c.agentId = :agentId AND c.voidedAt IS NULL AND c.collectedAt >= :startOfDay AND c.collectedAt < :endOfDay")
+    long sumCollectedTodayByAgent(@Param("agentId") UUID agentId, @Param("startOfDay") Instant startOfDay, @Param("endOfDay") Instant endOfDay);
 
     /**
      * Distinct from {@link #sumUnreconciledByAgent} on purpose: this counts only collections a
@@ -132,6 +161,9 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
     /** Collections under this line whose rejection request was approved — drives the /ofj "Rejected" badge, taking priority over the plain pending-confirmation count. */
     long countByReconciledInLineIdAndVoidedAtIsNotNull(UUID lineId);
 
+    /** Same set {@link #countByReconciledInLineIdAndVoidedAtIsNotNull} counts, fetched in full so the /ofj "Rejected" badge can show what was actually rejected (see OfjService#toLineResponse). */
+    List<Collection> findByReconciledInLineIdAndVoidedAtIsNotNull(UUID lineId);
+
     @Query("SELECT COALESCE(SUM(c.amountXaf), 0) FROM Collection c "
             + "WHERE c.reconciledInLineId = :lineId AND c.reconciliationStatus = :status AND c.voidedAt IS NULL")
     long sumByReconciledInLineIdAndReconciliationStatus(@Param("lineId") UUID lineId, @Param("status") CollectionReconciliationStatus status);
@@ -174,4 +206,7 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
 
     /** Back-Office client transactions export — every collection recorded against this client within an arbitrary [from, to) window. */
     List<Collection> findByClientIdAndCollectedAtBetween(UUID clientId, Instant start, Instant end);
+
+    /** Bulk counterpart to {@link #findByClientIdAndCollectedAtBetween} — every collection for every client in a branch (or any other client-id set) within an arbitrary [from, to) window, for a CBS-import/audit CSV export spanning the whole branch rather than one client at a time. */
+    List<Collection> findByClientIdInAndCollectedAtBetween(List<UUID> clientIds, Instant start, Instant end);
 }

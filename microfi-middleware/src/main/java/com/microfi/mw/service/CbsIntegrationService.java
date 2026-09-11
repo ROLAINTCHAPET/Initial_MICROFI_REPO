@@ -8,6 +8,7 @@ import com.microfi.mw.adapters.dto.EscrowCreditResult;
 import com.microfi.mw.adapters.dto.ExportAckResult;
 import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
+import com.microfi.mw.adapters.dto.MemberLookupResult;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
 import com.microfi.mw.adapters.dto.TransactionReversalResult;
@@ -33,6 +34,12 @@ public class CbsIntegrationService {
         CoreBankingAdapter adapter = adapterFactory.getActiveAdapter();
         return callLogger.logged(correlationId, "members.verify", adapter.vendor(),
                 () -> adapter.verifyMember(activationId));
+    }
+
+    public MemberLookupResult getMember(String correlationId, String accountNumber) {
+        CoreBankingAdapter adapter = adapterFactory.getActiveAdapter();
+        return callLogger.logged(correlationId, "members.lookup", adapter.vendor(),
+                () -> adapter.getMember(accountNumber));
     }
 
     public BalanceResult getBalance(String correlationId, String memberId) {

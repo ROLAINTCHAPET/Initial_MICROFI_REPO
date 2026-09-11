@@ -37,10 +37,14 @@ Future<void> showErrorDialog(BuildContext context, Object error, {String? title}
     context: context,
     builder: (_) => AlertDialog(
       icon: Container(
-        width: 48,
-        height: 48,
-        decoration: const BoxDecoration(color: MicrofiColors.error, shape: BoxShape.circle),
-        child: const Icon(Icons.error_outline, color: Colors.white, size: 26),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: MicrofiColors.error,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: MicrofiColors.error.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 5))],
+        ),
+        child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 27),
       ),
       title: Text(title ?? l10n.errorDialogTitle, textAlign: TextAlign.center),
       content: Text(friendlyErrorMessage(context, error), textAlign: TextAlign.center),
@@ -66,10 +70,14 @@ Future<String?> promptForPin(BuildContext context, {required String message}) {
     context: context,
     builder: (dialogContext) => AlertDialog(
       icon: Container(
-        width: 48,
-        height: 48,
-        decoration: const BoxDecoration(color: MicrofiColors.primary, shape: BoxShape.circle),
-        child: const Icon(Icons.lock_outline, color: Colors.white, size: 26),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: MicrofiColors.primary,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: MicrofiColors.primary.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 5))],
+        ),
+        child: const Icon(Icons.lock_rounded, color: Colors.white, size: 26),
       ),
       title: Text(l10n.dialogEnterPinTitle, textAlign: TextAlign.center),
       content: Column(
@@ -106,10 +114,14 @@ Future<void> showSuccessDialog(BuildContext context, String message, {String? ti
     context: context,
     builder: (_) => AlertDialog(
       icon: Container(
-        width: 48,
-        height: 48,
-        decoration: const BoxDecoration(color: MicrofiColors.secondary, shape: BoxShape.circle),
-        child: const Icon(Icons.check, color: Colors.white, size: 26),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: MicrofiColors.secondary,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: MicrofiColors.secondary.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 5))],
+        ),
+        child: const Icon(Icons.check_rounded, color: Colors.white, size: 28),
       ),
       title: Text(title ?? l10n.commonDone, textAlign: TextAlign.center),
       content: Text(message, textAlign: TextAlign.center),

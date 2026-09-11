@@ -9,6 +9,7 @@ export type BadgeStatus =
   | "SYNCED"
   | "PENDING"
   | "PENDING_CEILING"
+  | "PENDING_APPROVAL"
   | "BLOCKED"
   | "ACTIVE"
   | "SUSPENDED"
@@ -28,6 +29,7 @@ const STATUS_STYLES: Record<BadgeStatus, { className: string; dot?: boolean }> =
   SYNCED: { className: "bg-secondary-fixed text-on-secondary-fixed-variant", dot: true },
   ACTIVE: { className: "bg-secondary-fixed text-on-secondary-fixed-variant", dot: true },
   PENDING_CEILING: { className: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
+  PENDING_APPROVAL: { className: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
   RESOLVED: { className: "bg-secondary-fixed text-on-secondary-fixed-variant", dot: true },
   OPEN: { className: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
   PENDING: { className: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },

@@ -110,6 +110,7 @@ export function ClientTransactionsPanel({
             meta={{ scope: clientLabel, from, to, generatedBy }}
             columns={columns}
             rows={collections ?? []}
+            csv
           />
         </div>
       </div>

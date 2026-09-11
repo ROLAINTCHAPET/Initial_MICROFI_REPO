@@ -45,7 +45,7 @@ export function Input({ label, error, success = false, disabled, id, icon, trail
         </label>
       )}
       <div className="relative">
-        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">{icon}</span>}
+        {icon && <span className="absolute left-3 inset-y-0 flex items-center text-outline pointer-events-none">{icon}</span>}
         <input
           {...props}
           id={inputId}
@@ -56,7 +56,7 @@ export function Input({ label, error, success = false, disabled, id, icon, trail
             disabled:bg-surface-grey-100 disabled:text-text-grey-disabled disabled:border-transparent
             ${borderClass} ${className}`}
         />
-        {trailing && <span className="absolute right-3 top-1/2 -translate-y-1/2">{trailing}</span>}
+        {trailing && <span className="absolute right-3 inset-y-0 flex items-center">{trailing}</span>}
       </div>
       {error && <p className="text-xs text-danger-red">{error}</p>}
     </div>

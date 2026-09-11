@@ -122,6 +122,42 @@ class AdminUserManagementControllerTest {
     }
 
     @Test
+    void testCreateByAdminStartsActiveImmediately() {
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_MANAGER, branchId))
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE");
+    }
+
+    /** The core of this correction: only an ADMIN's own creation skips approval — a manager's never does. */
+    @Test
+    void testCreateByManagerStartsPendingApproval() {
+        when(adminUserRepository.existsByLogin("newuser")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(Branch.builder().id(branchId).build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .post()
+                .uri("/api/v1/admin/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createBody(AdminRole.BRANCH_CASHIER, branchId))
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("PENDING_APPROVAL");
+    }
+
+    @Test
     void testCreateManagerConflictsWithExistingManager() {
         AdminUser existingManager = AdminUser.builder().id(UUID.randomUUID()).login("current-mgr")
                 .role(AdminRole.BRANCH_MANAGER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
@@ -395,6 +431,91 @@ class AdminUserManagementControllerTest {
                 .bodyValue("{\"status\":\"SUSPENDED\"}")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testUpdateStatusRejectsSettingPendingApproval() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + UUID.randomUUID() + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"PENDING_APPROVAL\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    /** The loophole this closes: without it, a manager could activate their own pending creation directly, bypassing approval entirely. */
+    @Test
+    void testUpdateStatusByManagerOnPendingApprovalAccountForbidden() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.PENDING_APPROVAL).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testApproveSuccess() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.PENDING_APPROVAL).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+        when(adminUserRepository.save(any(AdminUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/approve")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE");
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo("ADMIN_USER_APPROVED");
+        assertThat(captor.getValue().getTargetAdminUserId()).isEqualTo(id);
+    }
+
+    @Test
+    void testApproveByManagerForbidden() {
+        UUID id = UUID.randomUUID();
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_MANAGER, branchId)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/approve")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testApproveNonPendingAccountConflict() {
+        UUID id = UUID.randomUUID();
+        AdminUser target = AdminUser.builder().id(id).login("target").role(AdminRole.BRANCH_CASHIER).branchId(branchId).status(AdminUserStatus.ACTIVE).build();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.of(target));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/approve")
+                .exchange()
+                .expectStatus().is4xxClientError()
+                .expectStatus().isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void testApproveNotFound() {
+        UUID id = UUID.randomUUID();
+        when(adminUserRepository.findById(id)).thenReturn(Optional.empty());
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN, null)))
+                .patch()
+                .uri("/api/v1/admin/users/" + id + "/approve")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test

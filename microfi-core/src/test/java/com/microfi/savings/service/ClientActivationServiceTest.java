@@ -292,6 +292,24 @@ class ClientActivationServiceTest {
     }
 
     @Test
+    void finalizingAssignsTheSponsoringAgentAsThePortfolioOwner() {
+        // "Portefeuille client" — completing an activation is how a client enters an agent's
+        // portfolio (Branch#requireClientPortfolio), same trigger point as ACTIVE status.
+        ClientProfile client = activatedClient();
+        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(client));
+        when(passwordEncoder.matches("1234", "hashed-pin")).thenReturn(true);
+        ActivationRequest alreadySponsored = ActivationRequest.builder().id(UUID.randomUUID()).clientId(clientId)
+                .agentId(agentId).sponsoredAt(Instant.now()).build();
+        when(activationRequestRepository.findByClientIdAndStatus(clientId, ActivationRequestStatus.PENDING)).thenReturn(Optional.of(alreadySponsored));
+        when(cbsClientService.splitFee(anyString(), anyString(), org.mockito.ArgumentMatchers.eq(1000L), anyString()))
+                .thenReturn(Mono.just(MiddlewareFeeSplit.builder().agentCommissionXaf(300).mfiShareXaf(700).reference("FEE-4").build()));
+
+        service.confirmPayment(clientId, paymentRequest("1234"));
+
+        assertThat(client.getAssignedAgentId()).isEqualTo(agentId);
+    }
+
+    @Test
     void finalizingRevokesAnyPreviouslyExpiredToken() {
         when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(activatedClient()));
         when(passwordEncoder.matches("1234", "hashed-pin")).thenReturn(true);

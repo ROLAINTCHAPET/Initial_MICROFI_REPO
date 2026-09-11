@@ -22,4 +22,7 @@ public interface CollectionRejectionRequestRepository extends JpaRepository<Coll
     List<CollectionRejectionRequest> findByAgentIdOrderByRequestedAtDesc(UUID agentId);
 
     List<CollectionRejectionRequest> findByStatusOrderByRequestedAtDesc(CollectionRejectionStatus status);
+
+    /** The approved decision behind each of a line's voided collections — drives the /ofj "Rejected" badge's actual-vs-expected detail. */
+    List<CollectionRejectionRequest> findByCollectionIdInAndStatus(List<UUID> collectionIds, CollectionRejectionStatus status);
 }

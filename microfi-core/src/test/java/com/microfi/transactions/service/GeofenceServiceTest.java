@@ -194,6 +194,26 @@ class GeofenceServiceTest {
     }
 
     @Test
+    void getGeofenceOrEmptyReturnsVerticesWhenAssigned() {
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.of(squareGeofence));
+
+        GeofenceResponse response = geofenceService.getGeofenceOrEmpty(agentId);
+
+        assertThat(response.getAgentId()).isEqualTo(agentId);
+        assertThat(response.getVertices()).isNotEmpty();
+    }
+
+    @Test
+    void getGeofenceOrEmptyReturnsEmptyVerticesWhenNoneAssigned() {
+        when(geofenceRepository.findByAgentId(agentId)).thenReturn(Optional.empty());
+
+        GeofenceResponse response = geofenceService.getGeofenceOrEmpty(agentId);
+
+        assertThat(response.getAgentId()).isEqualTo(agentId);
+        assertThat(response.getVertices()).isEmpty();
+    }
+
+    @Test
     void applyGeofenceToBranchWritesSameVerticesToEveryActiveAgentAndReturnsCount() {
         UUID branchId = UUID.randomUUID();
         UUID agent1 = UUID.randomUUID();

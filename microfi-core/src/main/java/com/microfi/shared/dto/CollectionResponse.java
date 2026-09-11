@@ -22,6 +22,8 @@ public class CollectionResponse {
     private UUID agentId;
     private UUID clientId;
     private String clientName;
+    /** Only populated by bulk multi-client exports (see CollectionService#findByClientsAndRange) — the CBS's own account-number identifier, distinct from clientName. */
+    private String clientMfiMemberNo;
     private long amountXaf;
     private double lat;
     private double lon;

@@ -33,7 +33,20 @@ public class AdminUserEnrollmentService {
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /** Convenience for callers that never need approval-gating (e.g. RegistrationApplicationService, already ADMIN-vetted). */
     public AdminUser create(CreateAdminUserRequest request) {
+        return create(request, false);
+    }
+
+    /**
+     * @param requiresApproval true when the caller is a BRANCH_MANAGER — the new account starts
+     *                          {@link AdminUserStatus#PENDING_APPROVAL} instead of ACTIVE, and
+     *                          can't log in (see AdminAuthenticationController#login) until an
+     *                          ADMIN explicitly approves it. False for an ADMIN-initiated creation
+     *                          (starts ACTIVE immediately, as before this gate existed) — an ADMIN
+     *                          approving their own creation would be a meaningless extra step.
+     */
+    public AdminUser create(CreateAdminUserRequest request, boolean requiresApproval) {
         requireConsistentRoleAndBranch(request.getRole(), request.getBranchId());
         if (adminUserRepository.existsByLogin(request.getLogin())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Login '" + request.getLogin() + "' already exists");
@@ -69,6 +82,7 @@ public class AdminUserEnrollmentService {
                 .role(request.getRole())
                 .branchId(request.getBranchId())
                 .mustChangePassword(true)
+                .status(requiresApproval ? AdminUserStatus.PENDING_APPROVAL : AdminUserStatus.ACTIVE)
                 .build();
         return adminUserRepository.save(newUser);
     }

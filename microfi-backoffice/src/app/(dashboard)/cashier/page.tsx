@@ -62,9 +62,15 @@ export default async function CashierPortalPage({
   const waitingConfirmation: WaitingConfirmationLine[] = pendingConfirmations
     .map((p) => ({ lineId: p.lineId, agentLabel: label(p.agentId), pendingTotalXaf: p.totalXaf, pendingConfirmationCount: p.collectionCount }));
 
+  // Scoped to exactly this line's CONFIRMED collections (confirmedCount/confirmedTotalXaf), not
+  // "the whole line has nothing pending" — a repeat same-day sweep reuses the same line id, so an
+  // earlier-confirmed batch can sit right alongside a newer still-pending one on the very same
+  // line. Gating on pendingConfirmationCount === 0 made an agent's already-validated cash vanish
+  // from this section entirely the moment any fresh collection was reconciled under that line,
+  // even though nothing had actually happened to the confirmed money.
   const validated: ValidatedLine[] = summary.agentLines
-    .filter((l) => l.resolved && l.pendingConfirmationCount === 0)
-    .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), physicalTotalXaf: l.physicalTotalXaf, deltaXaf: l.deltaXaf }));
+    .filter((l) => l.confirmedCount > 0)
+    .map((l) => ({ lineId: l.id, agentLabel: label(l.agentId), confirmedTotalXaf: l.confirmedTotalXaf }));
 
   return (
     <div className="flex flex-col gap-6">

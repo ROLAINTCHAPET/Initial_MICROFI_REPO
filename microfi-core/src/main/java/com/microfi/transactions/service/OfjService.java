@@ -19,7 +19,9 @@ import com.microfi.shared.dto.ExportableSummaryResponse;
 import com.microfi.shared.dto.MiddlewareCollectionLine;
 import com.microfi.shared.dto.MiddlewareExportAck;
 import com.microfi.shared.dto.MiddlewareTransactionPostResult;
+import com.microfi.events.OfjClosingExportCompletedEvent;
 import com.microfi.shared.dto.OfjAgentLineResponse;
+import com.microfi.shared.dto.OfjClosingExportAlertResponse;
 import com.microfi.shared.dto.OfjPendingLineResponse;
 import com.microfi.shared.dto.OfjSummaryResponse;
 import com.microfi.shared.dto.PendingReconciliationLineResponse;
@@ -28,6 +30,7 @@ import com.microfi.shared.dto.VarianceDebtResponse;
 import com.microfi.shared.dto.VarianceRequest;
 import com.microfi.transactions.domain.Collection;
 import com.microfi.transactions.domain.CollectionReconciliationStatus;
+import com.microfi.transactions.domain.CollectionRejectionStatus;
 import com.microfi.transactions.domain.ExportBatch;
 import com.microfi.transactions.domain.ExportTrigger;
 import com.microfi.transactions.domain.OfjAgentLine;
@@ -36,6 +39,7 @@ import com.microfi.transactions.domain.OfjSession;
 import com.microfi.transactions.domain.OfjSessionStatus;
 import com.microfi.transactions.domain.VarianceDebt;
 import com.microfi.transactions.domain.VarianceDebtStatus;
+import com.microfi.transactions.repository.CollectionRejectionRequestRepository;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.ExportBatchRepository;
 import com.microfi.transactions.repository.OfjAgentLineRepository;
@@ -44,6 +48,7 @@ import com.microfi.transactions.repository.OfjSessionRepository;
 import com.microfi.transactions.repository.VarianceDebtRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -78,11 +83,13 @@ public class OfjService {
     private final VarianceDebtRepository varianceDebtRepository;
     private final ExportBatchRepository exportBatchRepository;
     private final CollectionRepository collectionRepository;
+    private final CollectionRejectionRequestRepository collectionRejectionRequestRepository;
     private final CbsClientService cbsClientService;
     private final AgentDirectoryService agentDirectoryService;
     private final ActivationDirectoryService activationDirectoryService;
     private final ClientDirectoryService clientDirectoryService;
     private final AuditService auditService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public OfjSummaryResponse getSummary(UUID branchId) {
         return toSummary(getOrCreateSession(branchId));
@@ -196,9 +203,13 @@ public class OfjService {
         Instant cutoff = Instant.now();
         long newCollections = collectionRepository.sumUncountedByAgent(request.getAgentId(), cutoff);
         long newActivations = activationDirectoryService.sumUnreconciled(request.getAgentId(), cutoff);
+        // A rejection-triggered requeue (Agent#carriedPhysicalXaf) puts a collection back into
+        // newCollections above so it can be re-confirmed, but that cash was already physically
+        // handed over in an earlier sweep — folded in here so the cashier isn't expected to
+        // re-enter cash they already have, which otherwise reads as a fresh shortage.
         long physicalTotal = request.getPhysicalDenominationLines().stream()
                 .mapToLong(line -> line.getFaceValueXaf() * line.getQuantity())
-                .sum();
+                .sum() + agentDirectoryService.consumeCarriedPhysicalXaf(request.getAgentId());
 
         OfjAgentLine line = ofjAgentLineRepository.findByOfjIdAndAgentId(session.getId(), request.getAgentId())
                 .orElseGet(() -> OfjAgentLine.builder().id(UUID.randomUUID()).ofjId(session.getId()).agentId(request.getAgentId())
@@ -339,11 +350,17 @@ public class OfjService {
 
     /**
      * The agent's own sign-off on a cashier's physical count — the only thing that actually frees
-     * their escrow ceiling (see CollectionRepository#sumUnreconciledByAgent). Verifies the line
-     * genuinely belongs to this agent before touching it, same "never trust the caller's claimed
-     * ownership" principle as CollectionController resolving the agent from the JWT, not a request field.
+     * their escrow ceiling (see CollectionRepository#sumUnreconciledByAgent). Requires the agent's
+     * own transaction PIN, the same check a collection itself requires
+     * (AgentDirectoryService#verifyTransactionPin) — confirming this attests it was genuinely them,
+     * not just whoever is holding an unlocked phone. Verified before the line is even looked up,
+     * same precedence CollectionService#recordCollection gives its own PIN check. Also verifies the
+     * line genuinely belongs to this agent before touching it, same "never trust the caller's
+     * claimed ownership" principle as CollectionController resolving the agent from the JWT, not a
+     * request field.
      */
-    public void confirmReconciliation(UUID agentId, UUID lineId) {
+    public void confirmReconciliation(UUID agentId, UUID lineId, String pin) {
+        agentDirectoryService.verifyTransactionPin(agentId, pin);
         OfjAgentLine line = ofjAgentLineRepository.findById(lineId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconciliation line not found: " + lineId));
         if (!line.getAgentId().equals(agentId)) {
@@ -440,6 +457,10 @@ public class OfjService {
      * business date.
      */
     public EndDayResponse exportForAgent(UUID agentId) {
+        if (agentDirectoryService.hasEndedDayToday(agentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "You've already ended your day — any remaining cash is picked up by the branch's own close");
+        }
         List<Collection> exportable = collectionRepository.findByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
                 agentId, CollectionReconciliationStatus.CONFIRMED);
         if (exportable.isEmpty()) {
@@ -467,8 +488,18 @@ public class OfjService {
         return EndDayResponse.builder().exportedCount(posted).exportedTotalXaf(postedTotalXaf).build();
     }
 
-    /** How much confirmed-but-unexported cash this agent has ready to push via {@link #exportForAgent} — backs the mobile "End My Day" banner. */
+    /**
+     * How much confirmed-but-unexported cash this agent has ready to push via
+     * {@link #exportForAgent} — backs the mobile "End My Day" banner. Once the agent has already
+     * ended today, this always reports zero regardless of any cash that becomes confirmed
+     * afterward (e.g. a late reconciliation confirmation) — "End My Day" is a one-way signal and
+     * must not resurface on the mobile app just because a little more cash trickled into
+     * CONFIRMED status; that leftover is swept by the branch's own close instead.
+     */
     public ExportableSummaryResponse getExportableSummary(UUID agentId) {
+        if (agentDirectoryService.hasEndedDayToday(agentId)) {
+            return ExportableSummaryResponse.builder().readyCount(0).readyTotalXaf(0).build();
+        }
         return ExportableSummaryResponse.builder()
                 .readyCount(collectionRepository.countByAgentIdAndReconciliationStatusAndVoidedAtIsNullAndExportedAtIsNull(
                         agentId, CollectionReconciliationStatus.CONFIRMED))
@@ -523,6 +554,15 @@ public class OfjService {
                 .detailsParam1(trigger.name())
                 .detailsParam2(String.valueOf(posted))
                 .build());
+        if (trigger == ExportTrigger.SCHEDULED_CLOSING_TIME) {
+            applicationEventPublisher.publishEvent(new OfjClosingExportCompletedEvent(
+                    OfjClosingExportAlertResponse.builder()
+                            .branchId(branchId)
+                            .businessDate(session.getBusinessDate())
+                            .postedCount(posted)
+                            .exportedAt(Instant.now())
+                            .build()));
+        }
         return Optional.of(batch);
     }
 
@@ -712,6 +752,16 @@ public class OfjService {
     }
 
     private OfjAgentLineResponse toLineResponse(OfjAgentLine line) {
+        List<Collection> rejected = collectionRepository.findByReconciledInLineIdAndVoidedAtIsNotNull(line.getId());
+        long rejectedActualTotalXaf = rejected.stream().mapToLong(Collection::getAmountXaf).sum();
+        long rejectedExpectedTotalXaf = 0L;
+        if (!rejected.isEmpty()) {
+            List<UUID> rejectedIds = rejected.stream().map(Collection::getId).toList();
+            rejectedExpectedTotalXaf = collectionRejectionRequestRepository
+                    .findByCollectionIdInAndStatus(rejectedIds, CollectionRejectionStatus.APPROVED).stream()
+                    .mapToLong(r -> nz(r.getExpectedAmountXaf()))
+                    .sum();
+        }
         return OfjAgentLineResponse.builder()
                 .id(line.getId())
                 .agentId(line.getAgentId())
@@ -725,7 +775,13 @@ public class OfjService {
                 .resolved(isResolved(line))
                 .pendingConfirmationCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(
                         line.getId(), CollectionReconciliationStatus.PENDING_AGENT_CONFIRMATION))
-                .rejectedCount(collectionRepository.countByReconciledInLineIdAndVoidedAtIsNotNull(line.getId()))
+                .rejectedCount(rejected.size())
+                .rejectedActualTotalXaf(rejectedActualTotalXaf)
+                .rejectedExpectedTotalXaf(rejectedExpectedTotalXaf)
+                .confirmedTotalXaf(collectionRepository.sumByReconciledInLineIdAndReconciliationStatus(
+                        line.getId(), CollectionReconciliationStatus.CONFIRMED))
+                .confirmedCount(collectionRepository.countByReconciledInLineIdAndReconciliationStatusAndVoidedAtIsNull(
+                        line.getId(), CollectionReconciliationStatus.CONFIRMED))
                 .build();
     }
 

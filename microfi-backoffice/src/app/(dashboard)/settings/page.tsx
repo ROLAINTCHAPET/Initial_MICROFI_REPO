@@ -59,6 +59,7 @@ export default async function BranchSettingsPage({
           maxCashiers={branch.maxCashiers}
           requireImei={branch.requireImei}
           defaultCeilingPct={branch.defaultCeilingPct}
+          requireClientActivation={branch.requireClientActivation}
         />
       </div>
 

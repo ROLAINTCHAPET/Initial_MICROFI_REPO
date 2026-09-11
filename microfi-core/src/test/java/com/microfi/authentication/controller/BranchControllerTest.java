@@ -196,6 +196,96 @@ class BranchControllerTest {
     }
 
     @Test
+    void testSetRequireClientActivationSuccess() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central").timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/branches/" + id + "/require-client-activation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"requireClientActivation\":true}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.requireClientActivation").isEqualTo(true);
+    }
+
+    @Test
+    void testSetRequireClientActivationCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .patch()
+                .uri("/api/v1/admin/branches/" + UUID.randomUUID() + "/require-client-activation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"requireClientActivation\":true}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testSetRequireClientPortfolioSuccess() {
+        UUID id = UUID.randomUUID();
+        Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central").timezone("Africa/Douala").build();
+        when(branchRepository.findById(id)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/branches/" + id + "/require-client-portfolio")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"requireClientPortfolio\":true}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.requireClientPortfolio").isEqualTo(true);
+    }
+
+    @Test
+    void testSetRequireClientPortfolioCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .patch()
+                .uri("/api/v1/admin/branches/" + UUID.randomUUID() + "/require-client-portfolio")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"requireClientPortfolio\":true}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void testCreateBranchDefaultsRequireClientPortfolioFalse() {
+        when(branchRepository.existsByCode("BR1")).thenReturn(false);
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/branches")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"code\":\"BR1\",\"name\":\"Douala Central\",\"timezone\":\"Africa/Douala\"}")
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.requireClientPortfolio").isEqualTo(Branch.DEFAULT_REQUIRE_CLIENT_PORTFOLIO);
+    }
+
+    @Test
+    void testCreateBranchDefaultsRequireClientActivationFalse() {
+        when(branchRepository.existsByCode("BR1")).thenReturn(false);
+        when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/branches")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"code\":\"BR1\",\"name\":\"Douala Central\",\"timezone\":\"Africa/Douala\"}")
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.requireClientActivation").isEqualTo(Branch.DEFAULT_REQUIRE_CLIENT_ACTIVATION);
+    }
+
+    @Test
     void testSetMaxCashiersSuccess() {
         UUID id = UUID.randomUUID();
         Branch branch = Branch.builder().id(id).code("BR1").name("Douala Central").timezone("Africa/Douala").build();

@@ -57,11 +57,17 @@ public class ClientSelfService {
         return requireClient(clientId).getCbsRef();
     }
 
+    /** For scoping this client's own branch-notice/broadcast polling. */
+    public UUID getBranchId(UUID clientId) {
+        return requireClient(clientId).getBranchId();
+    }
+
     /** See CollectionDirectoryService#findRecentByClient — visible before the CBS-backed history is. */
     public List<ClientRecentCollectionResponse> getRecentCollections(UUID clientId) {
         return collectionDirectoryService.findRecentByClient(clientId).stream()
                 .map(c -> ClientRecentCollectionResponse.builder()
                         .id(c.id())
+                        .agentId(c.agentId())
                         .amountXaf(c.amountXaf())
                         .locationName(c.locationName())
                         .collectedAt(c.collectedAt())

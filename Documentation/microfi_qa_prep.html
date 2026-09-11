@@ -1,0 +1,762 @@
+<title>MICROFI Q&amp;A Prep</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #f3f6fa;
+    --surface: #ffffff;
+    --surface-2: #eef2f8;
+    --text: #142138;
+    --text-muted: #57667f;
+    --border: #d7dfeb;
+    --accent: #1d3f6e;
+    --accent-strong: #12294e;
+    --gold: #a97a24;
+    --gold-soft: #f3e6cc;
+    --danger: #93402c;
+    --danger-soft: #f5e3dd;
+    --focus: #3a6ec2;
+    --shadow: 0 1px 2px rgba(20, 33, 56, 0.06), 0 8px 24px -12px rgba(20, 33, 56, 0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1524;
+      --surface: #141f34;
+      --surface-2: #1a2740;
+      --text: #e8edf7;
+      --text-muted: #9aabc7;
+      --border: #29395a;
+      --accent: #7fa4dd;
+      --accent-strong: #a8c3ea;
+      --gold: #e3b262;
+      --gold-soft: #3a2f18;
+      --danger: #e0917b;
+      --danger-soft: #3a221c;
+      --focus: #7fa4dd;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0d1524;
+    --surface: #141f34;
+    --surface-2: #1a2740;
+    --text: #e8edf7;
+    --text-muted: #9aabc7;
+    --border: #29395a;
+    --accent: #7fa4dd;
+    --accent-strong: #a8c3ea;
+    --gold: #e3b262;
+    --gold-soft: #3a2f18;
+    --danger: #e0917b;
+    --danger-soft: #3a221c;
+    --focus: #7fa4dd;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lora', Georgia, 'Times New Roman', serif;
+    line-height: 1.55;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 18px 96px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .masthead {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+    padding: 22px 0 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
+    font-weight: 800;
+    font-size: clamp(24px, 5vw, 32px);
+    letter-spacing: -0.01em;
+    margin: 4px 0 6px;
+    text-wrap: balance;
+    color: var(--accent-strong);
+  }
+
+  .subhead {
+    color: var(--text-muted);
+    font-size: 14.5px;
+    max-width: 54ch;
+    margin: 0 0 16px;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .progress {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-bar {
+    width: 64px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .progress-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width 0.25s ease;
+    width: 0%;
+  }
+
+  .quiz-toggle {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 7px 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .quiz-toggle:hover { border-color: var(--accent); }
+  .quiz-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .quiz-toggle[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .quiz-toggle .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+  }
+
+  .filters {
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filters::-webkit-scrollbar { height: 5px; }
+  .filters::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .pill {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 6px 13px;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .pill[aria-pressed="true"] {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+    color: #fff;
+  }
+  .pill .n {
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.7;
+    margin-left: 4px;
+    font-size: 11px;
+  }
+
+  /* ---------- Sections ---------- */
+
+  section.category {
+    margin-top: 34px;
+  }
+  section.category.is-hidden { display: none; }
+
+  .cat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border-bottom: 2px solid var(--cat-color, var(--accent));
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  .cat-head h2 {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--cat-color, var(--accent));
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+  .cat-head .cat-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .qa-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .qa {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cat-color, var(--accent));
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .qa.is-reviewed { opacity: 0.72; }
+
+  .qa-q {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 14px 14px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Manrope', sans-serif;
+  }
+  .qa-q:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  .qa-check {
+    flex: 0 0 auto;
+    width: 19px; height: 19px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--surface);
+    background: var(--surface);
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .qa.is-reviewed .qa-check {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .qa-check svg { width: 12px; height: 12px; opacity: 0; }
+  .qa.is-reviewed .qa-check svg { opacity: 1; }
+
+  .qa-q-text {
+    flex: 1;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.4;
+    text-wrap: balance;
+  }
+  .qtag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--cat-color, var(--accent));
+    margin-right: 8px;
+    opacity: 0.75;
+  }
+
+  .qa-chevron {
+    flex: 0 0 auto;
+    width: 18px; height: 18px;
+    color: var(--text-muted);
+    transition: transform 0.18s ease;
+    margin-top: 2px;
+  }
+  .qa[data-open="true"] .qa-chevron { transform: rotate(90deg); }
+
+  .qa-a {
+    display: grid;
+    grid-template-rows: 1fr;
+    background: var(--surface-2);
+    transition: grid-template-rows 0.2s ease;
+  }
+  .qa[data-open="false"] .qa-a { grid-template-rows: 0fr; }
+  .qa-a-inner {
+    overflow: hidden;
+    padding: 0 16px;
+  }
+  .qa[data-open="true"] .qa-a-inner { padding: 14px 16px 16px 42px; }
+
+  .qa-a p {
+    margin: 0 0 10px;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .qa-a p:last-child { margin-bottom: 0; }
+  .qa-a em { color: var(--text-muted); font-style: italic; }
+  .qa-a code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.86em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .qa-a .caveat {
+    display: block;
+    margin-top: 10px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    background: var(--gold-soft);
+    color: var(--text);
+    font-size: 13px;
+    border-left: 2px solid var(--gold);
+  }
+  .qa-a .caveat.danger {
+    background: var(--danger-soft);
+    border-left-color: var(--danger);
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 480px) {
+    .qa[data-open="true"] .qa-a-inner { padding-left: 16px; }
+  }
+</style>
+
+<div class="page">
+  <div class="masthead">
+    <div class="eyebrow">MICROFI Collect &middot; Enterprise-wide presentation</div>
+    <h1>Q&amp;A rehearsal card</h1>
+    <p class="subhead">Every question rehearsed so far, grouped by angle, with the answer as you'd actually say it. Tap a question to fold it away once you're solid on it.</p>
+    <div class="toolbar">
+      <div class="progress">
+        <span id="progressLabel">0 / 0 reviewed</span>
+        <span class="progress-bar"><span id="progressFill"></span></span>
+      </div>
+      <button class="quiz-toggle" id="quizToggle" type="button" aria-pressed="false">
+        <span class="dot"></span>
+        <span id="quizToggleLabel">Quiz mode: off</span>
+      </button>
+    </div>
+    <div class="filters" id="filters" role="tablist" aria-label="Filter by category"></div>
+  </div>
+
+  <div id="categories"></div>
+
+  <footer>Last updated for the Thursday session &middot; your own device only, nothing here syncs anywhere</footer>
+</div>
+
+<script>
+  const DATA = [
+    {
+      id: "business", label: "Business & Impact", color: "var(--accent)",
+      items: [
+        {
+          q: "What problem does this actually solve?",
+          a: [
+            "Itinerant agents collect cash door-to-door for MFI clients, but today that's paper-based: no proof of where or when cash was collected, no cap on how much cash an agent can carry, and reconciliation happens by hand at day's end.",
+            "MICROFI digitizes that entire loop &mdash; GPS-verified collection, an enforced cash ceiling per agent, and automated end-of-day reconciliation against the core banking system."
+          ]
+        },
+        {
+          q: "How is this different from a mobile money agent app or a generic fintech wallet?",
+          a: [
+            "Mobile money apps are built around one wallet moving money between two people. This is purpose-built for an MFI's own itinerant collection network: it enforces the MFI's own operational rules (schedule windows, per-branch policies, escrow ceilings), reconciles against the MFI's real ledger through a core banking integration, and produces the audit trail a branch manager actually needs &mdash; not a payments UX."
+          ]
+        },
+        {
+          q: "What's the expected impact / ROI?",
+          a: [
+            "Concretely: fewer reconciliation errors, since the physical-vs-digital math is automatic instead of manual; faster fraud detection, since geofence and audit-trail anomalies surface same-day instead of at month-end; and a bounded worst-case loss per agent, since the escrow ceiling caps how much cash any single agent can be holding at once."
+          ]
+        }
+      ]
+    },
+    {
+      id: "security", label: "Security & Fraud Prevention", color: "var(--danger)",
+      items: [
+        {
+          q: "Can an agent just pocket cash and not record it?",
+          a: [
+            "That risk exists in any cash-collection model &mdash; no software eliminates a dishonest employee holding physical cash. What this system does is make it detectable fast: the agent's escrow ceiling forces a daily reconciliation between what they physically have and what's digitally recorded, so an unrecorded collection surfaces as a shortfall the same day, not at month-end.",
+            "The client also has a receipt as their own evidence, and there's a dedicated misconduct-reporting channel for clients to flag an agent directly."
+          ]
+        },
+        {
+          q: "What stops an agent from collecting outside their assigned zone, or GPS-spoofing?",
+          a: [
+            "Every collection is checked against the agent's assigned geofence &mdash; both live when online, and now also locally on the device before it's even queued offline, so an out-of-zone attempt is blocked before the client is handed a receipt, not just discovered later.",
+            "GPS spoofing is a known limitation of any GPS-based system in general &mdash; no app can fully prevent a rooted device faking location &mdash; but combined with the schedule window, the audit trail, and the misconduct channel, it raises the cost of trying meaningfully."
+          ]
+        },
+        {
+          q: "What if the agent's phone is lost or stolen?",
+          a: [
+            "The device is bound to one agent via a stable Android device identifier (<code>SSAID</code>) captured at first login &mdash; not a telephony IMEI, since Android hasn't allowed third-party apps to read the real IMEI since Android 10.",
+            "This identifier survives an app reinstall but resets on a factory reset, so a stolen phone that gets wiped, or a different phone entirely, won't inherit that binding without an admin explicitly resetting it. The offline queue is encrypted at rest via SQLCipher, and every transaction still requires the agent's own PIN, which locks out after repeated wrong attempts."
+          ],
+          caveat: "If asked “why does the database field still say IMEI then?” &mdash; it's a naming leftover from an earlier design, kept as-is through the API/DB layer since it behaves identically either way. Just own that plainly."
+        },
+        {
+          q: "If an agent tries to log in from a different device than their own, what happens?",
+          a: [
+            "It's strictly one agent, one device. Once an agent's account is bound to a device, logging in from any other device is rejected outright &mdash; even if that other device has been used successfully by a different agent before. Being “known to the system” isn't enough; it has to be this agent's own bound device.",
+            "The only way past that is a branch manager or admin explicitly resetting that agent's device binding, which lets them bind a new device on their next login."
+          ],
+          caveat: "The system does keep a first-seen/last-seen record of every device, but purely as an audit trail &mdash; useful for spotting the same physical device later reused across two unrelated agents' accounts &mdash; it never grants access on its own."
+        },
+        {
+          q: "How do you know the system itself is secure &mdash; have you actually tested it?",
+          a: [
+            "Yes &mdash; over 660 automated tests cover authentication, authorization boundaries, the money-path logic, and the offline sync path specifically, plus a formal IEEE 829-style test documentation pack. I'd keep the details for a technical follow-up rather than the main talk."
+          ]
+        }
+      ]
+    },
+    {
+      id: "offline", label: "Offline & Reliability", color: "var(--accent)",
+      items: [
+        {
+          q: "The app is offline-first &mdash; what actually happens if an agent has no signal?",
+          a: [
+            "Collection keeps working: PIN, escrow ceiling, and geofence are all checked on the device using the last confirmed data before the app hands the client a receipt, so the agent can't unknowingly go over their ceiling or collect outside their zone even without connectivity.",
+            "The transaction queues locally, encrypted, and uploads automatically the moment the phone reconnects."
+          ]
+        },
+        {
+          q: "Can the system be tricked by staying offline on purpose?",
+          a: [
+            "Harder than it sounds. The device caches the agent's own ceiling and geofence from the last time it was online, and checks the exact same rules the server would &mdash; so going offline doesn't loosen the rules, it just delays when the network confirms them.",
+            "Every synced item is independently validated by the server as final authority regardless of what the device decided."
+          ]
+        },
+        {
+          q: "What if the backend or the bank's system is down, not just the phone?",
+          a: [
+            "Agents keep collecting &mdash; the offline queue doesn't care whether the server is reachable or the phone is. Exporting to the core banking system is decoupled from collection itself: cash gets recorded and reconciled locally first, and the export retries safely once the connection is back, since it's idempotent and can never double-post."
+          ]
+        }
+      ]
+    },
+    {
+      id: "financial", label: "Financial Integrity & Reconciliation", color: "var(--gold)",
+      items: [
+        {
+          q: "How do you make sure the digital total actually matches the cash the agent physically has?",
+          a: [
+            "That's the end-of-day process: a cashier physically counts the agent's cash and the system compares it against everything recorded that day. A shortfall becomes a tracked debt against that agent, not something that quietly disappears.",
+            "If a specific collection was recorded in error, there's a formal rejection/reversal workflow with a manager's sign-off, and it automatically corrects the reconciliation instead of leaving stale numbers behind."
+          ]
+        },
+        {
+          q: "What's the “escrow ceiling” in plain terms?",
+          a: [
+            "Think of it as the agent's credit limit as a cash courier. They put down a security deposit, and that buys them a ceiling on how much client cash they can be holding before they must go reconcile.",
+            "It's configurable per branch &mdash; a trusted branch might allow more headroom than the deposit itself, a newer one might allow less."
+          ]
+        },
+        {
+          q: "Does this integrate with our actual banking system, or is it a separate app?",
+          a: [
+            "It's built with an integration layer specifically for that &mdash; a middleware service that talks to the core banking system. For this pilot phase it's running against a mock so the flow can be demonstrated safely; connecting it to the real core banking system is a configuration/integration step, not a redesign."
+          ]
+        }
+      ]
+    },
+    {
+      id: "client", label: "Client Trust", color: "var(--accent)",
+      items: [
+        {
+          q: "What does the client actually see or get?",
+          a: [
+            "A receipt &mdash; printed via Bluetooth or as a downloadable PDF &mdash; at the moment of collection, plus their own login to check their balance, transaction history, and account status. They're never dependent on the agent's word for what was collected."
+          ]
+        },
+        {
+          q: "How does a client know which agent is “theirs”?",
+          a: [
+            "Once an agent sponsors and helps activate a client's account, that client becomes part of that agent's portfolio &mdash; and branches can optionally require that only their own portfolio agent can collect from them, which prevents an unrelated agent from collecting for a client they have no relationship with."
+          ]
+        }
+      ]
+    },
+    {
+      id: "rollout", label: "Rollout & Roadmap", color: "var(--gold)",
+      items: [
+        {
+          q: "What hardware do agents need?",
+          a: ["A standard Android smartphone &mdash; no special hardware required, though a Bluetooth thermal printer is supported for physical receipts if a branch wants that."]
+        },
+        {
+          q: "How long would this take to roll out, and what does training look like?",
+          a: ["That depends on the pilot branch's readiness and is being scoped with the relevant stakeholders &mdash; happy to follow up with a concrete plan."],
+          caveat: "Genuinely outside engineering scope &mdash; bridge to the right owner rather than guessing a timeline."
+        },
+        {
+          q: "What's not done yet / what's next?",
+          a: [
+            "The core banking integration is currently a mock pending a real connection; the deployment target for a wider rollout is containerized and cloud-ready but not yet running on Kubernetes &mdash; that's an explicit “version 2” item.",
+            "Better to say that plainly than imply it's more finished than it is."
+          ]
+        },
+        {
+          q: "Is this compliant with data protection / banking regulation?",
+          a: ["The architecture is built with that in mind &mdash; encryption at rest and in transit, role-based access control, a full audit trail &mdash; but formal regulatory sign-off is a legal/compliance process that sits outside engineering, and I'd defer the specifics to whoever owns that rather than overstate it myself."],
+          caveat: "Don't improvise a compliance claim &mdash; bridge to the right owner."
+        }
+      ]
+    },
+    {
+      id: "architecture", label: "Architecture & Engineering Practice", color: "var(--accent)",
+      items: [
+        {
+          q: "Why a modular monolith instead of microservices?",
+          a: [
+            "At this scale &mdash; a pilot for one research center, not a multi-region deployment &mdash; microservices would add operational overhead without a corresponding benefit.",
+            "The codebase is already split into clear module boundaries that talk only through public service interfaces, never reaching into each other's data directly &mdash; so it's structured to be split apart later if it ever needs to be, without that being a rewrite."
+          ]
+        },
+        {
+          q: "Why Spring WebFlux (reactive) instead of a traditional blocking stack?",
+          a: ["The reactive stack lets I/O-bound work &mdash; broker round-trips, downstream bank calls &mdash; not tie up a thread per request, which matters once field agents are syncing offline batches and admin dashboards are polling at the same time."]
+        },
+        {
+          q: "Why PostgreSQL and not a NoSQL store?",
+          a: ["This is financial data with real relational integrity requirements &mdash; collections reference clients, agents, branches, reconciliation lines; ledger entries are append-only and must never be inconsistent. That's exactly what a relational database with real foreign keys and transactions is for."]
+        },
+        {
+          q: "The geofence check is described as “not PostGIS” &mdash; why not use a real geospatial database?",
+          a: ["At market/district scale, a handful of polygon vertices and a simple point-in-polygon check is accurate enough and has zero extra infrastructure cost. A geospatial database extension earns its complexity at a scale &mdash; thousands of overlapping precise queries &mdash; this use case isn't at."]
+        },
+        {
+          q: "What does your test coverage actually look like?",
+          a: ["Around 660 automated tests in the backend &mdash; unit tests for business logic, and slice tests that exercise the real security filter chain with an actual token, not a mocked principal, specifically to catch authorization bugs a shortcut would hide. The mobile app has its own suite covering the offline queue, local security checks, and receipt generation."]
+        },
+        {
+          q: "How does this scale beyond a single pilot?",
+          a: [
+            "The current deployment is a small self-hosted stack, appropriate for the pilot's actual load. The path to more scale is already anticipated in how it's built &mdash; stateless services behind a gateway, a message broker already decoupling bursty write paths &mdash; so growing means adding infrastructure, not re-architecting the application."
+          ]
+        }
+      ]
+    },
+    {
+      id: "data", label: "Data Consistency & Messaging", color: "var(--danger)",
+      items: [
+        {
+          q: "How do you avoid double-processing when an agent's offline batch syncs?",
+          a: ["Every collection carries a client-generated unique id. The server checks for an existing collection with that same agent + id before processing &mdash; if found, it replays the same response instead of re-running any business logic, so a retried sync can never double-record."]
+        },
+        {
+          q: "How do you avoid double-posting to the bank if an export runs twice?",
+          a: [
+            "Two layers: every exported collection gets stamped once posted, and every export query explicitly excludes already-exported rows, so a second run structurally can't see the same item twice.",
+            "On top of that, the actual bank call itself carries a content-derived idempotency key &mdash; a fingerprint of the exact batch being posted &mdash; so even a literal retry of the same request is safe on the banking side too."
+          ]
+        },
+        {
+          q: "You publish events from inside a database transaction &mdash; how do you avoid a consumer racing the commit?",
+          a: [
+            "Think of saving a collection like writing something down in a ledger. You don't want to say “it's written!” while your pen is still on the page &mdash; if something interrupts you before you finish, you'd have announced something that never actually got recorded.",
+            "So we wait until the save is fully finished and locked in before telling anyone about it. Only after the database confirms it's permanently saved do we send the notification &mdash; to the message broker, or to the dashboard. Whoever receives it and immediately looks the record up will always find it there."
+          ]
+        },
+        {
+          q: "What stops two people acting on the same thing at once &mdash; like approving the same request twice?",
+          a: ["State transitions check the current status before applying a change and reject with a conflict if it's already been decided &mdash; so a double-click or a race between two managers results in one succeeding and the second getting a clean “already decided” error, not a corrupted double-application."]
+        },
+        {
+          q: "Why RabbitMQ and not Kafka?",
+          a: [
+            "RabbitMQ is like a phone call &mdash; one system sends a request, waits, and gets an immediate answer back. That's exactly what happens when an agent submits a collection: send it, wait a moment, get a yes-or-no reply. It's also good for tapping a few people on the shoulder right now, like alerting whoever's watching the admin dashboard the instant an alert comes in.",
+            "Kafka is built for something different: recording a massive, ongoing stream of events that many systems replay and reprocess later, at a scale of millions of events a day, kept for weeks or months. We don't have that problem &mdash; using Kafka here would be like buying an industrial recording studio to make a phone call."
+          ]
+        },
+        {
+          q: "What is RabbitMQ actually used for here?",
+          a: [
+            "Exactly two jobs. First, throttling a burst of cash collections: when many agents' phones reconnect at once, each request goes through a small fixed-size pool of workers instead of hitting the server as one spike &mdash; a shock absorber.",
+            "Second, filling in a collection's location name without making the agent wait: the collection saves and confirms instantly, and a background worker resolves the GPS coordinates into a place name a moment later. The same pattern handles emergency alert locations too."
+          ],
+          caveat: "Deliberately not used for live dashboard alerts &mdash; those go through a simpler in-app mechanism, since there's only one server running. Worth mentioning as a sign of deliberate choices, not blanket use."
+        }
+      ]
+    }
+  ];
+
+  const listEl = document.getElementById('categories');
+  const filtersEl = document.getElementById('filters');
+  let activeFilter = 'all';
+
+  function storageGet(key, fallback) {
+    try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+    catch (_) { return fallback; }
+  }
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  let reviewed = storageGet('microfi-qa-reviewed', {});
+  let quizMode = storageGet('microfi-qa-quiz', false);
+
+  function qaKey(catId, idx) { return catId + ':' + idx; }
+
+  function render() {
+    // Filters
+    filtersEl.innerHTML = '';
+    const total = DATA.reduce((n, c) => n + c.items.length, 0);
+    const allPill = makePill('all', 'All', total);
+    filtersEl.appendChild(allPill);
+    DATA.forEach(cat => filtersEl.appendChild(makePill(cat.id, cat.label, cat.items.length)));
+
+    // Sections
+    listEl.innerHTML = '';
+    DATA.forEach(cat => {
+      const section = document.createElement('section');
+      section.className = 'category';
+      section.dataset.cat = cat.id;
+      section.style.setProperty('--cat-color', cat.color);
+      if (activeFilter !== 'all' && activeFilter !== cat.id) section.classList.add('is-hidden');
+
+      const head = document.createElement('div');
+      head.className = 'cat-head';
+      head.innerHTML = '<h2>' + cat.label + '</h2><span class="cat-count">' + cat.items.length + ' question' + (cat.items.length === 1 ? '' : 's') + '</span>';
+      section.appendChild(head);
+
+      const list = document.createElement('div');
+      list.className = 'qa-list';
+
+      cat.items.forEach((item, idx) => {
+        const key = qaKey(cat.id, idx);
+        const isReviewed = !!reviewed[key];
+        const open = !quizMode;
+
+        const qa = document.createElement('div');
+        qa.className = 'qa' + (isReviewed ? ' is-reviewed' : '');
+        qa.dataset.open = String(open);
+
+        const btn = document.createElement('button');
+        btn.className = 'qa-q';
+        btn.type = 'button';
+        btn.setAttribute('aria-expanded', String(open));
+        btn.innerHTML =
+          '<span class="qa-check" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+          '<span class="qa-q-text">' + item.q + '</span>' +
+          '<svg class="qa-chevron" viewBox="0 0 20 20" fill="none"><path d="M7 4l7 6-7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+        btn.addEventListener('click', (e) => {
+          // Toggle "reviewed" when the check area is clicked, otherwise toggle open/closed.
+          const rect = btn.querySelector('.qa-check').getBoundingClientRect();
+          const hitCheck = e.clientX >= rect.left - 6 && e.clientX <= rect.right + 6 && e.clientY >= rect.top - 6 && e.clientY <= rect.bottom + 6;
+          if (hitCheck) {
+            reviewed[key] = !reviewed[key];
+            storageSet('microfi-qa-reviewed', reviewed);
+            qa.classList.toggle('is-reviewed', !!reviewed[key]);
+            updateProgress();
+            return;
+          }
+          const nowOpen = qa.dataset.open !== 'true';
+          qa.dataset.open = String(nowOpen);
+          btn.setAttribute('aria-expanded', String(nowOpen));
+        });
+
+        const ans = document.createElement('div');
+        ans.className = 'qa-a';
+        const ansInner = document.createElement('div');
+        ansInner.className = 'qa-a-inner';
+        ansInner.innerHTML = item.a.map(p => '<p>' + p + '</p>').join('') +
+          (item.caveat ? '<span class="caveat' + (item.dangerCaveat ? ' danger' : '') + '">' + item.caveat + '</span>' : '');
+        ans.appendChild(ansInner);
+
+        qa.appendChild(btn);
+        qa.appendChild(ans);
+        list.appendChild(qa);
+      });
+
+      section.appendChild(list);
+      listEl.appendChild(section);
+    });
+
+    updateProgress();
+  }
+
+  function makePill(id, label, count) {
+    const b = document.createElement('button');
+    b.className = 'pill';
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-pressed', String(activeFilter === id));
+    b.innerHTML = label + '<span class="n">' + count + '</span>';
+    b.addEventListener('click', () => { activeFilter = id; render(); });
+    return b;
+  }
+
+  function updateProgress() {
+    const total = DATA.reduce((n, c) => n + c.items.length, 0);
+    const done = Object.values(reviewed).filter(Boolean).length;
+    document.getElementById('progressLabel').textContent = done + ' / ' + total + ' reviewed';
+    document.getElementById('progressFill').style.width = (total ? (done / total) * 100 : 0) + '%';
+  }
+
+  const quizBtn = document.getElementById('quizToggle');
+  const quizLabel = document.getElementById('quizToggleLabel');
+  function syncQuizButton() {
+    quizBtn.setAttribute('aria-pressed', String(quizMode));
+    quizLabel.textContent = 'Quiz mode: ' + (quizMode ? 'on' : 'off');
+  }
+  quizBtn.addEventListener('click', () => {
+    quizMode = !quizMode;
+    storageSet('microfi-qa-quiz', quizMode);
+    syncQuizButton();
+    render();
+  });
+
+  syncQuizButton();
+  render();
+</script>

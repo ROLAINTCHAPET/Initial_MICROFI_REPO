@@ -7,6 +7,7 @@ import com.microfi.mw.adapters.dto.EscrowCreditResult;
 import com.microfi.mw.adapters.dto.ExportAckResult;
 import com.microfi.mw.adapters.dto.FeeSplitResult;
 import com.microfi.mw.adapters.dto.HistoryEntry;
+import com.microfi.mw.adapters.dto.MemberLookupResult;
 import com.microfi.mw.adapters.dto.MemberVerificationResult;
 import com.microfi.mw.adapters.dto.TransactionPostResult;
 import com.microfi.mw.adapters.dto.TransactionReversalResult;
@@ -31,6 +32,7 @@ public class MockCbsAdapter extends AbstractCoreBankingAdapter {
     public static final String VENDOR = "mock";
 
     private final MockLedgerEntryRepository ledgerRepository;
+    private final MockCbsMemberRepository memberRepository;
 
     @Override
     protected String vendorKey() {
@@ -44,6 +46,16 @@ public class MockCbsAdapter extends AbstractCoreBankingAdapter {
         }
         String memberId = "CBS-" + Integer.toHexString(activationId.hashCode()).toUpperCase();
         return new MemberVerificationResult(true, memberId, "Mock Member " + memberId, "ACTIVE");
+    }
+
+    @Override
+    public MemberLookupResult getMember(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            return new MemberLookupResult(false, accountNumber, null, null, null);
+        }
+        return memberRepository.findByAccountNumber(accountNumber)
+                .map(member -> new MemberLookupResult(true, member.getAccountNumber(), member.getFullName(), member.getEmail(), member.getPhone()))
+                .orElseGet(() -> new MemberLookupResult(false, accountNumber, null, null, null));
     }
 
     @Override

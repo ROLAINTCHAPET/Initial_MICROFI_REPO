@@ -48,6 +48,7 @@ export function TrackingMap({
 }) {
   const dict = useDictionary();
   const routeLatLngs = useMemo<[number, number][]>(() => points.map((p) => [p.lat, p.lon]), [points]);
+  const transactionLatLngs = useMemo<[number, number][]>(() => transactions.map((t) => [t.lat, t.lon]), [transactions]);
   const geofenceLatLngs = useMemo<[number, number][]>(() => (geofence ?? []).map((v) => [v.lat, v.lon]), [geofence]);
   const draftLatLngs = useMemo<[number, number][]>(() => (editingVertices ?? []).map((v) => [v.lat, v.lon]), [editingVertices]);
 
@@ -68,7 +69,17 @@ export function TrackingMap({
       .catch(() => setPingLocationNames((m) => ({ ...m, [recordedAt]: null })));
   }
 
-  const boundsSource = routeLatLngs.length > 0 ? routeLatLngs : geofenceLatLngs.length > 0 ? geofenceLatLngs : [];
+  // Must include transaction markers, not just pings — an agent can have zero pings today (background
+  // tracking never started, permission not granted) while still having a perfectly valid, GPS-tagged
+  // collection; without this, that marker rendered but sat outside the map's default view, invisible
+  // until manually panned to. Falls back to the assigned geofence only when there's truly no activity
+  // (pings or transactions) to show today.
+  const boundsSource =
+    routeLatLngs.length > 0 || transactionLatLngs.length > 0
+      ? [...routeLatLngs, ...transactionLatLngs]
+      : geofenceLatLngs.length > 0
+        ? geofenceLatLngs
+        : [];
 
   return (
     <MapContainer center={DOUALA_FALLBACK} zoom={13} className="h-full w-full" scrollWheelZoom zoomControl={false}>

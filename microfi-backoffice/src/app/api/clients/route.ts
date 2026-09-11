@@ -18,3 +18,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unable to reach the backend" }, { status: 502 });
   }
 }
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  try {
+    const client = await api.post<ClientResponse>("/admin/clients", body);
+    return NextResponse.json(client, { status: 201 });
+  } catch (err) {
+    if (err instanceof ApiRequestError) {
+      return NextResponse.json({ message: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ message: "Unable to reach the backend" }, { status: 502 });
+  }
+}

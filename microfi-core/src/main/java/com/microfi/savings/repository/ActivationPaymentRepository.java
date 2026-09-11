@@ -22,6 +22,11 @@ public interface ActivationPaymentRepository extends JpaRepository<ActivationPay
             + "WHERE p.agentId = :agentId AND p.reconciledAt IS NULL AND p.paidAt < :cutoff")
     long sumUnreconciledByAgent(@Param("agentId") UUID agentId, @Param("cutoff") Instant cutoff);
 
+    /** Display-only calendar-day counterpart to {@link #sumUnreconciledByAgent} — see CollectionRepository#sumCollectedTodayByAgent's Javadoc for why the two must stay separate. */
+    @Query("SELECT COALESCE(SUM(p.amountXaf), 0) FROM ActivationPayment p "
+            + "WHERE p.agentId = :agentId AND p.paidAt >= :startOfDay AND p.paidAt < :endOfDay")
+    long sumCollectedTodayByAgent(@Param("agentId") UUID agentId, @Param("startOfDay") Instant startOfDay, @Param("endOfDay") Instant endOfDay);
+
     @Modifying
     @Query("UPDATE ActivationPayment p SET p.reconciledAt = :cutoff, p.reconciledInLineId = :lineId "
             + "WHERE p.agentId = :agentId AND p.reconciledAt IS NULL AND p.paidAt < :cutoff")

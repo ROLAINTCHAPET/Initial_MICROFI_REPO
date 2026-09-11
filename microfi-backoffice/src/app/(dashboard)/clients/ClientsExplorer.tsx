@@ -32,13 +32,14 @@ export function ClientsExplorer({
     { header: dict.clients.colMemberNo, value: (c) => c.mfiMemberNo },
     { header: dict.clients.colPhone, value: (c) => c.phone },
     { header: dict.clients.colStatus, value: (c) => dict.common.status[c.status] },
+    { header: dict.clients.colCbsSync, value: (c) => (c.cbsSynced ? dict.clients.detail.cbsSynced : dict.clients.detail.cbsPending) },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="relative max-w-sm w-full">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-outline pointer-events-none" />
+          <Icon name="search" className="absolute left-3 inset-y-0 my-auto size-5 text-outline pointer-events-none" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -72,6 +73,9 @@ export function ClientsExplorer({
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
+                {!client.cbsSynced && (
+                  <Badge status="PENDING" label={dict.clients.detail.cbsPending} />
+                )}
                 <Badge status={client.status} />
                 <Icon name="chevron-right" className="size-5 text-outline shrink-0" />
               </div>

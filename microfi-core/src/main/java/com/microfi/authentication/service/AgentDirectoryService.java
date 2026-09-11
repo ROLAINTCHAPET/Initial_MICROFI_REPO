@@ -90,6 +90,29 @@ public class AgentDirectoryService {
     }
 
     /**
+     * UC-19 (Branch#requireClientActivation) — whether this agent's branch requires a client to
+     * already be activated before any collection can be recorded for them, used by
+     * {@code CollectionService.recordCollection} so it never has to reach into {@code
+     * authentication}'s repositories directly.
+     */
+    public boolean effectiveRequireClientActivationForAgent(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        return branchRepository.findById(agent.getBranchId())
+                .map(Branch::effectiveRequireClientActivation)
+                .orElse(Branch.DEFAULT_REQUIRE_CLIENT_ACTIVATION);
+    }
+
+    /** Same shape as {@link #effectiveRequireClientActivationForAgent}, for the "portefeuille client" gate — see Branch#requireClientPortfolio. */
+    public boolean effectiveRequireClientPortfolioForAgent(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        return branchRepository.findById(agent.getBranchId())
+                .map(Branch::effectiveRequireClientPortfolio)
+                .orElse(Branch.DEFAULT_REQUIRE_CLIENT_PORTFOLIO);
+    }
+
+    /**
      * UC-15 schedule-lock: once today's opening time has passed (in the branch's own timezone),
      * it can no longer be rewritten for today — only closeTime stays adjustable, so a branch
      * manager can still shorten or extend the day without being able to retroactively change when
@@ -164,6 +187,50 @@ public class AgentDirectoryService {
     }
 
     /**
+     * Whether this agent has already called "End My Day" for today's UTC business date — same
+     * convention {@link #requireDayNotEnded} and {@code OfjService#exportForAgent} use. Backs
+     * {@code OfjService#getExportableSummary}/{@code #exportForAgent} so the mobile "End My Day"
+     * action stays gone once the agent has already signaled they're done for the day, even if a
+     * late reconciliation confirmation afterward leaves a little more cash confirmed-and-unexported
+     * (that leftover is swept by the branch's own session close or scheduled closing-time export
+     * instead — see OfjClosingTimeExportJob).
+     */
+    public boolean hasEndedDayToday(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        return LocalDate.now(ZoneOffset.UTC).equals(agent.getDayEndedBusinessDate());
+    }
+
+    /**
+     * Called by {@code CollectionRejectionService#requeueUnexportedSiblings} the moment a sibling
+     * collection is reset to {@code UNRECONCILED} — see {@code Agent#carriedPhysicalXaf}. Adds
+     * rather than overwrites: a second rejection before the agent's next reconcile must not lose
+     * the first one's carried amount.
+     */
+    public void addCarriedPhysicalXaf(UUID agentId, long amountXaf) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        agent.setCarriedPhysicalXaf((agent.getCarriedPhysicalXaf() == null ? 0L : agent.getCarriedPhysicalXaf()) + amountXaf);
+        agentRepository.save(agent);
+    }
+
+    /**
+     * {@code OfjService#reconcile}'s read side of {@link #addCarriedPhysicalXaf} — returns
+     * whatever's outstanding and clears it in the same call, so it's folded into exactly one
+     * reconcile sweep, never double-applied to a later one.
+     */
+    public long consumeCarriedPhysicalXaf(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
+        long carried = agent.getCarriedPhysicalXaf() == null ? 0L : agent.getCarriedPhysicalXaf();
+        if (carried != 0L) {
+            agent.setCarriedPhysicalXaf(null);
+            agentRepository.save(agent);
+        }
+        return carried;
+    }
+
+    /**
      * {@code Branch.timezone} is a free-text field with no format validation at write time, so
      * garbage values (e.g. seeded test data) can and do exist — a raw {@code ZoneId.of(...)} call
      * would throw and, worse, would do so mid-stream for a Flux of many branches (as it did for
@@ -185,6 +252,14 @@ public class AgentDirectoryService {
     /** Phone numbers for every agent at a branch, for a branch-wide SMS notice (e.g. a same-day schedule change) — agents with no phone on file are already filtered out. */
     public List<String> findAgentPhonesByBranch(UUID branchId) {
         return agentRepository.findByBranchId(branchId).stream()
+                .map(Agent::getPhone)
+                .filter(phone -> phone != null && !phone.isBlank())
+                .toList();
+    }
+
+    /** Every agent's phone network-wide, for a network-wide broadcast SMS blast (ADMIN only). */
+    public List<String> findAllAgentPhones() {
+        return agentRepository.findAll().stream()
                 .map(Agent::getPhone)
                 .filter(phone -> phone != null && !phone.isBlank())
                 .toList();

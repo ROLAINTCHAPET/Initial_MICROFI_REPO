@@ -1,6 +1,12 @@
 # Local session / tooling state — not shared project content
 .claude/
 
+# Environment variables / secrets — never committed
+.env
+.env.*
+# ...except the committed template documenting which variables are needed
+!.env.example
+
 # LibreOffice lock files
 .~lock.*#
 

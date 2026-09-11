@@ -87,4 +87,17 @@ class ClientSelfRepository {
     final json = await _client.post('/clients/me/activation/pay', {'pin': pin});
     return ClientActivationConfirmation.fromJson(json);
   }
+
+  /// ADMIN/BRANCH_MANAGER announcements addressed to clients — network-wide or this client's own
+  /// branch. Same no-push-infrastructure reasoning as the agent app's branch notices/broadcasts.
+  Future<List<ClientBroadcastMessage>> fetchBroadcasts() async {
+    final json = await _client.get('/clients/me/broadcasts') as List<dynamic>;
+    return json.map((e) => ClientBroadcastMessage.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// A client's report that their agent may have misbehaved — accepted best-effort, ADMIN/
+  /// BRANCH_MANAGER see it immediately in the Back-Office for triage.
+  Future<void> reportMisconduct({required String agentId, required String reason}) async {
+    await _client.post('/clients/me/misconduct-reports', {'agentId': agentId, 'reason': reason});
+  }
 }

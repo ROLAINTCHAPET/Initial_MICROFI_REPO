@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -43,6 +44,8 @@ public class ClientProfile {
 
     private String phone;
 
+    private String email;
+
     private UUID branchId;
 
     private String cbsRef;
@@ -55,4 +58,24 @@ public class ClientProfile {
     private String login;
 
     private String pinHash;
+
+    /**
+     * Null means this local mirror row hasn't yet been matched against the real CBS record by
+     * account number ({@link #mfiMemberNo}) — set entirely by {@code ClientCbsSyncJob}'s
+     * unattended background sweep, never by a person. Every sweep that finds a match overwrites
+     * {@code fullName}/{@code email}/{@code phone} from the CBS's own values and re-stamps this,
+     * so a client registered by hand from just the account number (the "an automatic refresh
+     * missed them" recovery case) gets its details filled in and confirmed on the very next run.
+     */
+    private Instant cbsSyncedAt;
+
+    /**
+     * "Portefeuille client" — the agent this client currently belongs to, enforced only when their
+     * branch opts into {@code Branch#requireClientPortfolio}. Set automatically the first time an
+     * agent sponsors this client's UC-19 activation to completion (see {@code
+     * ClientActivationService#confirmPayment}); a manager/admin can also reassign it by hand. Null
+     * means this client has never been assigned to anyone yet, and stays collectible by any agent
+     * in the branch regardless of the branch's setting.
+     */
+    private UUID assignedAgentId;
 }

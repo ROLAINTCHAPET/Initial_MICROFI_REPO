@@ -10,6 +10,7 @@ import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.domain.ClientStatus;
@@ -46,6 +47,9 @@ class ClientControllerTest {
 
     @MockitoBean
     private CollectionService collectionService;
+
+    @MockitoBean
+    private AgentDirectoryService agentDirectoryService;
 
     // SecurityConfig (imported to exercise the real auth-required chain) transitively needs
     // JwtAuthenticationFilter's dependencies even though this controller doesn't use them.
@@ -137,7 +141,56 @@ class ClientControllerTest {
                 .expectStatus().isCreated()
                 .expectBody()
                 .jsonPath("$.mfiMemberNo").isEqualTo("M001")
-                .jsonPath("$.status").isEqualTo("ACTIVE");
+                .jsonPath("$.status").isEqualTo("ACTIVE")
+                // Never verified against the CBS at creation — see ClientProfile#cbsSyncedAt.
+                .jsonPath("$.cbsSynced").isEqualTo(false)
+                .jsonPath("$.hasCredentials").isEqualTo(false);
+    }
+
+    @Test
+    void testCreateClientWithCredentialsSetsLoginAndPinImmediately() {
+        when(clientProfileRepository.existsByMfiMemberNo("M001")).thenReturn(false);
+        when(clientProfileRepository.findByLogin("jean.client")).thenReturn(Optional.empty());
+        when(clientProfileRepository.save(any(ClientProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"mfiMemberNo\":\"M001\",\"fullName\":\"Jean Client\",\"email\":\"jean@example.com\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.email").isEqualTo("jean@example.com")
+                .jsonPath("$.hasCredentials").isEqualTo(true);
+    }
+
+    @Test
+    void testCreateClientRejectsLoginWithoutPin() {
+        when(clientProfileRepository.existsByMfiMemberNo("M001")).thenReturn(false);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"mfiMemberNo\":\"M001\",\"fullName\":\"Jean Client\",\"login\":\"jean.client\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void testCreateClientRejectsAlreadyTakenLogin() {
+        when(clientProfileRepository.existsByMfiMemberNo("M001")).thenReturn(false);
+        when(clientProfileRepository.findByLogin("jean.client"))
+                .thenReturn(Optional.of(ClientProfile.builder().id(UUID.randomUUID()).login("jean.client").build()));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .post()
+                .uri("/api/v1/admin/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"mfiMemberNo\":\"M001\",\"fullName\":\"Jean Client\",\"login\":\"jean.client\",\"pin\":\"1234\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
     }
 
     @Test
@@ -243,4 +296,78 @@ class ClientControllerTest {
                 .exchange()
                 .expectStatus().isForbidden();
     }
+
+    @Test
+    void testSetAssignedAgentSuccess() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        UUID agentId = UUID.randomUUID();
+        ClientProfile client = ClientProfile.builder().id(id).mfiMemberNo("M001").fullName("Jean Client").branchId(branchId).build();
+        when(clientProfileRepository.findById(id)).thenReturn(Optional.of(client));
+        when(clientProfileRepository.save(any(ClientProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(branchId);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/clients/" + id + "/assigned-agent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"agentId\":\"" + agentId + "\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.assignedAgentId").isEqualTo(agentId.toString());
+    }
+
+    @Test
+    void testSetAssignedAgentClearsAssignmentWhenNull() {
+        UUID id = UUID.randomUUID();
+        ClientProfile client = ClientProfile.builder().id(id).mfiMemberNo("M001").fullName("Jean Client").assignedAgentId(UUID.randomUUID()).build();
+        when(clientProfileRepository.findById(id)).thenReturn(Optional.of(client));
+        when(clientProfileRepository.save(any(ClientProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/clients/" + id + "/assigned-agent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"agentId\":null}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.assignedAgentId").doesNotExist();
+    }
+
+    // A client can only ever be assigned to an agent from their own branch — reassigning them
+    // to an agent elsewhere would make the portfolio check unenforceable for that branch's own
+    // manager (they can't see or scope agents outside their branch).
+    @Test
+    void testSetAssignedAgentRejectsAgentFromAnotherBranch() {
+        UUID id = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        UUID otherBranchId = UUID.randomUUID();
+        UUID agentId = UUID.randomUUID();
+        ClientProfile client = ClientProfile.builder().id(id).mfiMemberNo("M001").fullName("Jean Client").branchId(branchId).build();
+        when(clientProfileRepository.findById(id)).thenReturn(Optional.of(client));
+        when(agentDirectoryService.requireBranchIdForAgent(agentId)).thenReturn(otherBranchId);
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/clients/" + id + "/assigned-agent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"agentId\":\"" + agentId + "\"}")
+                .exchange()
+                .expectStatus().is4xxClientError()
+                .expectStatus().isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void testSetAssignedAgentCashierForbidden() {
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.BRANCH_CASHIER)))
+                .patch()
+                .uri("/api/v1/admin/clients/" + UUID.randomUUID() + "/assigned-agent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"agentId\":null}")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
 }

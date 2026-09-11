@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
-import { formatCompactXaf } from "@/lib/format";
+import { formatXaf } from "@/lib/format";
 import type { AgentStatus } from "@/lib/types";
 import { useDictionary } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/format";
@@ -15,8 +15,12 @@ export interface AgentRow {
   employeeCode: string;
   branchName: string;
   status: AgentStatus;
-  // Cash actually collected today (not yet remitted) — this is what the ceiling gate
-  // (BR-03) blocks against, distinct from the funded guarantee shown as "Limit".
+  // Day-agnostic cash-in-hand (not yet remitted) — this is what the ceiling gate (BR-03)
+  // actually blocks against, distinct from the funded guarantee shown as "Limit". Drives the
+  // progress bar below; deliberately NOT the same figure as collectedTodayXaf (a backlog agent
+  // who collected nothing today can still be near their ceiling from older unreconciled cash).
+  cashInHandXaf: number | null;
+  // True calendar-day total, display-only — feeds the aggregate stat card, never the ceiling math.
   collectedTodayXaf: number | null;
   ceilingXaf: number | null;
   pct: number | null;
@@ -89,7 +93,7 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
           <div className="relative max-w-sm w-full">
-            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-outline pointer-events-none" />
+            <Icon name="search" className="absolute left-3 inset-y-0 my-auto size-5 text-outline pointer-events-none" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -137,7 +141,7 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
           active={filter === "suspended"}
           onClick={stats.suspended > 0 ? () => toggleFilter("suspended") : undefined}
         />
-        <StatCard label={dict.agents.statCollectedToday} value={formatCompactXaf(stats.collectedToday)} />
+        <StatCard label={dict.agents.statCollectedToday} value={formatXaf(stats.collectedToday)} />
       </div>
 
       {filter !== "all" && (
@@ -214,10 +218,10 @@ export function AgentsExplorer({ rows, actions }: { rows: AgentRow[]; actions?: 
                           <Badge status={row.status} />
                         </td>
                         <td className="p-4">
-                          {row.collectedTodayXaf !== null && row.ceilingXaf !== null && row.pct !== null ? (
+                          {row.cashInHandXaf !== null && row.ceilingXaf !== null && row.pct !== null ? (
                             <div className="flex flex-col gap-1 w-full">
                               <div className="flex justify-between text-xs tabular-nums">
-                                <span className={row.nearLimit ? "text-error font-semibold" : "text-on-surface"}>{row.collectedTodayXaf.toLocaleString()} XAF</span>
+                                <span className={row.nearLimit ? "text-error font-semibold" : "text-on-surface"}>{row.cashInHandXaf.toLocaleString()} XAF</span>
                                 <span className={row.nearLimit ? "text-error font-semibold" : "text-on-surface-variant"}>{row.pct}%</span>
                               </div>
                               <div className="w-full bg-surface-variant rounded-full h-2 overflow-hidden">

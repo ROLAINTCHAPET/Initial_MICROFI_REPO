@@ -128,6 +128,18 @@ public class GeofenceService {
     }
 
     /**
+     * Self-service variant of {@link #getGeofence} for the mobile app's local geofence cache
+     * (AgentSelfController) — an agent with none assigned gets an empty-vertices response instead
+     * of a 404, matching {@link #isWithinAssignedGeofence}'s "unassigned = unrestricted" default
+     * rather than treating the common case of "no geofence yet" as an error the app must handle.
+     */
+    public GeofenceResponse getGeofenceOrEmpty(UUID agentId) {
+        return geofenceRepository.findByAgentId(agentId)
+                .map(this::toResponse)
+                .orElseGet(() -> GeofenceResponse.builder().agentId(agentId).vertices(List.of()).build());
+    }
+
+    /**
      * Returns the agent to the same unrestricted state they were in before any geofence was ever
      * set (see {@link #isWithinAssignedGeofence}'s {@code orElse(true)}) — not a new state this
      * codebase needs to guard against, just the pre-existing default. Idempotent: deleting an

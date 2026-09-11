@@ -3,8 +3,10 @@ package com.microfi.savings.controller;
 import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.AdminRole;
+import com.microfi.authentication.service.AgentDirectoryService;
 import com.microfi.savings.domain.ClientProfile;
 import com.microfi.savings.repository.ClientProfileRepository;
+import com.microfi.shared.dto.AssignClientAgentRequest;
 import com.microfi.shared.dto.ClientResponse;
 import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.CreateClientRequest;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,6 +46,8 @@ public class ClientController {
 
     private final ClientProfileRepository clientProfileRepository;
     private final CollectionService collectionService;
+    private final PasswordEncoder passwordEncoder;
+    private final AgentDirectoryService agentDirectoryService;
 
     @GetMapping("/api/v1/clients/lookup")
     @Operation(summary = "Multi-Method Client Lookup", description = "Search by membership number, phone or name (QR/ID scans resolve to the same fields client-side), across every client — not limited to the agent's own branch. Which clients an agent may actually collect from is governed by their assigned geofence at collection time (see POST /collections), not by branch. An empty query returns every client, so the agent can browse before typing. Returns candidates for the agent to disambiguate; FR-06.")
@@ -72,13 +77,25 @@ public class ClientController {
                             throw new ResponseStatusException(HttpStatus.CONFLICT,
                                     "Client with membership number '" + request.getMfiMemberNo() + "' already exists");
                         }
+                        boolean hasLogin = request.getLogin() != null && !request.getLogin().isBlank();
+                        boolean hasPin = request.getPin() != null && !request.getPin().isBlank();
+                        if (hasLogin != hasPin) {
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "Provide both a login and a PIN to set this client's credentials, or neither to leave them for self-activation");
+                        }
+                        if (hasLogin && clientProfileRepository.findByLogin(request.getLogin()).isPresent()) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "Login '" + request.getLogin() + "' is already taken");
+                        }
                         ClientProfile client = ClientProfile.builder()
                                 .id(UUID.randomUUID())
                                 .mfiMemberNo(request.getMfiMemberNo())
                                 .fullName(request.getFullName())
                                 .phone(request.getPhone())
+                                .email(request.getEmail())
                                 .branchId(request.getBranchId())
                                 .cbsRef(request.getCbsRef())
+                                .login(hasLogin ? request.getLogin() : null)
+                                .pinHash(hasPin ? passwordEncoder.encode(request.getPin()) : null)
                                 .build();
                         return toResponse(clientProfileRepository.save(client));
                     }).subscribeOn(Schedulers.boundedElastic());
@@ -109,6 +126,20 @@ public class ClientController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/api/v1/admin/clients/collections")
+    @Operation(summary = "All Clients' Transactions by Period", description = "Every collection recorded against every client mirrored in a branch within an arbitrary [from, to) window, newest first — bulk counterpart to /admin/clients/{id}/collections for a CBS-import/audit CSV export spanning the whole branch. Any Back-Office role, own branch only unless ADMIN.")
+    public Mono<List<CollectionResponse>> collectionsForBranch(@RequestParam UUID branchId,
+                                                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+                                                                Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    AdminAccess.requireBranchScope(caller, branchId);
+                    List<UUID> clientIds = clientProfileRepository.findByBranchId(branchId).stream().map(ClientProfile::getId).toList();
+                    return collectionService.findByClientsAndRange(clientIds, from, to);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @GetMapping("/api/v1/admin/clients/{id}/collections")
     @Operation(summary = "Client Transactions by Period", description = "Every collection recorded against this client within an arbitrary [from, to) window, newest first — Financial & Transactional export, scoped to one client. Any Back-Office role, own branch only unless ADMIN.")
     public Mono<List<CollectionResponse>> collections(@PathVariable UUID id,
@@ -135,6 +166,24 @@ public class ClientController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @PatchMapping("/api/v1/admin/clients/{id}/assigned-agent")
+    @Operation(summary = "Reassign Client's Portfolio Agent", description = "\"Portefeuille client\": manually sets (or clears, with a null agentId) which agent this client belongs to — the same assignment an agent's own sponsored activation sets automatically. The target agent must belong to the client's own branch. ADMIN or BRANCH_MANAGER (own branch only).")
+    public Mono<ClientResponse> setAssignedAgent(@PathVariable UUID id, @RequestBody AssignClientAgentRequest request, Mono<Authentication> authenticationMono) {
+        return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
+                .flatMap(caller -> Mono.fromCallable(() -> {
+                    ClientProfile client = findClientOrThrow(id);
+                    AdminAccess.requireBranchScope(caller, client.getBranchId());
+                    if (request.getAgentId() != null) {
+                        UUID agentBranchId = agentDirectoryService.requireBranchIdForAgent(request.getAgentId());
+                        if (!agentBranchId.equals(client.getBranchId())) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "That agent belongs to a different branch than this client");
+                        }
+                    }
+                    client.setAssignedAgentId(request.getAgentId());
+                    return toResponse(clientProfileRepository.save(client));
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
     private ClientProfile findClientOrThrow(UUID id) {
         return clientProfileRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + id));
@@ -146,8 +195,13 @@ public class ClientController {
                 .mfiMemberNo(client.getMfiMemberNo())
                 .fullName(client.getFullName())
                 .phone(client.getPhone())
+                .email(client.getEmail())
                 .branchId(client.getBranchId())
                 .status(client.getStatus())
+                .cbsSynced(client.getCbsSyncedAt() != null)
+                .cbsSyncedAt(client.getCbsSyncedAt())
+                .hasCredentials(client.getPinHash() != null)
+                .assignedAgentId(client.getAssignedAgentId())
                 .build();
     }
 }

@@ -54,46 +54,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.all(MicrofiSpacing.page),
           children: [
             Center(
-              child: CircleAvatar(
-                radius: 32,
-                backgroundColor: MicrofiColors.surfaceContainerHigh,
+              child: Container(
+                width: 84,
+                height: 84,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [MicrofiColors.primary, MicrofiColors.primaryContainer],
+                  ),
+                  boxShadow: [BoxShadow(color: MicrofiColors.primary.withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 6))],
+                ),
                 child: Text(
                   profile.fullName.isNotEmpty ? profile.fullName[0].toUpperCase() : '?',
-                  style: const TextStyle(color: MicrofiColors.primary, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Center(
-              child: Text(profile.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+              child: Text(profile.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(MicrofiSpacing.card),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: MicrofiColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
               ),
               child: Column(
                 children: [
-                  _Row(label: l10n.lgUsernameLabel, value: profile.username),
-                  _Row(label: l10n.prEmployeeCodeLabel, value: profile.employeeCode),
-                  if (profile.email != null) _Row(label: l10n.prEmailLabel, value: profile.email!),
-                  _Row(label: l10n.prPhoneLabel, value: profile.phone),
-                  _Row(label: l10n.prDeviceBindingLabel, value: profile.imei != null ? l10n.prBound : l10n.prNotBoundOwnDevice),
-                  _Row(label: l10n.rpBranchLabel, value: _branchName ?? '…'),
-                  _Row(label: l10n.cwStatusLabel, value: profile.status),
+                  _Row(icon: Icons.person_outline_rounded, label: l10n.lgUsernameLabel, value: profile.username),
+                  _Row(icon: Icons.badge_outlined, label: l10n.prEmployeeCodeLabel, value: profile.employeeCode),
+                  if (profile.email != null) _Row(icon: Icons.email_outlined, label: l10n.prEmailLabel, value: profile.email!),
+                  _Row(icon: Icons.call_outlined, label: l10n.prPhoneLabel, value: profile.phone),
+                  _Row(icon: Icons.smartphone_outlined, label: l10n.prDeviceBindingLabel, value: profile.imei != null ? l10n.prBound : l10n.prNotBoundOwnDevice),
+                  _Row(icon: Icons.location_on_outlined, label: l10n.rpBranchLabel, value: _branchName ?? '…'),
+                  _Row(icon: Icons.verified_outlined, label: l10n.cwStatusLabel, value: profile.status, last: true),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 48,
               child: OutlinedButton.icon(
                 onPressed: _changePin,
-                icon: const Icon(Icons.lock_reset_outlined),
+                icon: const Icon(Icons.lock_reset_rounded),
                 label: Text(l10n.prChangeTransactionPin),
               ),
             ),
@@ -113,20 +123,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _Row extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
+  final bool last;
 
-  const _Row({required this.label, required this.value});
+  const _Row({required this.icon, required this.label, required this.value, this.last = false});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: last
+          ? null
+          : const BoxDecoration(border: Border(bottom: BorderSide(color: MicrofiColors.outlineVariant, width: 0.75))),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: MicrofiColors.onSurfaceVariant))),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Icon(icon, size: 18, color: MicrofiColors.outline),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: const TextStyle(color: MicrofiColors.onSurfaceVariant, fontSize: 13))),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: MicrofiColors.primary)),
         ],
       ),
     );

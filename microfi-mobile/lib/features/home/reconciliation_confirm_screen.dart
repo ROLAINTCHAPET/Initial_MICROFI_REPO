@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../collection/collection_repository.dart';
@@ -24,48 +26,92 @@ class _ReconciliationConfirmScreenState extends State<ReconciliationConfirmScree
   bool _loading = true;
   String? _error;
   String? _confirmingLineId;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Mirrors Home's own 60s pending-confirmations poll, but faster since the agent is actively
+    // looking at this screen — a fresh cashier sweep should show up without a manual pull.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _load(silent: true));
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final lines = await _repository.listMyPendingConfirmations();
       if (!mounted) return;
-      setState(() => _lines = lines);
+      setState(() {
+        _lines = lines;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(context, e));
+      if (!silent) setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) setState(() => _loading = false);
     }
   }
 
   Future<void> _confirm(PendingReconciliationLine line) async {
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
+    // The PIN lives in this dialog, not a separate step afterward — confirming genuinely proves
+    // it was this agent, the same reasoning a collection's own PIN entry exists for, so it belongs
+    // right alongside the "are you sure" prompt rather than a second screen to tap through.
+    final pinController = TextEditingController();
+    final pin = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
         title: Text(l10n.rcConfirmDialogTitle),
-        content: Text(l10n.rcConfirmDialogMessage(_fmt(line.totalXaf), line.collectionCount)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.rcConfirmDialogMessage(_fmt(line.totalXaf), line.collectionCount)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinController,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.rcEnterPinToConfirmLabel,
+                prefixIcon: const Icon(Icons.lock_outline),
+                border: const OutlineInputBorder(),
+              ),
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.commonCancel)),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.rcConfirmButton)),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonCancel)),
+          FilledButton(
+            onPressed: () {
+              if (pinController.text.isEmpty) return;
+              Navigator.of(context).pop(pinController.text);
+            },
+            child: Text(l10n.rcConfirmButton),
+          ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (pin == null) return;
 
     setState(() => _confirmingLineId = line.lineId);
     try {
-      await _repository.confirm(line.lineId);
+      await _repository.confirm(line.lineId, pin);
       if (!mounted) return;
       await showSuccessDialog(context, l10n.rcConfirmSuccess);
       _load();
@@ -121,7 +167,7 @@ class _ReconciliationConfirmScreenState extends State<ReconciliationConfirmScree
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  const Icon(Icons.check_circle_outline, color: MicrofiColors.outlineVariant, size: 40),
+                  Icon(Icons.check_circle_outline_rounded, color: MicrofiColors.secondary.withValues(alpha: 0.5), size: 44),
                   const SizedBox(height: 10),
                   Text(l10n.rcEmptyState, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
                 ],
@@ -129,28 +175,44 @@ class _ReconciliationConfirmScreenState extends State<ReconciliationConfirmScree
             )
           else
             ..._lines.map((line) => Padding(
-                  padding: const EdgeInsets.only(bottom: MicrofiSpacing.gap),
+                  padding: const EdgeInsets.only(bottom: MicrofiSpacing.gapLg),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(MicrofiSpacing.card),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: MicrofiColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(MicrofiRadius.md),
-                      border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+                      borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                      boxShadow: MicrofiShadows.soft,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.rcLineSummary(line.collectionCount, _fmt(line.totalXaf)),
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-                        if (line.lastCountedAt != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.rcCountedAt(_date(line.lastCountedAt!), _time(context, line.lastCountedAt!)),
-                            style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
-                          ),
-                        ],
-                        const SizedBox(height: MicrofiSpacing.gap),
+                        Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(color: MicrofiColors.tertiaryFixedDim.withValues(alpha: 0.25), shape: BoxShape.circle),
+                              child: const Icon(Icons.fact_check_outlined, color: MicrofiColors.onTertiaryFixedVariant, size: 19),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(l10n.rcLineSummary(line.collectionCount, _fmt(line.totalXaf)),
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
+                                  if (line.lastCountedAt != null)
+                                    Text(
+                                      l10n.rcCountedAt(_date(line.lastCountedAt!), _time(context, line.lastCountedAt!)),
+                                      style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
                         Row(
                           children: [
                             Expanded(
@@ -160,6 +222,7 @@ class _ReconciliationConfirmScreenState extends State<ReconciliationConfirmScree
                             Expanded(
                               child: FilledButton(
                                 onPressed: _confirmingLineId == line.lineId ? null : () => _confirm(line),
+                                style: FilledButton.styleFrom(backgroundColor: MicrofiColors.secondary),
                                 child: _confirmingLineId == line.lineId
                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                     : Text(l10n.rcConfirmButton),
@@ -213,27 +276,43 @@ class _ReconciliationLineCollectionsScreenState extends State<ReconciliationLine
   List<CollectionSummary> _collections = [];
   bool _loading = true;
   String? _error;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // A cashier or another admin action (a sibling being exported, a rejection approved
+    // elsewhere) can change what belongs in this batch while the agent is still looking at it —
+    // silent, so an agent mid-review isn't interrupted by a loading spinner every tick.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _load(silent: true));
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final collections = await _collectionRepository.listForReconciliationLine(widget.line.lineId);
       if (!mounted) return;
-      setState(() => _collections = collections);
+      setState(() {
+        _collections = collections;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = friendlyErrorMessage(context, e));
+      if (!silent) setState(() => _error = friendlyErrorMessage(context, e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) setState(() => _loading = false);
     }
   }
 
@@ -324,26 +403,36 @@ class _ReconciliationLineCollectionsScreenState extends State<ReconciliationLine
           padding: const EdgeInsets.only(bottom: MicrofiSpacing.gap),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(MicrofiSpacing.card),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: MicrofiColors.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(MicrofiRadius.md),
-              border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+              boxShadow: MicrofiShadows.softSmall,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Text(c.clientName ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(color: MicrofiColors.secondaryContainer, shape: BoxShape.circle),
+                      child: const Icon(Icons.arrow_downward_rounded, color: MicrofiColors.onSecondaryContainer, size: 16),
                     ),
-                    Text('${c.amountXaf} XAF', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(c.clientName ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                          Text('$date • $time', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                    Text('${c.amountXaf} XAF', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
                   ],
                 ),
-                Text('$date • $time', style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
-                const SizedBox(height: MicrofiSpacing.gap),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(onPressed: () => _requestRejection(c), child: Text(l10n.rcRequestRejectionButton)),

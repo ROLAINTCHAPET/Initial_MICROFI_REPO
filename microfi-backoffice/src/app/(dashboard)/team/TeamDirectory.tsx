@@ -75,7 +75,7 @@ export function TeamDirectory({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="relative max-w-sm w-full">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-outline pointer-events-none" />
+          <Icon name="search" className="absolute left-3 inset-y-0 my-auto size-5 text-outline pointer-events-none" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}

@@ -73,20 +73,35 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          Text(l10n.cwMyAccountTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.cwMyAccountTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
-            padding: const EdgeInsets.all(MicrofiSpacing.card),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: MicrofiColors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(MicrofiRadius.md),
-              border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [MicrofiColors.primary, MicrofiColors.primaryContainer],
+              ),
+              boxShadow: MicrofiShadows.soft,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l10n.cwBookletTokenTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: MicrofiColors.primary)),
-                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle),
+                      child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 17),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(l10n.cwBookletTokenTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white)),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 _InfoRow(label: l10n.cwStatusLabel, value: profile.tokenStatus),
                 if (profile.tokenExpiresAt != null) _InfoRow(label: l10n.cwExpiresLabel, value: _fmtDate(profile.tokenExpiresAt!)),
               ],
@@ -97,9 +112,9 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: null,
-              icon: const Icon(Icons.qr_code_2, size: 18),
+              icon: const Icon(Icons.qr_code_2_rounded, size: 18),
               label: Text(l10n.cwRequestWithdrawalComingSoon),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
             ),
           ),
           const SizedBox(height: 8),
@@ -134,8 +149,8 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+          Text(label, style: const TextStyle(fontSize: 13, color: Colors.white70)),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
         ],
       ),
     );

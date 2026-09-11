@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
 import { useDictionary, useLocale } from "@/lib/i18n/I18nProvider";
-import { exportToExcel, exportToPdf, type ExportColumn, type ExportMeta } from "@/lib/export";
+import { exportToExcel, exportToPdf, exportToCsv, type ExportColumn, type ExportMeta } from "@/lib/export";
 
 interface ExportButtonsProps<T> {
   filenameBase: string;
@@ -13,6 +13,8 @@ interface ExportButtonsProps<T> {
   meta: Omit<ExportMeta, "locale">;
   columns: ExportColumn<T>[];
   rows: T[];
+  /** Opt-in third button for exports meant to feed a system (e.g. a CBS batch import) rather than only be read by a person — most export surfaces don't need it. */
+  csv?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ interface ExportButtonsProps<T> {
  * stamps it onto the generated document, so the export always follows the platform's own
  * language rather than the browser's.
  */
-export function ExportButtons<T>({ filenameBase, sheetName, pdfTitle, meta, columns, rows }: ExportButtonsProps<T>) {
+export function ExportButtons<T>({ filenameBase, sheetName, pdfTitle, meta, columns, rows, csv = false }: ExportButtonsProps<T>) {
   const dict = useDictionary();
   const locale = useLocale();
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -56,6 +58,12 @@ export function ExportButtons<T>({ filenameBase, sheetName, pdfTitle, meta, colu
         <Icon name="reports" className="size-4" />
         {dict.export.pdf}
       </Button>
+      {csv && (
+        <Button type="button" variant="ghost" disabled={rows.length === 0} onClick={() => exportToCsv(filenameBase, columns, rows)}>
+          <Icon name="reports" className="size-4" />
+          {dict.export.csv}
+        </Button>
+      )}
     </div>
   );
 }

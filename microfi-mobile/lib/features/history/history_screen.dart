@@ -75,29 +75,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: ListView(
         padding: const EdgeInsets.all(MicrofiSpacing.page),
         children: [
-          Text(l10n.hsCollectionHistoryTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
+          Text(l10n.hsCollectionHistoryTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(MicrofiSpacing.card),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: MicrofiColors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(MicrofiRadius.md),
-              border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [MicrofiColors.secondary, Color(0xFF00483C)],
+              ),
+              boxShadow: MicrofiShadows.soft,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(l10n.histTotalCollectedThisMonth, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(_fmt(_thisMonthTotal), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-                    const SizedBox(width: 5),
-                    const Text('XAF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant)),
-                  ],
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
+                  child: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.histTotalCollectedThisMonth, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(_fmt(_thisMonthTotal), style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: Colors.white)),
+                          const SizedBox(width: 5),
+                          Text('XAF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.85))),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -108,43 +125,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  const Icon(Icons.receipt_long, color: MicrofiColors.outlineVariant, size: 40),
+                  Icon(Icons.receipt_long_rounded, color: MicrofiColors.outline.withValues(alpha: 0.6), size: 40),
                   const SizedBox(height: 10),
                   Text(l10n.hsNoCollectionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
                 ],
               ),
             )
           else
-            ..._collections.map((c) {
-              final time = TimeOfDay.fromDateTime(c.collectedAt.toLocal()).format(context);
-              final date = '${c.collectedAt.toLocal().day}/${c.collectedAt.toLocal().month}/${c.collectedAt.toLocal().year}';
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(color: MicrofiColors.secondaryContainer, shape: BoxShape.circle),
-                      child: const Icon(Icons.arrow_downward, color: MicrofiColors.onSecondaryContainer, size: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(c.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-                          Text(l10n.histDateTimeCashLine(date, time), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
-                          if (c.locationName != null)
-                            Text(c.locationName!, style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    Text(l10n.hsAmountCollectedPlus(_fmt(c.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+            Container(
+              decoration: BoxDecoration(
+                color: MicrofiColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                boxShadow: MicrofiShadows.soft,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                children: [
+                  for (int i = 0; i < _collections.length; i++) ...[
+                    Builder(builder: (context) {
+                      final c = _collections[i];
+                      final time = TimeOfDay.fromDateTime(c.collectedAt.toLocal()).format(context);
+                      final date = '${c.collectedAt.toLocal().day}/${c.collectedAt.toLocal().month}/${c.collectedAt.toLocal().year}';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(color: MicrofiColors.secondaryContainer, shape: BoxShape.circle),
+                              child: const Icon(Icons.arrow_downward_rounded, color: MicrofiColors.onSecondaryContainer, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(c.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+                                  Text(l10n.histDateTimeCashLine(date, time), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
+                                  if (c.locationName != null)
+                                    Text(c.locationName!, style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                ],
+                              ),
+                            ),
+                            Text(l10n.hsAmountCollectedPlus(_fmt(c.amountXaf)), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
+                          ],
+                        ),
+                      );
+                    }),
+                    if (i < _collections.length - 1) Divider(height: 1, indent: 58, color: MicrofiColors.outlineVariant.withValues(alpha: 0.5)),
                   ],
-                ),
-              );
-            }),
+                ],
+              ),
+            ),
         ],
       ),
     );

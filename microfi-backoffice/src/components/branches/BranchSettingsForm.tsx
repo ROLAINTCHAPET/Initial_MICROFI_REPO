@@ -30,6 +30,7 @@ export function BranchSettingsForm({
   maxCashiers,
   requireImei,
   defaultCeilingPct,
+  requireClientActivation,
   onCancel,
   onSaved,
 }: {
@@ -41,6 +42,7 @@ export function BranchSettingsForm({
   maxCashiers: number;
   requireImei: boolean;
   defaultCeilingPct: number;
+  requireClientActivation: boolean;
   onCancel?: () => void;
   onSaved?: () => void;
 }) {
@@ -54,6 +56,7 @@ export function BranchSettingsForm({
   const [maxCashiersValue, setMaxCashiersValue] = useState(String(maxCashiers));
   const [requireImeiValue, setRequireImeiValue] = useState(requireImei);
   const [defaultCeilingPctValue, setDefaultCeilingPctValue] = useState(String(defaultCeilingPct));
+  const [requireClientActivationValue, setRequireClientActivationValue] = useState(requireClientActivation);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
@@ -103,6 +106,15 @@ export function BranchSettingsForm({
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ defaultCeilingPct: Number(defaultCeilingPctValue) }),
+          })
+        );
+      }
+      if (requireClientActivationValue !== requireClientActivation) {
+        requests.push(
+          fetch(`/api/branches/${branchId}/require-client-activation`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requireClientActivation: requireClientActivationValue }),
           })
         );
       }
@@ -207,6 +219,21 @@ export function BranchSettingsForm({
           <p className="text-sm font-semibold text-on-surface">{dict.branches.settingsForm.requireImeiLabel}</p>
           <p className="text-xs text-on-surface-variant mt-1">
             {dict.branches.settingsForm.requireImeiHint}
+          </p>
+        </label>
+      </div>
+      <div className="flex items-start gap-3 p-3 rounded-[var(--radius-sm)] border-2 border-outline-variant">
+        <input
+          id="require-client-activation"
+          type="checkbox"
+          checked={requireClientActivationValue}
+          onChange={(e) => setRequireClientActivationValue(e.target.checked)}
+          className="mt-0.5 size-4 cursor-pointer accent-primary"
+        />
+        <label htmlFor="require-client-activation" className="cursor-pointer">
+          <p className="text-sm font-semibold text-on-surface">{dict.branches.settingsForm.requireClientActivationLabel}</p>
+          <p className="text-xs text-on-surface-variant mt-1">
+            {dict.branches.settingsForm.requireClientActivationHint}
           </p>
         </label>
       </div>

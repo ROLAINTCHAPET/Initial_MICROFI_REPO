@@ -10,7 +10,6 @@ import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
-import com.microfi.authentication.repository.TerminalRepository;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.AgentPasswordResetService;
 import com.microfi.authentication.service.JwtService;
@@ -53,7 +52,6 @@ public class AuthenticationController {
     private final PasswordEncoder passwordEncoder;
     private final AuthEventPublisher authEventPublisher;
     private final BranchRepository branchRepository;
-    private final TerminalRepository terminalRepository;
     private final TerminalService terminalService;
     private final AuditService auditService;
 
@@ -105,31 +103,28 @@ public class AuthenticationController {
 
                     Branch branch = branchRepository.findById(agent.getBranchId()).orElse(null);
 
-                    // Device recognition (FR-01, BR-Auth-02). A device/terminal is a property of
-                    // the system, not of any one agent: once a device has been used successfully
-                    // once, by anyone, it's recognized and any agent may use it from then on.
-                    // Three cases:
+                    // Device recognition (FR-01, BR-Auth-02). Strictly one agent, one device: once
+                    // bound, an agent may only log in from that exact device again — a device being
+                    // "known" to the system (used successfully by some other agent before) is not
+                    // enough to let a different, already-bound agent onto it. Two cases:
                     //  - agent has logged in before, same device as last time (agent.imei matches):
-                    //    always fine — no registry lookup needed. This also keeps every already-
-                    //    bound agent's routine login working on day one, before their existing
-                    //    device has ever been explicitly recorded in the new Terminal table.
-                    //  - agent has logged in before, different device: the new device must already
-                    //    be a recognized terminal — used successfully by anyone, including this
-                    //    agent, before — regardless of the branch's current requireImei setting (a
-                    //    branch turning the requirement off later doesn't retroactively loosen an
-                    //    already-active agent). Otherwise reject; an admin must resetDeviceBinding
-                    //    to let this agent bootstrap a new terminal.
+                    //    always fine.
+                    //  - agent has logged in before, different device: always rejected, regardless
+                    //    of whether that device has ever been seen before, by anyone. An admin must
+                    //    explicitly resetDeviceBinding to let this agent bootstrap a new device.
                     //  - agent has never logged in before, branch requires a device: this login
-                    //    bootstraps the terminal registry with whatever device sent it, so long as
-                    //    one was actually sent — even if the system has never seen it before.
-                    //    (If the branch doesn't require a device, skip entirely.)
+                    //    binds whatever device sent it, so long as one was actually sent — even if
+                    //    the system has never seen it before. (If the branch doesn't require a
+                    //    device, skip entirely.)
+                    // The Terminal registry itself (TerminalService#recognize) is kept purely as a
+                    // first-seen/last-seen audit record — e.g. spotting the same physical device
+                    // later reused across two unrelated agents' accounts after a binding reset —
+                    // it never again grants access on its own.
                     boolean requiresImei = branch != null && branch.effectiveRequireImei();
                     boolean recognizeDeviceNow = false;
                     if (agent.getImei() != null) {
                         boolean sameDeviceAsLastTime = agent.getImei().equals(request.getImei());
-                        boolean knownTerminal = sameDeviceAsLastTime
-                                || (request.getImei() != null && terminalRepository.findByDeviceId(request.getImei()).isPresent());
-                        if (!knownTerminal) {
+                        if (!sameDeviceAsLastTime) {
                             authEventPublisher.publishFailure(request.getUsername(), request.getImei());
                             auditAgentLogin(agent, request.getUsername(), "LOGIN_FAILED_UNRECOGNIZED_DEVICE");
                             return Mono.error(new InvalidCredentialsException("Device IMEI does not match registered device"));

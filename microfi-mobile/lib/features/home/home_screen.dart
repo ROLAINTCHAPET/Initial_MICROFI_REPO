@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../core/animated_entrance.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
 import '../../core/dialogs.dart';
 import '../../core/local_ceiling_cache.dart';
+import '../../core/local_geofence_cache.dart';
+import '../../core/local_schedule_cache.dart';
 import '../../core/location.dart';
 import '../../core/receipt_context_cache.dart';
 import '../../core/status_components.dart';
@@ -19,6 +22,7 @@ import '../history/history_screen.dart';
 import '../route/route_screen.dart';
 import 'agent_profile.dart';
 import 'branch_notice_repository.dart';
+import 'broadcast_repository.dart';
 import 'branch_repository.dart';
 import 'collection_rejection_notification_cache.dart';
 import 'contact_branch.dart';
@@ -62,6 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _dismissedNoticeId;
   Timer? _noticePollTimer;
 
+  BroadcastMessage? _bannerBroadcast;
+  String? _dismissedBroadcastId;
+  Timer? _broadcastPollTimer;
+
   int _pendingConfirmationCount = 0;
   int _pendingConfirmationTotalXaf = 0;
   Timer? _confirmationPollTimer;
@@ -93,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _connectivitySub?.cancel();
     _sosPollTimer?.cancel();
     _noticePollTimer?.cancel();
+    _broadcastPollTimer?.cancel();
     _confirmationPollTimer?.cancel();
     _rejectionDecisionPollTimer?.cancel();
     _exportablePollTimer?.cancel();
@@ -120,11 +129,15 @@ class _HomeScreenState extends State<HomeScreen> {
         _pendingCount = pending.length;
       });
       LocalCeilingCache(profile.id).save(effectiveCeilingXaf: escrow.effectiveCeilingXaf, cumulativeTodayXaf: escrow.cumulativeTodayXaf);
+      unawaited(_refreshGeofenceCache(profile.id));
+      unawaited(_refreshScheduleCache(profile.id));
       unawaited(_reportSyncStatusBestEffort(profile.id, pending.length));
       _refreshReceiptContext();
       _checkSosStatus();
       _checkBranchNotices();
       _noticePollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkBranchNotices());
+      _checkBroadcasts();
+      _broadcastPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkBroadcasts());
       _checkPendingConfirmations();
       _confirmationPollTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPendingConfirmations());
       _checkRejectionDecisions();
@@ -214,6 +227,29 @@ class _HomeScreenState extends State<HomeScreen> {
       await _repository.reportSyncStatus(agentId, pendingCount);
     } catch (_) {
       // Retried on the next _load() (app resume, connectivity change, or post-sync reload).
+    }
+  }
+
+  /// Keeps LocalGeofenceCache fresh so an offline collection has something recent to check
+  /// against — a failed fetch here just leaves the previous snapshot in place, same
+  /// best-effort reasoning as [_reportSyncStatusBestEffort].
+  Future<void> _refreshGeofenceCache(String agentId) async {
+    try {
+      final geofence = await _repository.fetchGeofence();
+      await LocalGeofenceCache(agentId).save(geofence);
+    } catch (_) {
+      // Retried on the next _load().
+    }
+  }
+
+  /// Keeps LocalScheduleCache fresh so an offline collection has something recent to check
+  /// against — same best-effort reasoning as [_refreshGeofenceCache].
+  Future<void> _refreshScheduleCache(String agentId) async {
+    try {
+      final branch = await BranchRepository(widget.token).fetchMyBranch();
+      await LocalScheduleCache(agentId).save(openTime: branch.openTime, closeTime: branch.closeTime);
+    } catch (_) {
+      // Retried on the next _load().
     }
   }
 
@@ -326,6 +362,23 @@ class _HomeScreenState extends State<HomeScreen> {
       final latest = notices.first;
       if (latest.id == _dismissedNoticeId) return;
       setState(() => _bannerNotice = latest);
+    } catch (_) {
+      // Best-effort — silently retried on the next poll/screen load.
+    }
+  }
+
+  // ADMIN/BRANCH_MANAGER announcement to every agent — same no-push-infrastructure reasoning as
+  // branch notices, just a distinct message type (and distinct dismiss-tracking) so dismissing
+  // one never hides the other.
+  Future<void> _checkBroadcasts() async {
+    final profile = _profile;
+    if (profile == null) return;
+    try {
+      final broadcasts = await BroadcastRepository(widget.token).listMine();
+      if (!mounted || broadcasts.isEmpty) return;
+      final latest = broadcasts.first;
+      if (latest.id == _dismissedBroadcastId) return;
+      setState(() => _bannerBroadcast = latest);
     } catch (_) {
       // Best-effort — silently retried on the next poll/screen load.
     }
@@ -454,6 +507,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _dismissBroadcast() {
+    final broadcast = _bannerBroadcast;
+    if (broadcast == null) return;
+    setState(() {
+      _dismissedBroadcastId = broadcast.id;
+      _bannerBroadcast = null;
+    });
+  }
+
   void _startSosPolling() {
     _sosPollTimer?.cancel();
     _sosPollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _checkSosStatus());
@@ -485,141 +547,255 @@ class _HomeScreenState extends State<HomeScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(MicrofiSpacing.page),
+        padding: const EdgeInsets.fromLTRB(MicrofiSpacing.page, MicrofiSpacing.page, MicrofiSpacing.page, MicrofiSpacing.page + 8),
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: MicrofiColors.surfaceContainerHigh,
-                child: Text(
-                  profile.fullName.isNotEmpty ? profile.fullName[0].toUpperCase() : '?',
-                  style: const TextStyle(color: MicrofiColors.primary, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(profile.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: MicrofiColors.primary)),
-                    const SizedBox(height: 1),
-                    Text(profile.employeeCode, style: const TextStyle(fontSize: 12, color: MicrofiColors.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _SosButton(sending: _sendingSos, onTap: _sendSos),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Align(alignment: Alignment.centerLeft, child: _StatusPill(status: profile.status)),
+          _HomeHeader(profile: profile, sendingSos: _sendingSos, onSos: _sendSos),
           const SizedBox(height: MicrofiSpacing.gapLg),
           if (_pendingSos != null) ...[
-            _SosPendingBanner(),
+            FadeSlideIn(child: _SosPendingBanner()),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_bannerNotice != null) ...[
-            _BranchNoticeBanner(notice: _bannerNotice!, onDismiss: _dismissBranchNotice),
+            FadeSlideIn(child: _BranchNoticeBanner(notice: _bannerNotice!, onDismiss: _dismissBranchNotice)),
+            const SizedBox(height: MicrofiSpacing.gapLg),
+          ],
+          if (_bannerBroadcast != null) ...[
+            FadeSlideIn(child: _BroadcastBanner(broadcast: _bannerBroadcast!, onDismiss: _dismissBroadcast)),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_pendingConfirmationCount > 0) ...[
-            _PendingConfirmationBanner(count: _pendingConfirmationCount, onTap: _openPendingConfirmations),
+            FadeSlideIn(child: _PendingConfirmationBanner(count: _pendingConfirmationCount, onTap: _openPendingConfirmations)),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_exportableCount > 0) ...[
-            _EndDayBanner(count: _exportableCount, totalXaf: _exportableTotalXaf, sending: _endingDay, onTap: _endingDay ? null : _endMyDay),
+            FadeSlideIn(child: _EndDayBanner(count: _exportableCount, totalXaf: _exportableTotalXaf, sending: _endingDay, onTap: _endingDay ? null : _endMyDay)),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
           if (_pendingCount > 0) ...[
-            OfflineBanner(
-              pendingCount: _pendingCount,
-              syncing: _syncing,
-              onSyncNow: _online ? _syncNow : null,
+            FadeSlideIn(
+              child: OfflineBanner(
+                pendingCount: _pendingCount,
+                syncing: _syncing,
+                onSyncNow: _online ? _syncNow : null,
+              ),
             ),
             const SizedBox(height: MicrofiSpacing.gapLg),
           ],
-          if (escrow != null) _CeilingGaugeCard(escrow: escrow, pendingConfirmationTotalXaf: _pendingConfirmationTotalXaf),
+          if (escrow != null)
+            FadeSlideIn(child: _CeilingGaugeCard(escrow: escrow, pendingConfirmationTotalXaf: _pendingConfirmationTotalXaf)),
           const SizedBox(height: MicrofiSpacing.gapLg),
-          SizedBox(
-            width: double.infinity,
-            height: 64,
-            child: FilledButton(
-              onPressed: _collectCash,
-              style: FilledButton.styleFrom(
-                backgroundColor: MicrofiColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+          _PrimaryCtaButton(icon: Icons.add_circle_rounded, label: l10n.hsNewCollection, onTap: _collectCash),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: Divider(color: MicrofiColors.outlineVariant.withValues(alpha: 0.6))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  l10n.hsQuickActionsSectionLabel,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.6),
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add_circle, size: 20, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(l10n.hsNewCollection, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                ],
+              Expanded(child: Divider(color: MicrofiColors.outlineVariant.withValues(alpha: 0.6))),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.map_rounded,
+                  label: l10n.hsMyRoute,
+                  accent: MicrofiColors.primary,
+                  onTap: _openMyRoute,
+                ),
               ),
-            ),
+              const SizedBox(width: MicrofiSpacing.gapLg),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.history_rounded,
+                  label: l10n.hsQuickActionHistory,
+                  accent: MicrofiColors.secondary,
+                  onTap: _openHistory,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: MicrofiSpacing.gapLg),
           Row(
             children: [
-              Expanded(child: _QuickAction(icon: Icons.map, label: l10n.hsMyRoute, onTap: _openMyRoute)),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.how_to_reg_rounded,
+                  label: l10n.hsSponsorClientActivation,
+                  accent: MicrofiColors.onTertiaryFixedVariant,
+                  onTap: _openSponsorActivation,
+                ),
+              ),
               const SizedBox(width: MicrofiSpacing.gapLg),
-              Expanded(child: _QuickAction(icon: Icons.history, label: l10n.hsQuickActionHistory, onTap: _openHistory)),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.call_rounded,
+                  label: l10n.commonContactBranch,
+                  accent: MicrofiColors.secondary,
+                  onTap: () => contactBranch(context, widget.token),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: MicrofiSpacing.gap),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _openSponsorActivation,
-              icon: const Icon(Icons.how_to_reg, size: 16),
-              label: Text(l10n.hsSponsorClientActivation, style: const TextStyle(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: MicrofiColors.primary,
-                side: const BorderSide(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
-              ),
-            ),
-          ),
-          const SizedBox(height: MicrofiSpacing.gap),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => contactBranch(context, widget.token),
-              icon: const Icon(Icons.call, size: 16),
-              label: Text(l10n.commonContactBranch, style: const TextStyle(fontSize: 13)),
-              style: FilledButton.styleFrom(
-                backgroundColor: MicrofiColors.secondary,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MicrofiRadius.md)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.hsRecentCollections, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
-              TextButton(onPressed: _openHistory, child: Text(l10n.hsSeeAll, style: const TextStyle(fontSize: 13))),
+              Text(l10n.hsRecentCollections, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
+              TextButton(onPressed: _openHistory, child: Text(l10n.hsSeeAll, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
             ],
           ),
-          const Divider(color: MicrofiColors.outlineVariant, height: 1),
-          if (_recent.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(l10n.hsNoCollectionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
-            )
-          else
-            ..._recent.map((c) => _RecentCollectionRow(collection: c)),
+          const SizedBox(height: 4),
+          Container(
+            decoration: BoxDecoration(
+              color: MicrofiColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+              boxShadow: MicrofiShadows.soft,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _recent.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 28),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.savings_outlined, size: 30, color: MicrofiColors.outline.withValues(alpha: 0.6)),
+                          const SizedBox(height: 8),
+                          Text(l10n.hsNoCollectionsRecorded, style: const TextStyle(fontSize: 13, color: MicrofiColors.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < _recent.length; i++) ...[
+                        _RecentCollectionRow(collection: _recent[i]),
+                        if (i < _recent.length - 1)
+                          Divider(height: 1, indent: 58, color: MicrofiColors.outlineVariant.withValues(alpha: 0.5)),
+                      ],
+                    ],
+                  ),
+          ),
         ],
       ),
     );
   }
 }
 
+/// The friendlier "hero" replacement for the old plain avatar+name row — a soft navy-to-container
+/// gradient card carrying the greeting, employee code, live status pill and the SOS button, so the
+/// very top of Home reads as a welcome rather than a data row.
+class _HomeHeader extends StatelessWidget {
+  final AgentProfile profile;
+  final bool sendingSos;
+  final VoidCallback onSos;
+
+  const _HomeHeader({required this.profile, required this.sendingSos, required this.onSos});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final active = profile.status == 'ACTIVE';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [MicrofiColors.primary, MicrofiColors.primaryContainer],
+        ),
+        boxShadow: MicrofiShadows.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: Text(
+                  profile.fullName.isNotEmpty ? profile.fullName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: MicrofiColors.primary, fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.hsGreeting,
+                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75), fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      profile.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _SosButton(sending: sendingSos, onTap: onSos),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(MicrofiRadius.full),
+                ),
+                child: Text(profile.employeeCode, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(MicrofiRadius.full),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(color: active ? MicrofiColors.secondaryFixed : MicrofiColors.errorContainer, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      active ? l10n.hsStatusActive : l10n.hsStatusSuspended,
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The main "count cash → escrow ceiling" summary — elevated with a soft shadow (rather than a
+/// hard outline) and a rounder gradient-filled gauge so it reads as this screen's centerpiece.
 class _CeilingGaugeCard extends StatelessWidget {
   final EscrowStatus escrow;
   // escrow.cumulativeTodayXaf combines two different things that occupy the escrow ceiling for
@@ -636,11 +812,11 @@ class _CeilingGaugeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
-      padding: const EdgeInsets.all(MicrofiSpacing.card + 2),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: MicrofiColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: MicrofiShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,27 +825,42 @@ class _CeilingGaugeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.hsTodaysCollections, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.4)),
-                  const SizedBox(height: 3),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    margin: const EdgeInsets.only(top: 2, right: 10),
+                    decoration: BoxDecoration(
+                      color: MicrofiColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: MicrofiColors.primary, size: 19),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_fmt(escrow.cumulativeTodayXaf), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
-                      const SizedBox(width: 5),
-                      const Text('XAF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MicrofiColors.primaryContainer)),
+                      Text(l10n.hsTodaysCollections, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MicrofiColors.onSurfaceVariant, letterSpacing: 0.4)),
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(_fmt(escrow.cumulativeTodayXaf), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800, color: MicrofiColors.primary)),
+                          const SizedBox(width: 5),
+                          const Text('XAF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MicrofiColors.primaryContainer)),
+                        ],
+                      ),
+                      if (pendingConfirmationTotalXaf > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          AppLocalizations.of(context)!.hsOfWhichAwaitingConfirmation(_fmt(pendingConfirmationTotalXaf)),
+                          style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
+                        ),
+                      ],
                     ],
                   ),
-                  if (pendingConfirmationTotalXaf > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      AppLocalizations.of(context)!.hsOfWhichAwaitingConfirmation(_fmt(pendingConfirmationTotalXaf)),
-                      style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant),
-                    ),
-                  ],
                 ],
               ),
               Column(
@@ -681,7 +872,7 @@ class _CeilingGaugeCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(MicrofiRadius.full),
             child: TweenAnimationBuilder<double>(
@@ -689,9 +880,9 @@ class _CeilingGaugeCard extends StatelessWidget {
               duration: const Duration(milliseconds: 500),
               builder: (context, value, _) => LinearProgressIndicator(
                 value: value,
-                minHeight: 10,
+                minHeight: 12,
                 backgroundColor: MicrofiColors.surfaceContainerHigh,
-                valueColor: AlwaysStoppedAnimation(escrow.nearLimit ? MicrofiColors.error : MicrofiColors.primary),
+                valueColor: AlwaysStoppedAnimation(escrow.nearLimit ? MicrofiColors.error : MicrofiColors.secondary),
               ),
             ),
           ),
@@ -720,34 +911,93 @@ class _CeilingGaugeCard extends StatelessWidget {
   }
 }
 
-class _QuickAction extends StatelessWidget {
+/// The single, unmissable "start a collection" action — deliberately its own widget (rather than
+/// inlined FilledButton styling) so its shadow/gradient treatment reads as clearly the highest
+/// priority thing on the screen, above the quick-action grid below it.
+class _PrimaryCtaButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  const _QuickAction({required this.icon, required this.label, required this.onTap});
+  const _PrimaryCtaButton({required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MicrofiColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(MicrofiRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(MicrofiRadius.md),
-        onTap: onTap,
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(MicrofiRadius.md),
-            border: Border.all(color: MicrofiColors.outlineVariant, width: MicrofiBorders.width),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        boxShadow: [BoxShadow(color: MicrofiColors.secondary.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Material(
+        color: MicrofiColors.secondary,
+        borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+          onTap: onTap,
+          child: Container(
+            height: 62,
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 24, color: Colors.white),
+                const SizedBox(width: 10),
+                Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+              ],
+            ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: MicrofiColors.primary, size: 20),
-              const SizedBox(height: 5),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: MicrofiColors.primary)),
-            ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _QuickAction({required this.icon, required this.label, required this.accent, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: MicrofiColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(MicrofiRadius.md),
+        boxShadow: MicrofiShadows.softSmall,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(MicrofiRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(MicrofiRadius.md),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: accent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: Icon(icon, color: accent, size: 19),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5, color: MicrofiColors.primary),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -765,26 +1015,26 @@ class _RecentCollectionRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final time = TimeOfDay.fromDateTime(collection.collectedAt.toLocal()).format(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 38,
+            height: 38,
             decoration: const BoxDecoration(color: MicrofiColors.secondaryContainer, shape: BoxShape.circle),
-            child: const Icon(Icons.arrow_downward, color: MicrofiColors.onSecondaryContainer, size: 16),
+            child: const Icon(Icons.arrow_downward_rounded, color: MicrofiColors.onSecondaryContainer, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(collection.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.primary)),
+                Text(collection.clientName ?? l10n.hsUnknownClient, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.primary)),
                 Text(l10n.hsTimeCashLine(time), style: const TextStyle(fontSize: 11, color: MicrofiColors.onSurfaceVariant)),
               ],
             ),
           ),
-          Text(l10n.hsAmountCollectedPlus(_fmt(collection.amountXaf)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MicrofiColors.secondary)),
+          Text(l10n.hsAmountCollectedPlus(_fmt(collection.amountXaf)), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: MicrofiColors.secondary)),
         ],
       ),
     );
@@ -801,34 +1051,6 @@ class _RecentCollectionRow extends StatelessWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  final String status;
-
-  const _StatusPill({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final active = status == 'ACTIVE';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: (active ? MicrofiColors.secondary : MicrofiColors.error).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(MicrofiRadius.full),
-        border: Border.all(color: active ? MicrofiColors.secondary : MicrofiColors.error),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? MicrofiColors.secondary : MicrofiColors.error, shape: BoxShape.circle)),
-          const SizedBox(width: 5),
-          Text(active ? l10n.hsStatusActive : l10n.hsStatusSuspended, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? MicrofiColors.secondary : MicrofiColors.error)),
-        ],
-      ),
-    );
-  }
-}
-
 /// UC-15 — a same-day schedule change surfaced here since there's no push channel to rely on;
 /// dismissible since, unlike the SOS banner, there's nothing further for the agent to do about it.
 class _BranchNoticeBanner extends StatelessWidget {
@@ -839,31 +1061,46 @@ class _BranchNoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: MicrofiColors.secondaryContainer,
-        borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+    return _AlertBanner(
+      icon: Icons.info_outline_rounded,
+      background: MicrofiColors.secondaryContainer,
+      foreground: MicrofiColors.onSecondaryContainer,
+      message: notice.message,
+      trailing: InkWell(
+        onTap: onDismiss,
+        borderRadius: BorderRadius.circular(MicrofiRadius.full),
+        child: const Padding(
+          padding: EdgeInsets.all(2),
+          child: Icon(Icons.close_rounded, color: MicrofiColors.onSecondaryContainer, size: 18),
+        ),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: MicrofiColors.onSecondaryContainer, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              notice.message,
-              style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onSecondaryContainer, fontWeight: FontWeight.w600),
-            ),
-          ),
-          InkWell(
-            onTap: onDismiss,
-            borderRadius: BorderRadius.circular(MicrofiRadius.full),
-            child: const Padding(
-              padding: EdgeInsets.all(2),
-              child: Icon(Icons.close, color: MicrofiColors.onSecondaryContainer, size: 16),
-            ),
-          ),
-        ],
+    );
+  }
+}
+
+/// An ADMIN/BRANCH_MANAGER announcement — distinct message type from a branch notice (network-wide
+/// or branch-scoped, sender-authored rather than an automatic schedule-change record), so it gets
+/// its own icon/color even though the banner shape and dismiss behavior are identical.
+class _BroadcastBanner extends StatelessWidget {
+  final BroadcastMessage broadcast;
+  final VoidCallback onDismiss;
+
+  const _BroadcastBanner({required this.broadcast, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return _AlertBanner(
+      icon: Icons.campaign_outlined,
+      background: MicrofiColors.primaryContainer,
+      foreground: MicrofiColors.onPrimary,
+      message: broadcast.message,
+      trailing: InkWell(
+        onTap: onDismiss,
+        borderRadius: BorderRadius.circular(MicrofiRadius.full),
+        child: const Padding(
+          padding: EdgeInsets.all(2),
+          child: Icon(Icons.close_rounded, color: MicrofiColors.onPrimary, size: 18),
+        ),
       ),
     );
   }
@@ -880,29 +1117,13 @@ class _PendingConfirmationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return InkWell(
+    return _AlertBanner(
+      icon: Icons.fact_check_outlined,
+      background: MicrofiColors.tertiaryFixed,
+      foreground: MicrofiColors.onTertiaryFixedVariant,
+      message: l10n.hsPendingConfirmationBanner(count),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(MicrofiRadius.sm),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: MicrofiColors.tertiaryFixed,
-          borderRadius: BorderRadius.circular(MicrofiRadius.sm),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.fact_check_outlined, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                l10n.hsPendingConfirmationBanner(count),
-                style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onTertiaryFixedVariant, fontWeight: FontWeight.w600),
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: MicrofiColors.onTertiaryFixedVariant, size: 18),
-          ],
-        ),
-      ),
+      trailing: const Icon(Icons.chevron_right_rounded, color: MicrofiColors.onTertiaryFixedVariant, size: 20),
     );
   }
 }
@@ -920,32 +1141,15 @@ class _EndDayBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return InkWell(
+    return _AlertBanner(
+      icon: Icons.cloud_upload_outlined,
+      background: MicrofiColors.secondaryFixed,
+      foreground: MicrofiColors.onSecondaryFixedVariant,
+      message: l10n.hsEndDayBanner(count, _fmt(totalXaf)),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(MicrofiRadius.sm),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: MicrofiColors.secondaryFixed,
-          borderRadius: BorderRadius.circular(MicrofiRadius.sm),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.cloud_upload_outlined, color: MicrofiColors.onSecondaryFixedVariant, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                l10n.hsEndDayBanner(count, _fmt(totalXaf)),
-                style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onSecondaryFixedVariant, fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (sending)
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: MicrofiColors.onSecondaryFixedVariant))
-            else
-              const Icon(Icons.chevron_right, color: MicrofiColors.onSecondaryFixedVariant, size: 18),
-          ],
-        ),
-      ),
+      trailing: sending
+          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: MicrofiColors.onSecondaryFixedVariant))
+          : const Icon(Icons.chevron_right_rounded, color: MicrofiColors.onSecondaryFixedVariant, size: 20),
     );
   }
 
@@ -966,25 +1170,62 @@ class _SosPendingBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
+    return _AlertBanner(
+      icon: Icons.emergency_rounded,
+      background: MicrofiColors.errorContainer,
+      foreground: MicrofiColors.onErrorContainer,
+      message: AppLocalizations.of(context)!.hsSosPendingBanner,
+    );
+  }
+}
+
+/// Shared visual family for every Home banner — colored icon disc + message (+ optional trailing
+/// action/spinner), softly elevated and rounded so the whole stack of alerts reads as one
+/// consistent language instead of five differently-styled flat containers.
+class _AlertBanner extends StatelessWidget {
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final String message;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _AlertBanner({
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    required this.message,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: MicrofiColors.errorContainer,
-        borderRadius: BorderRadius.circular(MicrofiRadius.sm),
+        color: background,
+        borderRadius: BorderRadius.circular(MicrofiRadius.md),
+        boxShadow: MicrofiShadows.softSmall,
       ),
       child: Row(
         children: [
-          const Icon(Icons.emergency, color: MicrofiColors.onErrorContainer, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              AppLocalizations.of(context)!.hsSosPendingBanner,
-              style: const TextStyle(fontSize: 12.5, color: MicrofiColors.onErrorContainer, fontWeight: FontWeight.w600),
-            ),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+            child: Icon(icon, color: foreground, size: 18),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message, style: TextStyle(fontSize: 12.5, color: foreground, fontWeight: FontWeight.w600)),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 6), trailing!],
         ],
       ),
     );
+    if (onTap == null) return content;
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(MicrofiRadius.md), child: content);
   }
 }
 
@@ -996,19 +1237,26 @@ class _SosButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MicrofiColors.error,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: sending ? null : onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Center(
-            child: sending
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.emergency, color: Colors.white, size: 20),
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 3))],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+      ),
+      child: Material(
+        color: MicrofiColors.error,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: sending ? null : onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: sending
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.emergency_rounded, color: Colors.white, size: 21),
+            ),
           ),
         ),
       ),

@@ -3,9 +3,9 @@ services:
     image: postgres:16
     container_name: microfi_postgres
     environment:
-      POSTGRES_USER: microfi
-      POSTGRES_PASSWORD: microfi_password
-      POSTGRES_DB: microfi
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "15432:5432"
     volumes:
@@ -26,8 +26,8 @@ services:
     image: rabbitmq:3-management
     container_name: microfi_rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: microfi
-      RABBITMQ_DEFAULT_PASS: microfi_password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
       - "15673:5672"
       - "25672:15672"
@@ -41,9 +41,9 @@ services:
       dockerfile: Dockerfile
     container_name: microfi_core
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/microfi
-      - SPRING_DATASOURCE_USERNAME=microfi
-      - SPRING_DATASOURCE_PASSWORD=microfi_password
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
@@ -55,8 +55,8 @@ services:
       # exactly why it went unnoticed rather than erroring loudly.
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
-      - SPRING_RABBITMQ_USERNAME=microfi
-      - SPRING_RABBITMQ_PASSWORD=microfi_password
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
       # How long POST /collections and /collections/sync will wait for
@@ -70,17 +70,17 @@ services:
       - MIDDLEWARE_BASE_URL=http://microfi-middleware:8081
       # First ADMIN account, created once at startup if none exists yet (see AdminBootstrapRunner).
       # Change these before any real deployment.
-      - ADMIN_BOOTSTRAP_LOGIN=admin
-      - ADMIN_BOOTSTRAP_PASSWORD=ChangeMe123!
+      - ADMIN_BOOTSTRAP_LOGIN=${ADMIN_BOOTSTRAP_LOGIN}
+      - ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
       # UC-09/FR-09 SMS gateway (POST /collections/{id}/notify). Unset client id/secret = every
       # send fails gracefully (logged as FAILED) rather than the app failing to start.
       - SMS_VENDOR=orange
-      # - ORANGE_SMS_CLIENT_ID=
-      # - ORANGE_SMS_CLIENT_SECRET=
-      # - ORANGE_SMS_SENDER_ADDRESS=
-      # - MTN_SMS_CLIENT_ID=
-      # - MTN_SMS_CLIENT_SECRET=
-      # - MTN_SMS_SENDER_ADDRESS=
+      # - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
+      # - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+      # - ORANGE_SMS_SENDER_ADDRESS=${ORANGE_SMS_SENDER_ADDRESS}
+      # - MTN_SMS_CLIENT_ID=${MTN_SMS_CLIENT_ID}
+      # - MTN_SMS_CLIENT_SECRET=${MTN_SMS_CLIENT_SECRET}
+      # - MTN_SMS_SENDER_ADDRESS=${MTN_SMS_SENDER_ADDRESS}
       # Compliance-gated registration document uploads (DocumentStorageService) — local disk,
       # matching the rest of this self-hosted stack rather than S3/MinIO.
       - REGISTRATION_DOCUMENTS_STORAGE_PATH=/data/registration-documents
@@ -105,9 +105,9 @@ services:
       dockerfile: Dockerfile
     container_name: microfi_middleware
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/microfi
-      - SPRING_DATASOURCE_USERNAME=microfi
-      - SPRING_DATASOURCE_PASSWORD=microfi_password
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
@@ -212,8 +212,8 @@ services:
     image: grafana/grafana:latest
     container_name: microfi_grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       # First-run only — doesn't reset the password on every restart once an admin has changed it.
       - GF_SECURITY_ADMIN_PASSWORD_RESET=false
       # Trace-to-logs correlation (Tempo datasource -> Loki) is a beta panel feature.

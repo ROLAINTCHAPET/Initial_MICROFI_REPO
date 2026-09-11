@@ -64,8 +64,12 @@ class _ClientReceiptScanScreenState extends State<ClientReceiptScanScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(MicrofiRadius.full)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(MicrofiRadius.full),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
                 child: Text(
                   l10n.crsPointCameraInstructions,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -81,8 +85,12 @@ class _ClientReceiptScanScreenState extends State<ClientReceiptScanScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: MicrofiColors.errorContainer, borderRadius: BorderRadius.circular(MicrofiRadius.md)),
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: MicrofiColors.errorContainer,
+                    borderRadius: BorderRadius.circular(MicrofiRadius.lg),
+                    boxShadow: MicrofiShadows.soft,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

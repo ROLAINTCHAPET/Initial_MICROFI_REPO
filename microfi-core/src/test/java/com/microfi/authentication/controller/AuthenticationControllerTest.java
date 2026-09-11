@@ -10,7 +10,6 @@ import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
-import com.microfi.authentication.repository.TerminalRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentPasswordResetService;
 import com.microfi.savings.service.ClientDetailsService;
@@ -78,9 +77,6 @@ class AuthenticationControllerTest {
 
     @MockitoBean
     private BranchRepository branchRepository;
-
-    @MockitoBean
-    private TerminalRepository terminalRepository;
 
     @MockitoBean
     private TerminalService terminalService;
@@ -152,6 +148,28 @@ class AuthenticationControllerTest {
     @Test
     void testLoginInvalidImei() {
         AuthRequest req = new AuthRequest("agt.dupont", "password123", "WRONG_IMEI");
+        Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
+        AgentDetails details = new AgentDetails(agent);
+
+        when(agentDetailsService.findByUsername("agt.dupont")).thenReturn(Mono.just(details));
+        when(passwordEncoder.matches(anyString(), any())).thenReturn(true);
+
+        webTestClient.post()
+                .uri("/api/v1/auth/agent/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    /**
+     * Strictly one agent, one device: a different device being otherwise known to the system
+     * (used successfully by some other agent before) must NOT be enough to let this already-bound
+     * agent onto it — only an explicit admin resetDeviceBinding may let them bootstrap a new one.
+     */
+    @Test
+    void testLoginRejectsRecognizedDeviceThatBelongsToAnotherAgent() {
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "SHARED-BACKUP-PHONE");
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 

@@ -40,6 +40,32 @@ class AgentProfile {
       );
 }
 
+class GeofenceVertex {
+  final double lat;
+  final double lon;
+
+  GeofenceVertex({required this.lat, required this.lon});
+
+  factory GeofenceVertex.fromJson(Map<String, dynamic> json) => GeofenceVertex(
+        lat: (json['lat'] as num).toDouble(),
+        lon: (json['lon'] as num).toDouble(),
+      );
+}
+
+/// The caller's own assigned collection-zone polygon — empty [vertices] means unrestricted, same
+/// convention as the server's GeofenceService#isWithinAssignedGeofence.
+class AgentGeofence {
+  final List<GeofenceVertex> vertices;
+
+  AgentGeofence({required this.vertices});
+
+  factory AgentGeofence.fromJson(Map<String, dynamic> json) => AgentGeofence(
+        vertices: (json['vertices'] as List<dynamic>? ?? [])
+            .map((v) => GeofenceVertex.fromJson(v as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 class EscrowStatus {
   final String agentId;
   final int balanceXaf;

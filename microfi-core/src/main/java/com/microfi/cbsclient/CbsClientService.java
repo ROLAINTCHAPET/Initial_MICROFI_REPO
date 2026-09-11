@@ -5,6 +5,7 @@ import com.microfi.shared.dto.MiddlewareCollectionLine;
 import com.microfi.shared.dto.MiddlewareExportAck;
 import com.microfi.shared.dto.MiddlewareFeeSplit;
 import com.microfi.shared.dto.MiddlewareHistoryEntry;
+import com.microfi.shared.dto.MiddlewareMemberLookup;
 import com.microfi.shared.dto.MiddlewareMemberVerification;
 import com.microfi.shared.dto.MiddlewareTransactionPostResult;
 import com.microfi.shared.dto.MiddlewareTransactionReversalResult;
@@ -78,6 +79,20 @@ public class CbsClientService {
                 .retrieve()
                 .bodyToMono(MiddlewareTransactionReversalResult.class)
                 .doOnError(e -> log.error("Middleware transaction reversal failed for reference {}: {}", reference, e.getMessage()));
+    }
+
+    /**
+     * Background client-mirror sync (ClientCbsSyncJob): looks a member up by their CBS account
+     * number so a local {@code client_profile} row can be reconciled against the real CBS record.
+     * Distinct from {@link #verifyMember}, which resolves an opaque UC-19 activation ID.
+     */
+    public Mono<MiddlewareMemberLookup> getMember(String accountNumber) {
+        return webClient.post()
+                .uri("/mw/v1/members/lookup")
+                .bodyValue(Map.of("accountNumber", accountNumber))
+                .retrieve()
+                .bodyToMono(MiddlewareMemberLookup.class)
+                .doOnError(e -> log.error("Middleware member lookup failed for account {}: {}", accountNumber, e.getMessage()));
     }
 
     /** FR-21: live balance from the CBS. */

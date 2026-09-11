@@ -3,7 +3,9 @@ import 'package:geolocator/geolocator.dart';
 import 'app_shell.dart';
 import 'design_tokens.dart';
 import 'local_ceiling_cache.dart';
+import 'local_geofence_cache.dart';
 import 'local_pin_verifier.dart';
+import 'local_schedule_cache.dart';
 import 'location.dart';
 import 'location_tracking_service.dart';
 import 'session_storage.dart';
@@ -91,6 +93,8 @@ class _SessionEntryState extends State<SessionEntry> {
     if (profile != null) {
       await LocalPinVerifier(profile.id).clear();
       await LocalCeilingCache(profile.id).clear();
+      await LocalGeofenceCache(profile.id).clear();
+      await LocalScheduleCache(profile.id).clear();
     }
     await SessionStorage().clear();
     if (!mounted) return;

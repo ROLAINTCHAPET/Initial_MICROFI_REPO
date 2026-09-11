@@ -3,7 +3,7 @@
 
 export type AdminRole = "ADMIN" | "BRANCH_MANAGER" | "BRANCH_CASHIER";
 export type AgentStatus = "PENDING_CEILING" | "ACTIVE" | "SUSPENDED" | "DELETED";
-export type AdminUserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
+export type AdminUserStatus = "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "DELETED";
 export type ClientStatus = "ACTIVE" | "INACTIVE";
 export type VarianceDebtStatus = "OPEN" | "RESOLVED" | "WRITTEN_OFF";
 export type OfjSessionStatus = "OPEN" | "CLOSED";
@@ -24,6 +24,7 @@ export interface BranchResponse {
   maxCashiers: number;
   requireImei: boolean;
   defaultCeilingPct: number;
+  requireClientActivation: boolean;
 }
 
 export interface ScheduleDefaultsResponse {
@@ -68,6 +69,8 @@ export interface EscrowResponse {
   baseCeilingXaf: number;
   effectiveCeilingXaf: number;
   cumulativeTodayXaf: number;
+  /** True calendar-day sum, display-only — distinct from cumulativeTodayXaf (day-agnostic cash-in-hand for the ceiling gate). */
+  collectedTodayXaf: number;
   activeOverrideReason: string | null;
   overrideValidUntil: string | null;
   updatedAt: string;
@@ -84,6 +87,10 @@ export interface OfjAgentLineResponse {
   resolved: boolean;
   pendingConfirmationCount: number;
   rejectedCount: number;
+  rejectedActualTotalXaf: number;
+  rejectedExpectedTotalXaf: number;
+  confirmedTotalXaf: number;
+  confirmedCount: number;
 }
 
 export interface AdminPendingConfirmationResponse {
@@ -138,6 +145,34 @@ export interface CollectionRejectionRequestResponse {
   hasProof: boolean;
 }
 
+export interface OfjClosingExportAlertResponse {
+  branchId: string;
+  businessDate: string;
+  postedCount: number;
+  exportedAt: string;
+}
+
+export interface AgentMisconductReportResponse {
+  id: string;
+  agentId: string;
+  clientId: string;
+  reason: string;
+  reportedAt: string;
+  status: "PENDING" | "REVIEWED";
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+
+export interface BroadcastMessageResponse {
+  id: string;
+  audience: "CLIENTS" | "AGENTS";
+  branchId: string | null;
+  message: string;
+  senderLabel: string;
+  createdAt: string;
+  recipientCount: number | null;
+}
+
 export interface SosResponse {
   id: string;
   agentId: string;
@@ -154,6 +189,8 @@ export interface CollectionResponse {
   agentId: string;
   clientId: string;
   clientName: string | null;
+  /** Only populated by the bulk multi-client export (GET /admin/clients/collections) — the CBS's own account-number identifier. */
+  clientMfiMemberNo: string | null;
   amountXaf: number;
   locationName: string | null;
   collectedAt: string;
@@ -166,8 +203,14 @@ export interface ClientResponse {
   mfiMemberNo: string;
   fullName: string;
   phone: string;
+  email: string | null;
   branchId: string;
   status: ClientStatus;
+  /** True once an admin/branch-manager has confirmed this row against the real CBS record — there's no automated CBS verification call yet. */
+  cbsSynced: boolean;
+  cbsSyncedAt: string | null;
+  /** Whether this client can already log in (login/PIN set) — never the credentials themselves. */
+  hasCredentials: boolean;
 }
 
 export interface RoutePointResponse {

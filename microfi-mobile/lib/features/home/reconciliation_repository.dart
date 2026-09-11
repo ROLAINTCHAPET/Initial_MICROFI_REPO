@@ -90,9 +90,11 @@ class ReconciliationRepository {
     return json.map((e) => PendingReconciliationLine.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<void> confirm(String lineId) async {
+  /// Requires the agent's own transaction PIN — same check a collection itself requires — so
+  /// confirming genuinely proves it was them, not just whoever is holding an unlocked phone.
+  Future<void> confirm(String lineId, String pin) async {
     final client = ApiClient(token: token);
-    await client.postNoContent('/agents/me/reconciliations/$lineId/confirm');
+    await client.postNoContent('/agents/me/reconciliations/$lineId/confirm', {'pin': pin});
   }
 
   Future<void> requestCollectionRejection(String collectionId, String reason, {int? expectedAmountXaf}) async {

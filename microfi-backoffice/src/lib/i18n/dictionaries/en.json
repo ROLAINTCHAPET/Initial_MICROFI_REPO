@@ -36,6 +36,7 @@
       "SYNCED": "Synced",
       "PENDING": "Pending",
       "PENDING_CEILING": "Pending Ceiling",
+      "PENDING_APPROVAL": "Pending Approval",
       "BLOCKED": "Blocked",
       "ACTIVE": "Active",
       "SUSPENDED": "Suspended",
@@ -68,6 +69,7 @@
   "export": {
     "pdf": "Export PDF",
     "excel": "Export Excel",
+    "csv": "Export CSV",
     "from": "From",
     "to": "To",
     "apply": "Apply",
@@ -84,8 +86,11 @@
     "geolocation": "Geolocation",
     "endOfDayOversight": "End of Day Oversight",
     "sosConsole": "SOS Console",
+    "branches": "Branches",
     "registrations": "Registrations",
     "collectionRejections": "Collection Rejections",
+    "misconductReports": "Misconduct Reports",
+    "broadcasts": "Broadcast Messages",
     "audit": "Audit",
     "settings": "Settings"
   },
@@ -307,15 +312,36 @@
     "colMemberNo": "Member No.",
     "colPhone": "Phone",
     "colStatus": "Status",
+    "colCbsSync": "CBS Sync",
     "exportTitle": "Clients",
     "noClients": "No clients found for this branch.",
     "noMatches": "No clients match this search.",
     "backToClients": "Back to Clients",
+    "createModal": {
+      "title": "Create Client",
+      "recoveryHint": "For a client who already exists in the CBS but never made it into MICROFI — e.g. an automatic refresh missed them. Doesn't create anything in the CBS itself.",
+      "accountNumberLabel": "CBS Account Number",
+      "nameLabel": "Full Name",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "setCredentialsLabel": "Set login credentials now",
+      "setCredentialsHint": "Lets this client log in immediately instead of waiting on self-activation. Leave unchecked to have them set their own login/PIN later.",
+      "loginLabel": "Login",
+      "pinLabel": "PIN",
+      "submit": "Create Client",
+      "created": "Created",
+      "failedToCreate": "Failed to create client",
+      "restrictedMessage": "Creating a client is only available to an Administrator or Branch Manager."
+    },
     "detail": {
       "memberNo": "Member No.",
+      "email": "Email",
       "phone": "Phone",
       "branch": "Branch",
       "status": "Status",
+      "credentials": "Login Credentials Set",
+      "cbsSynced": "CBS Synced",
+      "cbsPending": "Pending CBS Sync",
       "transactionsTitle": "Transactions"
     },
     "transactions": {
@@ -331,7 +357,13 @@
       "reconciled": "Reconciled",
       "notReconciled": "Not yet reconciled",
       "unknownAgent": "Unknown agent",
-      "exportTitle": "Client Transactions"
+      "exportTitle": "Client Transactions",
+      "colClient": "Client",
+      "colAccountNumber": "Account Number",
+      "allClientsTitle": "Export All Clients' Transactions",
+      "allClientsSubtitle": "Every collection for every client in this branch over the chosen period — CSV is formatted for a CBS batch import; Excel/PDF for an audit-ready report.",
+      "exportTitleAllClients": "All Clients' Transactions",
+      "resultSummary": "{count} transaction(s), {value} XAF total"
     }
   },
   "settings": {
@@ -433,12 +465,62 @@
     "decisionReasonPrefix": "Reason: ",
     "allBranchesScope": "All branches"
   },
+  "ofjExportAlerts": {
+    "completedToast": "{branch}: scheduled closing-time export posted {count} collection(s) to the CBS"
+  },
+  "misconductReports": {
+    "subtitle": "A client's report that their agent may have misbehaved, awaiting your review.",
+    "noResults": "No misconduct reports in this filter.",
+    "newReportToast": "New misconduct report about {agent}",
+    "colAgent": "Agent",
+    "colClient": "Reporting Client",
+    "colReason": "Reason",
+    "colReportedAt": "Reported",
+    "colStatus": "Status",
+    "tooltipPending": "{count} misconduct report(s) awaiting review",
+    "tooltipNone": "No misconduct reports awaiting review",
+    "filterAll": "All",
+    "filterPending": "Pending",
+    "filterReviewed": "Reviewed",
+    "markReviewedButton": "Mark Reviewed",
+    "markingReviewed": "Marking reviewed…",
+    "failedToMarkReviewed": "Failed to mark reviewed"
+  },
+  "broadcasts": {
+    "pageSubtitle": "Send an announcement to every client or every agent. It's shown in their app and sent by SMS.",
+    "composeTitle": "Send Broadcast",
+    "audienceLabel": "Send to",
+    "audienceClients": "All Clients",
+    "audienceAgents": "All Agents",
+    "scopeLabel": "Scope",
+    "scopeOwnBranch": "My branch only",
+    "scopeNetworkWide": "Entire network",
+    "scopeOneBranch": "One branch",
+    "branchLabel": "Branch",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Type your announcement…",
+    "sendButton": "Send Broadcast",
+    "sending": "Sending…",
+    "sent": "Broadcast sent to {count} recipient(s)",
+    "failedToSend": "Failed to send broadcast",
+    "historyTitle": "Recent Broadcasts",
+    "noHistory": "No broadcasts sent yet.",
+    "colAudience": "Audience",
+    "colScope": "Scope",
+    "colMessage": "Message",
+    "colSentBy": "Sent By",
+    "colSentAt": "Sent",
+    "colRecipients": "Recipients",
+    "networkWide": "Network-wide"
+  },
   "ofj": {
     "pageTitle": "End of Day Oversight",
     "pageSubtitle": "Digital cash-desk reconciliation, read-only from the Back-Office.",
     "noBranches": "No branches exist yet. Create one first.",
     "awaitingAgentConfirmation": "{count} awaiting agent confirmation",
     "rejectedCollections": "{count} rejected",
+    "rejectedAmountWithExpected": "{actual} XAF recorded, agent says {expected} XAF",
+    "rejectedAmountNoExpected": "{actual} XAF voided",
     "viewingBranch": "Viewing branch",
     "branchFallback": "Branch",
     "reconcileCash": "Reconcile Cash",
@@ -556,7 +638,12 @@
       "suspendAccount": "Suspend Account",
       "reactivateAccount": "Reactivate Account",
       "suspendDescription": "Temporarily block system access.",
-      "reactivateDescription": "Restore this account's access to the system."
+      "reactivateDescription": "Restore this account's access to the system.",
+      "approveAccount": "Approve Account",
+      "approveDescription": "Activate this branch-manager-created account so it can sign in.",
+      "failedToApprove": "Failed to approve account",
+      "awaitingApproval": "Awaiting Admin Approval",
+      "awaitingApprovalDescription": "This account was created by a branch manager and can't sign in until an admin approves it."
     },
     "resetPassword": {
       "failedToReset": "Failed to reset password",
@@ -867,6 +954,9 @@
     }
   },
   "branches": {
+    "pageTitle": "Branches",
+    "pageSubtitle": "Every branch's schedule and configuration, in one place.",
+    "accessDenied": "Only an Administrator or a Branch Manager can view branches.",
     "directory": {
       "filterPlaceholder": "Filter branches…",
       "title": "Branch Directory",
@@ -885,7 +975,8 @@
       "colHours": "Hours",
       "colMaxCashiers": "Max Cashiers",
       "colRequireImei": "Requires Device Binding",
-      "colDefaultCeilingPct": "Default Ceiling %"
+      "colDefaultCeilingPct": "Default Ceiling %",
+      "colRequireClientActivation": "Requires Client Activation"
     },
     "workspace": {
       "scheduleSaved": "New schedule saved"
@@ -903,6 +994,8 @@
       "defaultCeilingHint": "Escrow ceiling granted per XAF of security deposit when an agent's escrow is funded: 100% grants a ceiling equal to the deposit, 150% grants 1.5x. Applies to every future top-up for agents at this branch; a manual waiver or an individual top-up can still be used to adjust any one agent regardless of this default.",
       "requireImeiLabel": "Require a bound device for new agents",
       "requireImeiHint": "Disable if agents at this branch use their own phone to collect. New agents can be enrolled without a bound device. Already-enrolled agents are unaffected.",
+      "requireClientActivationLabel": "Require client activation before collecting",
+      "requireClientActivationHint": "Off by default: an agent can collect cash from any client regardless of activation status. Enable to block collection until a client has completed activation (sponsorship, fee payment, and token issuance).",
       "saved": "Saved",
       "saveSettings": "Save Settings"
     },

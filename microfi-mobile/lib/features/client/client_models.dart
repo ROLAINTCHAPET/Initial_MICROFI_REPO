@@ -73,17 +73,33 @@ class ClientBalance {
 /// ClientHistoryEntry list, which only catches up at end-of-day export.
 class ClientRecentCollection {
   final String id;
+  final String agentId;
   final int amountXaf;
   final String? locationName;
   final DateTime collectedAt;
 
-  ClientRecentCollection({required this.id, required this.amountXaf, required this.locationName, required this.collectedAt});
+  ClientRecentCollection({required this.id, required this.agentId, required this.amountXaf, required this.locationName, required this.collectedAt});
 
   factory ClientRecentCollection.fromJson(Map<String, dynamic> json) => ClientRecentCollection(
         id: json['id'] as String,
+        agentId: json['agentId'] as String,
         amountXaf: (json['amountXaf'] as num).toInt(),
         locationName: json['locationName'] as String?,
         collectedAt: DateTime.parse(json['collectedAt'] as String),
+      );
+}
+
+class ClientBroadcastMessage {
+  final String id;
+  final String message;
+  final DateTime createdAt;
+
+  ClientBroadcastMessage({required this.id, required this.message, required this.createdAt});
+
+  factory ClientBroadcastMessage.fromJson(Map<String, dynamic> json) => ClientBroadcastMessage(
+        id: json['id'] as String,
+        message: json['message'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
       );
 }
 
