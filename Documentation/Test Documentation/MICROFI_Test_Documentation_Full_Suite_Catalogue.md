@@ -4,9 +4,11 @@
 
 **Format:** unlike the card-per-behavior style of the two documents above, this catalogue uses one table per test class: a short paragraph gives the business context (mostly drawn from the production class's own doc comment), then every test method is listed with a one-line statement of what it verifies. Nothing is summarized away — every method name from the source appears.
 
-**Verification status:** `mvn -o test` in `microfi-core` — **662 tests run, all passing** at time of last update (the suite's one known flake, `AgentDirectoryServiceTest.requireWithinScheduleWindowAllowsCollectionInsideWindow`, is a pre-existing real-clock issue unrelated to any work on this branch: it fails only when the suite happens to run within ~2 hours of local midnight, because its open/close window arithmetic wraps past `00:00`). `microfi-middleware`'s suite passes in full.
+**Verification status:** `mvn -o test` in `microfi-core` — **729 tests run, all passing** at time of last update (the suite's one known flake, `AgentDirectoryServiceTest.requireWithinScheduleWindowAllowsCollectionInsideWindow`, is a pre-existing real-clock issue unrelated to any work on this branch: it fails only when the suite happens to run within ~2 hours of local midnight, because its open/close window arithmetic wraps past `00:00`). `microfi-middleware`'s suite passes in full.
 
 **2026-09-08 update — "End My Day" one-way signal fix:** `OfjService.getExportableSummary`/`exportForAgent` had no awareness of `Agent.dayEndedBusinessDate` — if a reconciliation line was confirmed *after* an agent had already tapped "End My Day," the mobile banner would silently reappear. Added `AgentDirectoryService.hasEndedDayToday`, wired into both methods so the action stays gone (client-side, via a zeroed summary) and is rejected server-side (409) if called anyway. See the 6 new tests added to §3 and §7.4 below.
+
+**2026-09-12 update — Offline Field Collection Security Algorithm v1.1:** closes the gap between two outcomes that already existed (login blocked on a device mismatch, admin-only device reset) and the structural mechanism the spec requires behind them. Adds a real "installation" identity distinct from the device (`AgentInstallationBinding` — unlike Android SSAID, wiped on uninstall/Clear Data, so a reinstall always presents a fresh one), an alertable/resolvable `SecurityEvent` queue alongside the existing write-once audit log, two new agent states (`RECONCILIATION_REQUIRED` on a mismatch, `RESET_AUTHORIZED` after an admin reset, gated behind one online collection before offline is re-enabled), and a signed hash-chain on every `Collection` (`collectionCounter`/`previousHash`/`currentHash`/`signature`, HMAC-verified against a secret issued once per installation binding) enforcing the full 8-rule sync table. 49 new `@Test` methods across 3 new files (`SecurityEventServiceTest`, `SecurityEventControllerTest`, `CollectionChainCodecTest`) and 4 extended ones — see the new §12 below, and the extended entries in §1.3, §1.5, §3 and §5.3. Verified live against the running Docker stack, not just unit tests: installation mismatch → security event → blocked collection → admin reset → online-first-collection gate → back to `ACTIVE`, and all 8 chain sync rules exercised end-to-end with hand-computed HMAC vectors. Mobile-side: `sqflite_sqlcipher`'s at-rest encryption of the offline collection queue was independently confirmed on a real device (`integration_test/offline_storage_test.dart`'s "sanity" check — the raw `.db` file on disk does not contain a plaintext value known to have been inserted).
 
 ---
 
@@ -23,6 +25,7 @@
 9. [Async / Event Infrastructure (RabbitMQ, SSE)](#9-async--event-infrastructure-rabbitmq-sse)
 10. [Audit Logging](#10-audit-logging)
 11. [Middleware — CBS Mock Adapter](#11-middleware--cbs-mock-adapter)
+12. [Offline Field Collection Security Algorithm](#12-offline-field-collection-security-algorithm)
 
 ---
 
@@ -103,7 +106,10 @@ Registering, suspending, reactivating and configuring field agents from the back
 | `testReactivateAgentWithoutConfiguredCeilingRejected` | Reactivation is blocked without a ceiling. |
 | `testReactivateAgentFromPendingCeilingRejected` | An agent still `PENDING_CEILING` can't be "reactivated" (they were never active). |
 | `testSuspendAgentNotFound` | Suspending an unknown agent 404s. |
-| `testResetDeviceBindingClearsImeiAndRecordsReason` | Clearing a bound IMEI (lost/replaced phone) records the reason. |
+| `testResetDeviceBindingClearsImeiAndRecordsReason` | Clearing a bound IMEI/installation (lost/replaced phone, or clearing a `RECONCILIATION_REQUIRED` block) moves the agent to `RESET_AUTHORIZED`, captures the previous device/installation in the audit entry, and auto-resolves any open security events. |
+| `testResetDeviceBindingLeavesSuspendedAgentSuspended` | A device-binding reset never doubles as a silent reactivation of an agent an admin separately suspended. |
+| `testUpdateStatusToActiveFromReconciliationRequiredRejected` | The generic status endpoint can't clear a mismatch block — only Reset Device Binding can. |
+| `testUpdateStatusToActiveFromResetAuthorizedRejected` | Same guard for `RESET_AUTHORIZED` — one correct code path to reactivate, not two that could drift apart. |
 | `testResetDeviceBindingRequiresReason` | A reason is mandatory for this reset. |
 | `testResetDeviceBindingNotFound` | Resetting an unknown agent's binding 404s. |
 | `testResetDeviceBindingByCashierForbidden` | A cashier cannot reset device bindings. |
@@ -154,7 +160,7 @@ Everything a logged-in agent can read or do about themselves: profile, route, SO
 | `myCollectionRejectionRequestsReturnsOnlyThisAgentsRequestsWithDecisionDetails` | Own rejection-request history includes the manager's decision, scoped to the caller. |
 
 ### 1.5 `AuthenticationControllerTest` — field agent login
-The agent-facing login endpoint: password check, IMEI device binding, lockouts, and the branch-schedule/PENDING_CEILING interactions specific to agents.
+The agent-facing login endpoint: password check, IMEI device binding, installation binding (Offline Field Collection Security Algorithm — see §12), lockouts, and the branch-schedule/PENDING_CEILING interactions specific to agents.
 
 | Test | Verifies |
 |---|---|
@@ -162,6 +168,10 @@ The agent-facing login endpoint: password check, IMEI device binding, lockouts, 
 | `testLoginSucceedsForPendingCeilingAgent` | An agent awaiting their first escrow top-up can still log in (just not collect). |
 | `testLoginInvalidPassword` | Wrong password rejected. |
 | `testLoginInvalidImei` | Login from a non-bound device is rejected once binding exists. |
+| `testLoginRejectsRecognizedDeviceThatBelongsToAnotherAgent` | A device "known" to the system from a different agent's prior use is not enough — one agent, one device, strictly. |
+| `testLoginBindsFreshInstallationOnFirstLoginAndReturnsSecret` | First-ever login with an `installationId` binds it and returns a freshly generated HMAC secret for the collection hash-chain. |
+| `testLoginOnInstallationMismatchStillSucceedsButRaisesSecurityEvent` | The core fraud scenario: same device, a different installation than the one on file (uninstall/reinstall). Login still succeeds (only a device mismatch hard-rejects) — a `SecurityEvent` is raised instead, which is what actually blocks *collection*. |
+| `testLoginWithMatchingInstallationRaisesNoSecurityEvent` | A login presenting the same installation as last time raises nothing and issues no new secret. |
 | `testLoginSucceedsWithoutImeiWhenAgentHasNoneOnFile` | No IMEI on file yet ⇒ any device can log in (first-login binding case). |
 | `testLoginBindsDeviceOnFirstLoginWhenBranchRequiresImei` | First login records/binds the IMEI when the branch requires it. |
 | `testLoginRejectsWhenBranchRequiresImeiButNoneWasSent` | Missing IMEI is rejected outright when the branch mandates it. |
@@ -230,7 +240,7 @@ All per-branch policy toggles: IMEI requirement, escrow ceiling defaults, schedu
 ## 3. Agent Directory Service (cross-module resolvers)
 
 ### `AgentDirectoryServiceTest`
-The public read/lookup surface other modules use instead of reaching into `AgentRepository` directly — PIN verification/lockout, escrow ceiling and portfolio/activation setting resolution, schedule-window enforcement, and "end of day" state.
+The public read/lookup surface other modules use instead of reaching into `AgentRepository` directly — PIN verification/lockout, escrow ceiling and portfolio/activation setting resolution, schedule-window enforcement, "end of day" state, and (Offline Field Collection Security Algorithm, §12) the `RECONCILIATION_REQUIRED`/`RESET_AUTHORIZED` collection gates and the installation-binding facade `transactions.CollectionService` uses for hash-chain verification.
 
 | Test | Verifies |
 |---|---|
@@ -274,6 +284,17 @@ The public read/lookup surface other modules use instead of reaching into `Agent
 | `hasEndedDayTodayFalseWhenStampedForAnEarlierDate` | Reports `false` for a stamp from an earlier date (yesterday's end-of-day doesn't carry over). |
 | `hasEndedDayTodayFalseWhenNeverEnded` | Reports `false` when the agent has never ended a day. |
 | `hasEndedDayTodayUnknownAgentThrows404` | Unknown agent 404s. |
+| `verifyTransactionPinRejectsReconciliationRequiredWithSpecificMessage` | A mismatch-blocked agent gets a distinct "no longer authorized" message, not the generic PENDING_CEILING one. |
+| `verifyTransactionPinAllowsResetAuthorizedAgent` | `RESET_AUTHORIZED` is allowed through this gate (the online-first-collection requirement is enforced separately, earlier, in `CollectionService`). |
+| `flipToReconciliationRequiredChangesStatus` | An ACTIVE agent flips to `RECONCILIATION_REQUIRED` on a raised mismatch event. |
+| `flipToReconciliationRequiredNoOpsForSuspendedAgent` | A already-`SUSPENDED`/`DELETED` agent is left alone — the flip never weakens a stricter existing block. |
+| `requireOnlineFirstCollectionCompletedForOfflineRejectsWhenBindingStillOwesOne` | An `OFFLINE_SYNC` item is rejected while the current installation binding hasn't completed its required online-first collection. |
+| `requireOnlineFirstCollectionCompletedForOfflineAllowsWhenAlreadyCompleted` | Once satisfied, the same origin is let through. |
+| `requireOnlineFirstCollectionCompletedForOfflineIsNoOpForOnlineOrigin` | The gate never even looks up the binding for an `ONLINE` origin. |
+| `completeOnlineFirstCollectionIfNeededFlipsResetAuthorizedAgentBackToActive` | The first online collection after a reset stamps the binding and flips the agent back to `ACTIVE`. |
+| `completeOnlineFirstCollectionIfNeededIsNoOpForOfflineOrigin` | Only an `ONLINE` collection can satisfy the requirement. |
+| `completeOnlineFirstCollectionIfNeededIsNoOpWhenAlreadyCompleted` | Already-satisfied bindings are left untouched (no redundant writes). |
+| `requireCurrentInstallationBindingReturnsInstallationIdAndSecret` | The cross-module facade `CollectionService` uses for hash-chain verification returns the installation id and HMAC secret together. |
 
 ---
 
@@ -413,7 +434,7 @@ Everything a logged-in client can read about their own account.
 | `testMyCollectionsUnauthenticatedRejected` | Anonymous callers rejected. |
 
 ### 5.3 `CollectionServiceTest` — the money-path business rules
-The core `recordCollection` gate chain: idempotency, PIN, schedule window, day-not-ended, geofence, client status, no-pending-activation, UC-19 activation gate, portfolio gate (full detail in the dedicated addendum), denomination breakdown, and escrow ceiling.
+The core `recordCollection` gate chain: idempotency, the Offline Field Collection Security Algorithm's online-first-collection gate and hash-chain rule table (§12), PIN, schedule window, day-not-ended, geofence, client status, no-pending-activation, UC-19 activation gate, portfolio gate (full detail in the dedicated addendum), denomination breakdown, and escrow ceiling.
 
 | Test | Verifies |
 |---|---|
@@ -448,6 +469,16 @@ The core `recordCollection` gate chain: idempotency, PIN, schedule window, day-n
 | `findRecentByAgentResolvesClientNames` | Recent-collections read model resolves client names. |
 | `findByAgentAndDayResolvesClientNamesAndOrdersNewestFirst` | Per-day listing resolves names and orders newest-first. |
 | `findByClientsAndRangeResolvesNamesAndMfiMemberNosAndOrdersNewestFirst` | Multi-client range query resolves names + member numbers, ordered newest-first. |
+| `chainRulesAcceptValidFirstCollectionWithGenesisPreviousHash` | Counter 1 with `previousHash = GENESIS` and a correctly computed hash/signature is accepted, no security event raised. |
+| `chainRulesRejectBadPreviousHash` | A `previousHash` that doesn't match the chain's last record is rejected (403) and raises `BAD_PREVIOUS_HASH`. |
+| `chainRulesRejectBadSignature` | A `currentHash` that verifies but a `signature` that doesn't is rejected (403) and raises `BAD_SIGNATURE`. |
+| `chainRulesHoldCounterGapForReviewWithoutSecurityEvent` | A counter ahead of the expected next value is held for review (409) — a gap can mean lost/delayed records, not just forgery, so no security event is raised for this one. |
+| `chainRulesRejectStaleCounterAsConflictNotSecurityEvent` | A counter behind the expected next value, with a *new* `deviceTxId` (so not caught by the idempotency short-circuit), is a real anomaly (409), not a security event either. |
+| `chainRulesRejectMismatchedInstallation` | A request whose `installationId` doesn't match the agent's current binding is rejected (403) and raises `DEVICE_NOT_AUTHORIZED`. |
+| `chainRulesSkipValidationWhenNoCounterSent` | Back-compat rule 0: no `collectionCounter` at all (a pre-chain app build) skips validation entirely — no binding lookup even attempted. |
+| `chainRulesSkipValidationWhenAgentHasNoInstallationBinding` | An agent with no installation binding at all (pre-Phase-1) fails open — nothing to validate against. |
+| `offlineOriginRejectedWhenOnlineFirstCollectionStillOwed` | An `OFFLINE_SYNC` item is rejected before the PIN check when the online-first-collection requirement isn't yet satisfied. |
+| `onlineCollectionCompletionSignalFiresAfterSuccessfulSave` | A successful `ONLINE` collection signals `AgentDirectoryService` so the requirement can be marked satisfied. |
 
 ### 5.4 `EscrowServiceTest` — security deposit & ceiling
 | Test | Verifies |
@@ -716,7 +747,7 @@ These classes are the plumbing this branch is named for: bridging in-JVM Spring 
 | `SosAlertEventRelayTest.forwardsTheEventToTheBroadcaster` | SOS-raised event reaches the SSE broadcaster only after commit. |
 
 ### 9.2 `CollectionRecordDispatcherTest` — the RabbitMQ request/reply client side
-Replaces a direct in-process call to `CollectionService.recordCollection` with a RabbitMQ request-reply round trip, so a burst is throttled by the consumer pool rather than Core's general thread pool — behaves as a drop-in replacement to callers.
+Replaces a direct in-process call to `CollectionService.recordCollection` with a RabbitMQ request-reply round trip, so a burst is throttled by the consumer pool rather than Core's general thread pool — behaves as a drop-in replacement to callers. As of the Offline Field Collection Security Algorithm update (§12), `dispatch`/`CollectionRecordRequest` also carry a `CollectionOrigin` (`ONLINE`/`OFFLINE_SYNC`, resolved by the controller from which endpoint the request arrived on, never trusted from the client) — the three tests below were updated to pass it through rather than gaining new methods.
 
 | Test | Verifies |
 |---|---|
@@ -776,21 +807,81 @@ Regression coverage added because the mock used to return numbers with no real c
 
 ---
 
+## 12. Offline Field Collection Security Algorithm
+
+Closes the gap between two outcomes that already existed on this branch (login blocked on a device mismatch, admin-only device reset) and the structural mechanism the spec (`MICROFI_Offline_Collection_Security_Algorithm_v1_1.pdf`) requires behind them — a real installation identity distinct from the device, an alertable security-event queue, a proper agent state machine, and a signed hash-chain on every collection. The extended tests in §1.3, §1.5, §3 and §5.3 above cover the login/collection-gate/reset side; this section covers the three brand-new classes.
+
+### 12.1 `SecurityEventServiceTest` — the alertable, resolvable event ledger
+Distinct from `AuditLogEntry` (a write-once timeline with no resolved/unresolved concept): every `raise` call also writes a matching audit-log row so `/admin/audit-log` stays complete, but this table is the actionable queue an admin actually works from. `raise` runs `REQUIRES_NEW` (same reasoning as `AuditService.record`) — it's called by `CollectionService.applyChainRules` immediately before throwing to reject a record, and joining that caller's transaction would roll the event back right along with the rejection it's supposed to be evidence of.
+
+| Test | Verifies |
+|---|---|
+| `raisePersistsEventAndAuditsIt` | A raised event is persisted and a matching audit-log entry is written. |
+| `raiseFlipsAgentToReconciliationRequiredForInstallationMismatch` | An `INSTALLATION_MISMATCH` flips the agent's status. |
+| `raiseFlipsAgentToReconciliationRequiredForDeviceMismatch` | Same for `DEVICE_MISMATCH`. |
+| `raiseDoesNotFlipAgentForChainAnomalyTypes` | Sync-time chain anomalies (`COUNTER_GAP`, `BAD_PREVIOUS_HASH`, `BAD_SIGNATURE`, `DEVICE_NOT_AUTHORIZED`) are recorded but don't lock the agent out — only an identity mismatch does. |
+| `resolveStampsResolutionFields` | Resolving an event stamps resolved-at/by/reason. |
+| `resolveUnknownEventThrows404` | Resolving an unknown event 404s. |
+| `resolveAllOpenForAgentResolvesEveryOpenEvent` | Bulk-resolves every open event for one agent (used by the device-binding reset flow). |
+| `listOpenNetworkWideWhenBranchIdNull` | A null branch scope lists network-wide. |
+| `listOpenBranchScopedWhenBranchIdProvided` | A branch id scopes the listing. |
+
+### 12.2 `SecurityEventControllerTest` — the admin console
+`GET/PATCH /admin/security-events` — the actionable counterpart to `/admin/audit-log`'s read-only timeline. Same ADMIN-global/BRANCH_MANAGER-own-branch shape as `AuditLogController`.
+
+| Test | Verifies |
+|---|---|
+| `listOpenAdminSeesNetworkWide` | ADMIN's listing spans every branch. |
+| `listOpenBranchManagerPinnedToOwnBranch` | A manager's listing is pinned to their own branch regardless of intent. |
+| `listOpenCashierForbidden` | A cashier cannot view security events. |
+| `resolveRequiresReason` | A resolution reason is mandatory. |
+| `resolveBranchManagerOutOfScopeForbidden` | A manager cannot resolve an event outside their branch. |
+| `resolveSucceedsForAdmin` | ADMIN can resolve any event. |
+
+### 12.3 `CollectionChainCodecTest` — the hash-chain codec
+Must produce byte-identical output to its Dart counterpart (`microfi-mobile/test/core/collection_chain_codec_test.dart`) — an explicit, fixed-order pipe-delimited string (not JSON, to avoid key-ordering drift), with lat/lon fixed to 6 decimals and the timestamp as a raw epoch millisecond integer specifically to remove any Dart/Java default-formatting ambiguity. Two of the tests below assert against fixed vectors independently computed with Python's `hashlib`/`hmac` (a reference implementation, not either codebase's own code) — the same vectors are hand-copied into the Dart test, so a drift between the two implementations fails both suites, not just one silently disagreeing with the other.
+
+| Test | Verifies |
+|---|---|
+| `canonicalStringIsFixedOrderPipeDelimited` | The exact canonical string format for a fixed input. |
+| `computeHashIsDeterministicForTheSameInput` | Hashing the same input twice gives the same result. |
+| `computeHashMatchesTheIndependentlyComputedFixedVector` | The hash matches the Python-computed reference vector (cross-language check). |
+| `computeSignatureMatchesTheIndependentlyComputedFixedVector` | The HMAC signature matches the Python-computed reference vector. |
+| `computeHashChangesWhenAnyFieldChanges` | Any field change (e.g. a tampered amount) changes the hash. |
+| `computeSignatureVerifiesAgainstTheCorrectSecretOnly` | A signature only verifies against the secret it was actually signed with. |
+| `chainLinksSecondRecordToFirstsHash` | A second record's `previousHash` input is the first record's `currentHash` — the actual chain link. |
+
+### 12.4 Live verification (not unit-testable — exercised against the running Docker stack)
+
+Beyond the 49 new/extended automated tests above, the following end-to-end flows were exercised against a live `docker compose` stack with a real test agent, since they span the mobile↔Kong↔Core round trip and Postgres persistence that a unit test can't cover:
+
+- First-ever login with an `installationId` binds it and returns a freshly generated HMAC secret; a repeat login with the same id returns no secret.
+- Same device, a different `installationId` (the uninstall/reinstall scenario): login still succeeds, a `SecurityEvent` is raised, and the agent flips to `RECONCILIATION_REQUIRED`.
+- `POST /collections` against a `RECONCILIATION_REQUIRED` agent is rejected 403 with the "no longer authorized" message.
+- `PATCH /admin/agents/{id}/device-binding` clears the block, captures the previous device/installation in the audit entry, auto-resolves the open security event, and moves the agent to `RESET_AUTHORIZED`.
+- `POST /collections/sync` from the newly reset installation is rejected until one `POST /collections` (online) succeeds — which then flips the agent back to `ACTIVE` and stamps the binding.
+- All 8 sync-verification rules exercised with hand-computed (Python `hashlib`/`hmac`) request bodies: accept-expected-next, a tampered `currentHash` (403 + `BAD_PREVIOUS_HASH`), and a skipped-ahead counter (409 + `COUNTER_GAP`) were each confirmed to produce the correct HTTP response *and* the correct row in `GET /admin/security-events`.
+- One real bug was only caught this way: `SecurityEventService.raise()` initially lacked `@Transactional(REQUIRES_NEW)`, so an event raised immediately before `CollectionService.applyChainRules` threw its rejection was silently rolled back with it — a unit test with a mocked repository couldn't have caught this, since Mockito never exercises Spring's real transaction interceptor. Fixed and re-verified live.
+- Mobile: `sqflite_sqlcipher`'s at-rest encryption of the offline collection queue was independently confirmed on a real Android device (API 33) — `integration_test/offline_storage_test.dart`'s "sanity" test inserts a known plaintext value and asserts the raw `.db` file on disk does not contain it; result: `contains literal clientId "plaintext-check-client": false`.
+
+---
+
 ## Summary
 
 | Domain | Test classes | Test methods |
 |---|---|---|
-| Auth, Admin & Agent Management | 5 | 108 |
+| Auth, Admin & Agent Management | 5 | 114 |
 | Branch Management | 1 | 42 |
-| Agent Directory Service | 1 | 40 |
+| Agent Directory Service | 1 | 51 |
 | Client Onboarding/Activation/Self-Service | 6 | 70 |
-| Digital Cash Desk (Collections & Escrow) | 4 | 50 |
+| Digital Cash Desk (Collections & Escrow) | 4 | 60 |
 | Collection Rejection Workflow | 2 | 22 |
 | End-of-Day / OFJ & CBS Export | 4 | 79 |
 | Geolocation (Tracking/Geofence/Geocoding/SOS) | 8 | 61 |
 | Async/Event Infrastructure | 7 | 13 |
 | Audit Logging | 1 | 4 |
 | Middleware CBS Mock Adapter | 1 | 10 |
-| **Total** | **40** | **516*** |
+| Offline Field Collection Security Algorithm | 3 | 22 |
+| **Total** | **43** | **565*** |
 
-\* Individual counts above tally to slightly more than 510 in a few domains because a handful of test classes (e.g. `AgentSelfControllerTest`, `BranchControllerTest`) span two logically distinct concerns and are cross-referenced rather than double-counted in the grand total; the 510 figure is the raw `@Test`-annotation count from the source files (Section "Verification status" above).
+\* Individual counts above tally to slightly more than the raw `@Test`-annotation count in a few domains because a handful of test classes (e.g. `AgentSelfControllerTest`, `BranchControllerTest`) span two logically distinct concerns and are cross-referenced rather than double-counted in the grand total; **729** (Section "Verification status" above) is the actual number of JUnit test executions in the last full run, higher than the raw method count because a few methods are parameterized.
