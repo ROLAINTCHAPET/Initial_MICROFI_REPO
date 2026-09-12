@@ -10,11 +10,15 @@ import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.authentication.domain.AgentInstallationBinding;
+import com.microfi.authentication.domain.SecurityEventType;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentPasswordResetService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
+import com.microfi.authentication.service.InstallationBindingService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.authentication.service.TerminalService;
 import com.microfi.shared.dto.AuthRequest;
 import org.junit.jupiter.api.Test;
@@ -81,9 +85,15 @@ class AuthenticationControllerTest {
     @MockitoBean
     private TerminalService terminalService;
 
+    @MockitoBean
+    private InstallationBindingService installationBindingService;
+
+    @MockitoBean
+    private SecurityEventService securityEventService;
+
     @Test
     void testLoginSuccess() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -110,7 +120,7 @@ class AuthenticationControllerTest {
     void testLoginSucceedsForPendingCeilingAgent() {
         // A freshly enrolled agent (escrow not yet funded) can still log in and use the app —
         // they just can't collect deposits yet (see AgentDirectoryServiceTest#verifyTransactionPin*).
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.PENDING_CEILING).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -130,7 +140,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginInvalidPassword() {
-        AuthRequest req = new AuthRequest("agt.dupont", "wrong-password", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "wrong-password", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -147,7 +157,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginInvalidImei() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "WRONG_IMEI");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "WRONG_IMEI", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -169,7 +179,7 @@ class AuthenticationControllerTest {
      */
     @Test
     void testLoginRejectsRecognizedDeviceThatBelongsToAnotherAgent() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "SHARED-BACKUP-PHONE");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "SHARED-BACKUP-PHONE", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -189,7 +199,7 @@ class AuthenticationControllerTest {
         // Agent enrolled at a branch with IMEI requirement disabled (bring-your-own-phone) —
         // login must succeed regardless of what the app sends for imei, since there's no bound
         // device to check against.
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "SOME-DEVICE-STRING");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "SOME-DEVICE-STRING", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei(null).status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -211,7 +221,7 @@ class AuthenticationControllerTest {
     void testLoginBindsDeviceOnFirstLoginWhenBranchRequiresImei() {
         // Registration no longer sets an IMEI (AgentManagementController) — the agent's first
         // successful login at a branch that requires device binding is what actually binds it.
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "NEW-DEVICE-IMEI");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "NEW-DEVICE-IMEI", null);
         UUID branchId = UUID.randomUUID();
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei(null).status(AgentStatus.ACTIVE).branchId(branchId).build();
         AgentDetails details = new AgentDetails(agent);
@@ -235,7 +245,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginRejectsWhenBranchRequiresImeiButNoneWasSent() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "", null);
         UUID branchId = UUID.randomUUID();
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei(null).status(AgentStatus.ACTIVE).branchId(branchId).build();
         AgentDetails details = new AgentDetails(agent);
@@ -257,7 +267,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginSuspendedAgentBlocked() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.SUSPENDED).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -273,7 +283,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginDeletedAgentBlocked() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.DELETED).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -293,7 +303,7 @@ class AuthenticationControllerTest {
         // AgentDirectoryService#requireWithinScheduleWindow / CollectionServiceTest) — an agent
         // can still log in and use the app outside the branch's open/close window, they just can't
         // record a new collection until it reopens.
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         UUID branchId = UUID.randomUUID();
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).branchId(branchId).build();
         AgentDetails details = new AgentDetails(agent);
@@ -316,7 +326,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginLockedAccountRejectedBeforePasswordIsChecked() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE)
                 .lockedUntil(Instant.now().plusSeconds(600)).build();
         AgentDetails details = new AgentDetails(agent);
@@ -336,7 +346,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginExpiredLockIsIgnored() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE)
                 .lockedUntil(Instant.now().minusSeconds(1)).build();
         AgentDetails details = new AgentDetails(agent);
@@ -355,7 +365,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginWrongPasswordRegistersFailedAttempt() {
-        AuthRequest req = new AuthRequest("agt.dupont", "wrong-password", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "wrong-password", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -379,7 +389,7 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginSuccessResetsFailedAttempts() {
-        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123");
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", null);
         Agent agent = Agent.builder().employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).failedPinAttempts(2).build();
         AgentDetails details = new AgentDetails(agent);
 
@@ -395,5 +405,86 @@ class AuthenticationControllerTest {
                 .expectStatus().isOk();
 
         verify(agentDetailsService, times(1)).resetFailedLoginAttempts(agent);
+    }
+
+    @Test
+    void testLoginBindsFreshInstallationOnFirstLoginAndReturnsSecret() {
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", "INSTALL-1");
+        Agent agent = Agent.builder().id(UUID.randomUUID()).employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
+        AgentDetails details = new AgentDetails(agent);
+        AgentInstallationBinding created = AgentInstallationBinding.builder().agentId(agent.getId()).installationId("INSTALL-1").hmacSecretBase64("c2VjcmV0").build();
+
+        when(agentDetailsService.findByUsername("agt.dupont")).thenReturn(Mono.just(details));
+        when(passwordEncoder.matches(anyString(), any())).thenReturn(true);
+        when(jwtService.generateToken(any(HashMap.class), eq(details))).thenReturn("mock-jwt-token");
+        when(installationBindingService.findCurrent(agent.getId())).thenReturn(Optional.empty());
+        when(installationBindingService.bindFirst(agent.getId(), "INSTALL-1", false)).thenReturn(created);
+
+        webTestClient.post()
+                .uri("/api/v1/auth/agent/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.installationSecret").isEqualTo("c2VjcmV0");
+
+        verify(securityEventService, org.mockito.Mockito.never()).raise(any(), any(), any(), any());
+    }
+
+    /**
+     * The uninstall/reinstall fraud scenario itself: same device (imei matches), but the
+     * installation id differs from what's on file. Must NOT reject the login (only a device
+     * mismatch does that) — instead raises a security event and lets AgentDirectoryService's
+     * collection-time gate do the actual blocking.
+     */
+    @Test
+    void testLoginOnInstallationMismatchStillSucceedsButRaisesSecurityEvent() {
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", "NEW-INSTALL-AFTER-REINSTALL");
+        UUID agentId = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).branchId(branchId).build();
+        AgentDetails details = new AgentDetails(agent);
+        AgentInstallationBinding existingBinding = AgentInstallationBinding.builder().agentId(agentId).installationId("ORIGINAL-INSTALL").build();
+
+        when(agentDetailsService.findByUsername("agt.dupont")).thenReturn(Mono.just(details));
+        when(passwordEncoder.matches(anyString(), any())).thenReturn(true);
+        when(jwtService.generateToken(any(HashMap.class), eq(details))).thenReturn("mock-jwt-token");
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(existingBinding));
+
+        webTestClient.post()
+                .uri("/api/v1/auth/agent/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.token").isEqualTo("mock-jwt-token");
+
+        verify(securityEventService).raise(eq(agentId), eq(branchId), eq(SecurityEventType.INSTALLATION_MISMATCH), any());
+        verify(installationBindingService, org.mockito.Mockito.never()).bindFirst(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    void testLoginWithMatchingInstallationRaisesNoSecurityEvent() {
+        AuthRequest req = new AuthRequest("agt.dupont", "password123", "IMEI123", "SAME-INSTALL");
+        UUID agentId = UUID.randomUUID();
+        Agent agent = Agent.builder().id(agentId).employeeCode("AGT001").username("agt.dupont").imei("IMEI123").status(AgentStatus.ACTIVE).build();
+        AgentDetails details = new AgentDetails(agent);
+        AgentInstallationBinding existingBinding = AgentInstallationBinding.builder().agentId(agentId).installationId("SAME-INSTALL").build();
+
+        when(agentDetailsService.findByUsername("agt.dupont")).thenReturn(Mono.just(details));
+        when(passwordEncoder.matches(anyString(), any())).thenReturn(true);
+        when(jwtService.generateToken(any(HashMap.class), eq(details))).thenReturn("mock-jwt-token");
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(existingBinding));
+
+        webTestClient.post()
+                .uri("/api/v1/auth/agent/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(req)
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(securityEventService, org.mockito.Mockito.never()).raise(any(), any(), any(), any());
     }
 }

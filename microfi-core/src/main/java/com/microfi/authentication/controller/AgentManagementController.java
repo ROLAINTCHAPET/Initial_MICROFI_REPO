@@ -8,10 +8,14 @@ import com.microfi.authentication.AdminAccess;
 import com.microfi.authentication.AdminUserDetails;
 import com.microfi.authentication.domain.Agent;
 import com.microfi.authentication.domain.AdminRole;
+import com.microfi.authentication.domain.AgentInstallationBinding;
 import com.microfi.authentication.domain.AgentStatus;
+import com.microfi.authentication.repository.AgentInstallationBindingRepository;
 import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AgentEnrollmentService;
+import com.microfi.authentication.service.InstallationBindingService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.shared.dto.AgentResponse;
 import com.microfi.shared.dto.DeleteAgentRequest;
 import com.microfi.shared.dto.RegisterRequest;
@@ -65,6 +69,9 @@ public class AgentManagementController {
     private final OfjService ofjService;
     private final AgentEnrollmentService agentEnrollmentService;
     private final AuditService auditService;
+    private final InstallationBindingService installationBindingService;
+    private final SecurityEventService securityEventService;
+    private final AgentInstallationBindingRepository agentInstallationBindingRepository;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -129,6 +136,10 @@ public class AgentManagementController {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "This agent has been deleted and can no longer be suspended or reactivated");
                     }
                     if (request.getStatus() == AgentStatus.ACTIVE) {
+                        if (agent.getStatus() == AgentStatus.RECONCILIATION_REQUIRED || agent.getStatus() == AgentStatus.RESET_AUTHORIZED) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                    "This agent's device binding needs to be reset, not just reactivated — use Reset Device Binding instead");
+                        }
                         if (agent.getStatus() != AgentStatus.SUSPENDED) {
                             throw new ResponseStatusException(HttpStatus.CONFLICT,
                                     "Only a suspended agent can be reactivated here; a newly enrolled agent activates automatically once their escrow ceiling is funded");
@@ -168,18 +179,29 @@ public class AgentManagementController {
     }
 
     @PatchMapping("/{id}/device-binding")
-    @Operation(summary = "Reset Device Binding", description = "Lost/new-device recovery: clears this agent's login history marker (a required reason is kept on file). Devices are recognized system-wide, not owned by one agent (see Terminal) — an agent normally can't move to a device nobody has ever used before, but clearing this puts the agent back into a first-ever-login state, so their very next login registers whatever new device they use, no code to hand them, nothing transmitted out of band. Does not touch the agent's password or PIN. ADMIN or BRANCH_MANAGER (own branch only).")
+    @Operation(summary = "Reset Device Binding", description = "Lost/new-device recovery, and the only way to clear a RECONCILIATION_REQUIRED block after an installation/device mismatch (see SecurityEvent): clears this agent's device and installation binding (a required reason is kept on file) and moves them to RESET_AUTHORIZED — their next login registers whatever new device/installation they use, no code to hand them, nothing transmitted out of band, but an offline collection is held until that new installation completes one online collection. Does not touch the agent's password or PIN. ADMIN or BRANCH_MANAGER (own branch only).")
     public Mono<AgentResponse> resetDeviceBinding(@PathVariable UUID id, @Valid @RequestBody ResetAgentDeviceRequest request, Mono<Authentication> authenticationMono) {
         return AdminAccess.require(authenticationMono, AdminRole.ADMIN, AdminRole.BRANCH_MANAGER)
                 .flatMap(caller -> Mono.fromCallable(() -> {
                     Agent agent = agentRepository.findById(id)
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + id));
                     AdminAccess.requireBranchScope(caller, agent.getBranchId());
+                    String previousImei = agent.getImei();
+                    String previousInstallationId = installationBindingService.supersedeCurrent(agent.getId())
+                            .map(AgentInstallationBinding::getInstallationId)
+                            .orElse(null);
                     agent.setImei(null);
                     agent.setDeviceResetReason(request.getReason());
                     agent.setDeviceResetAt(Instant.now());
+                    // Leave SUSPENDED/DELETED untouched — a device-binding reset must never
+                    // double as a silent reactivation of an agent an admin separately blocked.
+                    if (agent.getStatus() != AgentStatus.SUSPENDED && agent.getStatus() != AgentStatus.DELETED) {
+                        agent.setStatus(AgentStatus.RESET_AUTHORIZED);
+                    }
                     Agent saved = agentRepository.save(agent);
-                    auditAgent(caller, "AGENT_DEVICE_RESET", agent, "AGENT_DEVICE_RESET_REASON", request.getReason());
+                    auditAgent(caller, "AGENT_DEVICE_RESET", agent, "AGENT_DEVICE_RESET_REASON",
+                            request.getReason(), previousImei, previousInstallationId);
+                    securityEventService.resolveAllOpenForAgent(agent.getId(), caller.getAdminUser().getId(), "Cleared by device-binding reset");
                     return toResponse(saved);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -238,6 +260,9 @@ public class AgentManagementController {
     }
 
     private AgentResponse toResponse(Agent agent) {
+        String currentInstallationId = agentInstallationBindingRepository.findFirstByAgentIdAndSupersededAtIsNull(agent.getId())
+                .map(AgentInstallationBinding::getInstallationId)
+                .orElse(null);
         return AgentResponse.builder()
                 .id(agent.getId())
                 .employeeCode(agent.getEmployeeCode())
@@ -246,6 +271,7 @@ public class AgentManagementController {
                 .fullName(agent.getFullName())
                 .phone(agent.getPhone())
                 .imei(agent.getImei())
+                .currentInstallationId(currentInstallationId)
                 .branchId(agent.getBranchId())
                 .status(agent.getStatus())
                 .pinMustChange(Boolean.TRUE.equals(agent.getPinMustChange()))

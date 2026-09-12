@@ -5,11 +5,14 @@ import com.microfi.audit.domain.AuditCategory;
 import com.microfi.audit.domain.AuditStatus;
 import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
+import com.microfi.authentication.domain.SecurityEventType;
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
 import com.microfi.transactions.domain.Collection;
+import com.microfi.transactions.domain.CollectionOrigin;
 import com.microfi.transactions.domain.DenominationLine;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.DenominationLineRepository;
@@ -32,6 +35,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -60,15 +64,29 @@ public class CollectionService {
     private final GeofenceService geofenceService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final AuditService auditService;
+    private final SecurityEventService securityEventService;
+    private final CollectionChainCodec collectionChainCodec;
 
     @Value("${collection.denomination-threshold-xaf:0}")
     private long denominationThresholdXaf;
 
+    /** Convenience overload for every caller that predates the ONLINE/OFFLINE_SYNC distinction (existing tests, anything treating this as a plain in-process call) — behaves exactly as before, as if always called from POST /collections. Production traffic always goes through the 3-arg overload via CollectionRecordListener, which resolves the real origin from which endpoint the request arrived on. */
     public CollectionResponse recordCollection(UUID agentId, CollectionRequest request) {
+        return recordCollection(agentId, request, CollectionOrigin.ONLINE);
+    }
+
+    public CollectionResponse recordCollection(UUID agentId, CollectionRequest request, CollectionOrigin origin) {
         var existing = collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId());
         if (existing.isPresent()) {
             return toResponse(existing.get(), true);
         }
+
+        // Offline Field Collection Security Algorithm v1.1 §8/§10: an OFFLINE_SYNC item from an
+        // installation that still owes its post-reset online-first collection is rejected before
+        // any other gate runs — same insertion point as the chain rules just below, both ahead of
+        // the PIN check so a compromised-identity rejection never wastes a PIN attempt.
+        agentDirectoryService.requireOnlineFirstCollectionCompletedForOffline(agentId, origin);
+        applyChainRules(agentId, request);
 
         agentDirectoryService.verifyTransactionPin(agentId, request.getPin());
         agentDirectoryService.requireWithinScheduleWindow(agentId, request.getCollectedAt());
@@ -108,8 +126,13 @@ public class CollectionService {
                 .collectedAt(request.getCollectedAt())
                 .deviceTxId(request.getDeviceTxId())
                 .terminalId(request.getTerminalId())
+                .collectionCounter(request.getCollectionCounter())
+                .previousHash(request.getPreviousHash())
+                .currentHash(request.getCurrentHash())
+                .signature(request.getSignature())
                 .build();
         collectionRepository.save(collection);
+        agentDirectoryService.completeOnlineFirstCollectionIfNeeded(agentId, origin);
 
         if (request.getDenominationLines() != null) {
             for (DenominationLineDto line : request.getDenominationLines()) {
@@ -132,6 +155,78 @@ public class CollectionService {
 
         auditCollectionRecorded(collection);
         return toResponse(collection, false);
+    }
+
+    /**
+     * Offline Field Collection Security Algorithm v1.1 §7 — the sync-verification rule table.
+     * Runs after the {@code deviceTxId} idempotency short-circuit (a genuine retry of an already-
+     * accepted record must win outright regardless of chain state, never be treated as a stale-
+     * counter anomaly) and before every other gate, so a chain rejection never wastes a PIN
+     * attempt or a ceiling lock.
+     */
+    private void applyChainRules(UUID agentId, CollectionRequest request) {
+        // Rule 0 (back-compat): no counter sent at all — either a pre-chain app build, or an agent
+        // whose login never bound an installation (no AgentInstallationBinding to validate
+        // against). Accept unchanged; nothing to gate.
+        if (request.getCollectionCounter() == null) {
+            return;
+        }
+
+        var bindingInfo = agentDirectoryService.requireCurrentInstallationBinding(agentId);
+        if (bindingInfo.isEmpty()) {
+            return;
+        }
+        AgentDirectoryService.InstallationBindingInfo binding = bindingInfo.get();
+
+        var agentInfo = agentDirectoryService.findAuditInfo(agentId);
+        if (!binding.installationId().equals(request.getInstallationId())) {
+            securityEventService.raise(agentId, agentInfo.branchId(), SecurityEventType.DEVICE_NOT_AUTHORIZED,
+                    "collection from unauthorized installation=" + request.getInstallationId());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This installation is not authorized to record collections");
+        }
+
+        Optional<Collection> last = collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId);
+        long expectedNext = last.map(c -> c.getCollectionCounter() + 1).orElse(1L);
+
+        if (request.getCollectionCounter() < expectedNext) {
+            // A genuine retry of an already-accepted counter would already have been caught by the
+            // deviceTxId short-circuit above — reaching here with a lower counter AND a new
+            // deviceTxId is a real anomaly (a stale/replayed record), not a network retry.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stale counter — already past this point in the chain");
+        }
+        if (request.getCollectionCounter() > expectedNext) {
+            // Held for review, not automatically treated as malicious — a gap can also mean lost
+            // or not-yet-arrived records (e.g. a still-offline sibling), not just forgery.
+            securityEventService.raise(agentId, agentInfo.branchId(), SecurityEventType.COUNTER_GAP,
+                    "expected counter=" + expectedNext + ", received=" + request.getCollectionCounter());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Counter gap detected — held for reconciliation review");
+        }
+
+        String expectedPreviousHash = last.map(Collection::getCurrentHash).orElse(CollectionChainCodec.GENESIS_HASH);
+        if (request.getPreviousHash() == null || !request.getPreviousHash().equals(expectedPreviousHash)) {
+            securityEventService.raise(agentId, agentInfo.branchId(), SecurityEventType.BAD_PREVIOUS_HASH,
+                    "expected previousHash=" + expectedPreviousHash + ", received=" + request.getPreviousHash());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chain continuity broken — this record does not link to your last one");
+        }
+
+        CollectionChainCodec.ChainInput chainInput = new CollectionChainCodec.ChainInput(
+                binding.installationId(), request.getDeviceTxId(), request.getClientId(), request.getAmountXaf(),
+                request.getLat(), request.getLon(), request.getCollectedAt().toEpochMilli(),
+                request.getCollectionCounter(), expectedPreviousHash);
+        String expectedHash = collectionChainCodec.computeHash(chainInput);
+        if (request.getCurrentHash() == null || !request.getCurrentHash().equals(expectedHash)) {
+            securityEventService.raise(agentId, agentInfo.branchId(), SecurityEventType.BAD_PREVIOUS_HASH,
+                    "computed hash does not match submitted currentHash");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Record hash does not match its declared content");
+        }
+
+        if (request.getSignature() == null
+                || !collectionChainCodec.computeSignature(binding.hmacSecretBase64(), expectedHash).equals(request.getSignature())) {
+            securityEventService.raise(agentId, agentInfo.branchId(), SecurityEventType.BAD_SIGNATURE,
+                    "signature does not verify against this installation's secret");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Record signature does not verify");
+        }
+        // accept-expected-next: counter, previousHash, currentHash and signature all check out.
     }
 
     /**

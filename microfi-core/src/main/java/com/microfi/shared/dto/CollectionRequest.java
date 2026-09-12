@@ -48,4 +48,17 @@ public class CollectionRequest {
     /** FR-08: mandatory above the configured threshold; sum must equal amountXaf exactly (BR-02). */
     @Valid
     private List<DenominationLineDto> denominationLines;
+
+    /**
+     * Offline Field Collection Security Algorithm v1.1 §5-7 hash-chain fields — all nullable at
+     * this DTO level so a pre-chain app build (or a login that never bound an installation) keeps
+     * working unchanged; see CollectionService's back-compat rule 0. When {@link #collectionCounter}
+     * is present, the other three must be too, or the chain-validation rule table rejects the
+     * request outright rather than treating a partial submission as "no chain data at all."
+     */
+    private String installationId;
+    private Long collectionCounter;
+    private String previousHash;
+    private String currentHash;
+    private String signature;
 }

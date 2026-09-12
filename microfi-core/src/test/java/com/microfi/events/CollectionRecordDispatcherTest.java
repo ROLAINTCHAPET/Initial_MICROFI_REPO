@@ -1,6 +1,7 @@
 package com.microfi.events;
 
 import com.microfi.shared.dto.CollectionRequest;
+import com.microfi.transactions.domain.CollectionOrigin;
 import com.microfi.shared.dto.CollectionResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class CollectionRecordDispatcherTest {
         CollectionResponse response = CollectionResponse.builder().id(UUID.randomUUID()).agentId(agentId).amountXaf(5000).build();
         stubReply(CollectionRecordReply.success(response));
 
-        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest()))
+        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest(), CollectionOrigin.ONLINE))
                 .expectNext(response)
                 .verifyComplete();
     }
@@ -56,7 +57,7 @@ class CollectionRecordDispatcherTest {
     void reThrowsTheExactRejectionFromTheListener() {
         stubReply(CollectionRecordReply.failure(409, "would exceed ceiling"));
 
-        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest()))
+        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest(), CollectionOrigin.ONLINE))
                 .expectErrorSatisfies(e -> {
                     var ex = (ResponseStatusException) e;
                     org.assertj.core.api.Assertions.assertThat(ex.getStatusCode().value()).isEqualTo(409);
@@ -69,7 +70,7 @@ class CollectionRecordDispatcherTest {
     void returnsServiceUnavailableOnReplyTimeout() {
         stubReply(null);
 
-        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest()))
+        StepVerifier.create(dispatcher.dispatch(agentId, new CollectionRequest(), CollectionOrigin.ONLINE))
                 .expectErrorSatisfies(e -> {
                     var ex = (ResponseStatusException) e;
                     org.assertj.core.api.Assertions.assertThat(ex.getStatusCode().value()).isEqualTo(503);

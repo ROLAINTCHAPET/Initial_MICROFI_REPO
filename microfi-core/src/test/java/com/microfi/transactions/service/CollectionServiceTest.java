@@ -3,7 +3,9 @@ package com.microfi.transactions.service;
 import com.microfi.audit.domain.AuditActorType;
 import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
+import com.microfi.authentication.domain.SecurityEventType;
 import com.microfi.authentication.service.AgentDirectoryService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.events.CollectionGeocodeEvent;
 import com.microfi.savings.service.ActivationDirectoryService;
 import com.microfi.savings.service.ClientDirectoryService;
@@ -12,6 +14,7 @@ import com.microfi.shared.dto.CollectionResponse;
 import com.microfi.shared.dto.DenominationLineDto;
 import com.microfi.shared.dto.EscrowResponse;
 import com.microfi.transactions.domain.Collection;
+import com.microfi.transactions.domain.CollectionOrigin;
 import com.microfi.transactions.repository.CollectionRepository;
 import com.microfi.transactions.repository.DenominationLineRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,8 +62,11 @@ class CollectionServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
     @Mock
     private AuditService auditService;
+    @Mock
+    private SecurityEventService securityEventService;
 
     private CollectionService collectionService;
+    private CollectionChainCodec collectionChainCodec;
 
     private final UUID agentId = UUID.randomUUID();
     private final UUID clientId = UUID.randomUUID();
@@ -68,7 +74,8 @@ class CollectionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, applicationEventPublisher, auditService);
+        collectionChainCodec = new CollectionChainCodec();
+        collectionService = new CollectionService(collectionRepository, denominationLineRepository, clientDirectoryService, escrowService, activationDirectoryService, agentDirectoryService, geofenceService, applicationEventPublisher, auditService, securityEventService, collectionChainCodec);
         ReflectionTestUtils.setField(collectionService, "denominationThresholdXaf", 0L);
         when(denominationLineRepository.findByCollectionId(any(UUID.class))).thenReturn(List.of());
         when(geofenceService.isWithinAssignedGeofence(any(), anyDouble(), anyDouble())).thenReturn(true);
@@ -541,5 +548,161 @@ class CollectionServiceTest {
         assertThat(results.get(0).getAgentId()).isEqualTo(otherAgentId);
         assertThat(results.get(1).getClientName()).isEqualTo("Jean Client");
         assertThat(results.get(1).getClientMfiMemberNo()).isEqualTo("M-001");
+    }
+
+    private static final String INSTALLATION_ID = "installation-1";
+    private static final String HMAC_SECRET = java.util.Base64.getEncoder().encodeToString("test-secret-32-bytes-padding!!!".getBytes());
+
+    private void stubInstallationBinding() {
+        when(agentDirectoryService.requireCurrentInstallationBinding(agentId))
+                .thenReturn(Optional.of(new AgentDirectoryService.InstallationBindingInfo(INSTALLATION_ID, HMAC_SECRET)));
+    }
+
+    private CollectionRequest chainedRequest(long counter, String previousHash) {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        request.setInstallationId(INSTALLATION_ID);
+        request.setCollectionCounter(counter);
+        request.setPreviousHash(previousHash);
+        var chainInput = new CollectionChainCodec.ChainInput(INSTALLATION_ID, request.getDeviceTxId(), request.getClientId(),
+                request.getAmountXaf(), request.getLat(), request.getLon(), request.getCollectedAt().toEpochMilli(), counter, previousHash);
+        String hash = collectionChainCodec.computeHash(chainInput);
+        request.setCurrentHash(hash);
+        request.setSignature(collectionChainCodec.computeSignature(HMAC_SECRET, hash));
+        return request;
+    }
+
+    @Test
+    void chainRulesAcceptValidFirstCollectionWithGenesisPreviousHash() {
+        stubInstallationBinding();
+        CollectionRequest request = chainedRequest(1, CollectionChainCodec.GENESIS_HASH);
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId)).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE);
+
+        assertThat(response.isDuplicate()).isFalse();
+        verify(securityEventService, never()).raise(any(), any(), any(), any());
+    }
+
+    @Test
+    void chainRulesRejectBadPreviousHash() {
+        stubInstallationBinding();
+        CollectionRequest request = chainedRequest(1, "wrong-previous-hash");
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+        verify(securityEventService).raise(eq(agentId), any(), eq(SecurityEventType.BAD_PREVIOUS_HASH), any());
+    }
+
+    @Test
+    void chainRulesRejectBadSignature() {
+        stubInstallationBinding();
+        CollectionRequest request = chainedRequest(1, CollectionChainCodec.GENESIS_HASH);
+        request.setSignature("tampered-signature");
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+        verify(securityEventService).raise(eq(agentId), any(), eq(SecurityEventType.BAD_SIGNATURE), any());
+    }
+
+    @Test
+    void chainRulesHoldCounterGapForReviewWithoutSecurityEvent() {
+        stubInstallationBinding();
+        CollectionRequest request = chainedRequest(5, CollectionChainCodec.GENESIS_HASH);
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+        verify(securityEventService).raise(eq(agentId), any(), eq(SecurityEventType.COUNTER_GAP), any());
+    }
+
+    @Test
+    void chainRulesRejectStaleCounterAsConflictNotSecurityEvent() {
+        stubInstallationBinding();
+        Collection last = Collection.builder().id(UUID.randomUUID()).agentId(agentId).collectionCounter(3L).currentHash("hash-3").build();
+        when(collectionRepository.findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(agentId)).thenReturn(Optional.of(last));
+        CollectionRequest request = chainedRequest(2, "hash-1");
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+        verify(securityEventService, never()).raise(any(), any(), any(), any());
+    }
+
+    @Test
+    void chainRulesRejectMismatchedInstallation() {
+        stubInstallationBinding();
+        CollectionRequest request = chainedRequest(1, CollectionChainCodec.GENESIS_HASH);
+        request.setInstallationId("some-other-installation");
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+        verify(securityEventService).raise(eq(agentId), any(), eq(SecurityEventType.DEVICE_NOT_AUTHORIZED), any());
+    }
+
+    @Test
+    void chainRulesSkipValidationWhenNoCounterSent() {
+        // Back-compat rule 0 — a pre-chain app build sends no counter at all; existing behavior
+        // (no binding lookup, no chain check) is preserved regardless of what requireCurrentInstallationBinding would return.
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE);
+
+        verify(agentDirectoryService, never()).requireCurrentInstallationBinding(any());
+    }
+
+    @Test
+    void chainRulesSkipValidationWhenAgentHasNoInstallationBinding() {
+        when(agentDirectoryService.requireCurrentInstallationBinding(agentId)).thenReturn(Optional.empty());
+        CollectionRequest request = chainedRequest(1, CollectionChainCodec.GENESIS_HASH);
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        CollectionResponse response = collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE);
+
+        assertThat(response.isDuplicate()).isFalse();
+        verify(collectionRepository, never()).findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(any());
+    }
+
+    @Test
+    void offlineOriginRejectedWhenOnlineFirstCollectionStillOwed() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "This device must complete one online collection before offline collection is allowed"))
+                .when(agentDirectoryService).requireOnlineFirstCollectionCompletedForOffline(agentId, CollectionOrigin.OFFLINE_SYNC);
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> collectionService.recordCollection(agentId, request, CollectionOrigin.OFFLINE_SYNC))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+        verify(agentDirectoryService, never()).verifyTransactionPin(any(), any());
+    }
+
+    @Test
+    void onlineCollectionCompletionSignalFiresAfterSuccessfulSave() {
+        CollectionRequest request = validRequest(5000, List.of(line(5000, 1)));
+        when(collectionRepository.findByAgentIdAndDeviceTxId(agentId, request.getDeviceTxId())).thenReturn(Optional.empty());
+        when(escrowService.getStatus(agentId)).thenReturn(EscrowResponse.builder().effectiveCeilingXaf(100_000).build());
+        when(collectionRepository.sumUnreconciledByAgent(any(), any())).thenReturn(0L);
+
+        collectionService.recordCollection(agentId, request, CollectionOrigin.ONLINE);
+
+        verify(agentDirectoryService).completeOnlineFirstCollectionIfNeeded(agentId, CollectionOrigin.ONLINE);
     }
 }

@@ -8,6 +8,7 @@ import '../auth/role_select_screen.dart';
 import 'client_history_screen.dart';
 import 'client_home_screen.dart';
 import 'client_models.dart';
+import 'client_notification_history_screen.dart';
 import 'client_report_agent_screen.dart';
 import 'client_wallet_screen.dart';
 import '../../l10n/app_localizations.dart';
@@ -55,6 +56,17 @@ class _ClientShellState extends State<ClientShell> {
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RoleSelectScreen()));
   }
 
+  void _openNotifications() {
+    final l10n = AppLocalizations.of(context)!;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: Text(l10n.nhTitle)),
+        body: SafeArea(child: ClientNotificationHistoryScreen(token: widget.token)),
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -74,6 +86,21 @@ class _ClientShellState extends State<ClientShell> {
         titleSpacing: 20,
         title: Text(l10n.cshMyBookletTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: 0.3)),
         actions: [
+          Tooltip(
+            message: l10n.asNotificationsTooltip,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _openNotifications,
+              child: Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.only(right: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.notifications_outlined, size: 18, color: Colors.white),
+              ),
+            ),
+          ),
           Tooltip(
             message: _online ? l10n.hsStatusActive : l10n.asOfflineTooltip,
             child: Container(

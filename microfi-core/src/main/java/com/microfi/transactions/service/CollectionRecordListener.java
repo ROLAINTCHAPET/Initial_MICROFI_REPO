@@ -26,7 +26,7 @@ public class CollectionRecordListener {
     @RabbitListener(queues = RabbitMQConfig.COLLECTION_RECORD_QUEUE, containerFactory = "collectionRecordContainerFactory")
     public CollectionRecordReply onRecordRequest(CollectionRecordRequest request) {
         try {
-            return CollectionRecordReply.success(collectionService.recordCollection(request.agentId(), request.request()));
+            return CollectionRecordReply.success(collectionService.recordCollection(request.agentId(), request.request(), request.origin()));
         } catch (ResponseStatusException e) {
             // A rejection is a normal, expected outcome (wrong PIN, over ceiling, ...) — captured
             // here and sent back as data rather than left to propagate, which would just leave

@@ -19,6 +19,9 @@ public interface CollectionRepository extends JpaRepository<Collection, UUID> {
 
     Optional<Collection> findByAgentIdAndDeviceTxId(UUID agentId, String deviceTxId);
 
+    /** Offline Field Collection Security Algorithm v1.1 §7 — the last chain-validated collection for this agent's current installation, to compute the expected next counter/previousHash against. Excludes pre-chain rows (collectionCounter IS NULL) so an agent's very first chained collection correctly computes expectedNext = 1 rather than colliding with an old, unchained row. */
+    Optional<Collection> findTopByAgentIdAndCollectionCounterIsNotNullOrderByCollectionCounterDesc(UUID agentId);
+
     /**
      * Scoped to {@code locationName} alone — {@link com.microfi.transactions.service.CollectionGeocodeListener}
      * used to load+mutate+save the whole entity, which meant Hibernate's default (non-{@code

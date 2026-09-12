@@ -6,6 +6,7 @@ import 'local_ceiling_cache.dart';
 import 'local_geofence_cache.dart';
 import 'local_pin_verifier.dart';
 import 'local_schedule_cache.dart';
+import 'local_trusted_time_cache.dart';
 import 'location.dart';
 import 'location_tracking_service.dart';
 import 'session_storage.dart';
@@ -95,6 +96,10 @@ class _SessionEntryState extends State<SessionEntry> {
       await LocalCeilingCache(profile.id).clear();
       await LocalGeofenceCache(profile.id).clear();
       await LocalScheduleCache(profile.id).clear();
+      await LocalTrustedTimeCache(profile.id).clear();
+      // LocalCollectionChainCache and the installation id/secret (InstallationIdService) are
+      // deliberately NOT cleared here — they belong to this installation's server-side binding,
+      // not to this login session; see LocalCollectionChainCache's own doc comment.
     }
     await SessionStorage().clear();
     if (!mounted) return;

@@ -7,12 +7,16 @@ import com.microfi.audit.service.AuditLogEntry;
 import com.microfi.audit.service.AuditService;
 import com.microfi.authentication.AgentDetails;
 import com.microfi.authentication.domain.Agent;
+import com.microfi.authentication.domain.AgentInstallationBinding;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
+import com.microfi.authentication.domain.SecurityEventType;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.AgentPasswordResetService;
+import com.microfi.authentication.service.InstallationBindingService;
 import com.microfi.authentication.service.JwtService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.authentication.service.TerminalService;
 import com.microfi.shared.dto.AuthRequest;
 import com.microfi.shared.dto.AuthResponse;
@@ -39,6 +43,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -54,6 +59,8 @@ public class AuthenticationController {
     private final BranchRepository branchRepository;
     private final TerminalService terminalService;
     private final AuditService auditService;
+    private final InstallationBindingService installationBindingService;
+    private final SecurityEventService securityEventService;
 
     private static final MessageResponse FORGOT_PASSWORD_ACK = MessageResponse.builder()
             .message("If that username exists, a reset code has been sent by SMS.")
@@ -140,16 +147,45 @@ public class AuthenticationController {
                     }
 
                     boolean finalRecognizeDeviceNow = recognizeDeviceNow;
-                    return Mono.fromRunnable(() -> {
+                    // Installation binding (see AgentInstallationBinding's doc comment for why this
+                    // is distinct from the device/imei check above): a mismatch here is the actual
+                    // uninstall/reinstall fraud scenario the whole feature exists for, on the SAME
+                    // physical device the imei check just let through. Unlike a device mismatch,
+                    // this does NOT reject the login — the agent needs to be able to log in to see
+                    // why they're blocked at collection time, and the attempt itself is forensic
+                    // signal (see AgentStatus#RECONCILIATION_REQUIRED).
+                    boolean requireOnlineFirstCollectionForNewBinding = agent.getStatus() == AgentStatus.RESET_AUTHORIZED;
+                    // Optional<String>, not a bare nullable String: Mono.fromCallable treats a null
+                    // return as an EMPTY completion, not a value — the exact same footgun
+                    // CollectionRecordDispatcher's own doc comment warns about — which would have
+                    // silently short-circuited the whole login (empty 200 body, no token) on every
+                    // login that doesn't issue a fresh installation secret, i.e. almost all of them.
+                    return Mono.fromCallable(() -> {
                                 agentDetailsService.resetFailedLoginAttempts(agent);
                                 if (finalRecognizeDeviceNow) {
                                     terminalService.recognize(request.getImei(), agent.getId());
                                     agent.setImei(request.getImei());
                                     agentDetailsService.bindDevice(agent);
                                 }
+                                String issuedInstallationSecret = null;
+                                String presentedInstallationId = request.getInstallationId();
+                                if (presentedInstallationId != null && !presentedInstallationId.isBlank()) {
+                                    Optional<AgentInstallationBinding> currentBinding = installationBindingService.findCurrent(agent.getId());
+                                    if (currentBinding.isPresent()) {
+                                        if (!currentBinding.get().getInstallationId().equals(presentedInstallationId)) {
+                                            securityEventService.raise(agent.getId(), agent.getBranchId(), SecurityEventType.INSTALLATION_MISMATCH,
+                                                    "expected installation=" + currentBinding.get().getInstallationId() + ", presented=" + presentedInstallationId);
+                                        }
+                                    } else {
+                                        AgentInstallationBinding created = installationBindingService.bindFirst(
+                                                agent.getId(), presentedInstallationId, requireOnlineFirstCollectionForNewBinding);
+                                        issuedInstallationSecret = created.getHmacSecretBase64();
+                                    }
+                                }
+                                return Optional.ofNullable(issuedInstallationSecret);
                             })
                             .subscribeOn(Schedulers.boundedElastic())
-                            .then(Mono.defer(() -> {
+                            .flatMap(issuedInstallationSecret -> Mono.defer(() -> {
                                 Map<String, Object> extraClaims = new HashMap<>();
                                 extraClaims.put("branchId", agent.getBranchId());
                                 extraClaims.put("role", "AGENT");
@@ -159,7 +195,7 @@ public class AuthenticationController {
                                 String jwtToken = jwtService.generateToken(extraClaims, agentDetails);
                                 authEventPublisher.publishSuccess(request.getUsername(), request.getImei());
                                 auditAgentLoginSuccess(agent, request.getUsername());
-                                return Mono.just(AuthResponse.builder().token(jwtToken).build());
+                                return Mono.just(AuthResponse.builder().token(jwtToken).installationSecret(issuedInstallationSecret.orElse(null)).build());
                             }));
                 })
                 .onErrorResume(e -> {

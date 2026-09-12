@@ -29,6 +29,15 @@ class PendingCollection {
   final String pin;
   final String terminalId;
 
+  /// Offline Field Collection Security Algorithm v1.1 hash-chain fields — null when this
+  /// installation has no HMAC secret yet (a pre-chain app build's last login, or one that's never
+  /// re-logged-in since), matching the server's own back-compat rule 0 (CollectionService#applyChainRules).
+  final String? installationId;
+  final int? collectionCounter;
+  final String? previousHash;
+  final String? currentHash;
+  final String? signature;
+
   PendingCollection({
     required this.deviceTxId,
     required this.clientId,
@@ -41,6 +50,11 @@ class PendingCollection {
     required this.denominationLines,
     required this.pin,
     required this.terminalId,
+    this.installationId,
+    this.collectionCounter,
+    this.previousHash,
+    this.currentHash,
+    this.signature,
   });
 
   Map<String, dynamic> toRequestBody() => {
@@ -54,6 +68,11 @@ class PendingCollection {
         'terminalId': terminalId,
         'denominationLines': denominationLines.map((d) => d.toJson()).toList(),
         'pin': pin,
+        if (installationId != null) 'installationId': installationId,
+        if (collectionCounter != null) 'collectionCounter': collectionCounter,
+        if (previousHash != null) 'previousHash': previousHash,
+        if (currentHash != null) 'currentHash': currentHash,
+        if (signature != null) 'signature': signature,
       };
 
   /// Only still used to decode rows left over from the pre-SQLite storage format during the
@@ -110,7 +129,7 @@ class OfflineQueueRepository {
     return openDatabase(
       path,
       password: password,
-      version: 3,
+      version: 4,
       onCreate: (db, version) => db.execute('''
         CREATE TABLE pending_collections (
           agent_id TEXT NOT NULL,
@@ -125,6 +144,11 @@ class OfflineQueueRepository {
           denomination_lines_json TEXT NOT NULL,
           pin TEXT NOT NULL DEFAULT '',
           terminal_id TEXT NOT NULL DEFAULT '',
+          installation_id TEXT,
+          collection_counter INTEGER,
+          previous_hash TEXT,
+          current_hash TEXT,
+          signature TEXT,
           PRIMARY KEY (agent_id, device_tx_id)
         )
       '''),
@@ -134,6 +158,13 @@ class OfflineQueueRepository {
         }
         if (oldVersion < 3) {
           await db.execute("ALTER TABLE pending_collections ADD COLUMN terminal_id TEXT NOT NULL DEFAULT ''");
+        }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE pending_collections ADD COLUMN installation_id TEXT');
+          await db.execute('ALTER TABLE pending_collections ADD COLUMN collection_counter INTEGER');
+          await db.execute('ALTER TABLE pending_collections ADD COLUMN previous_hash TEXT');
+          await db.execute('ALTER TABLE pending_collections ADD COLUMN current_hash TEXT');
+          await db.execute('ALTER TABLE pending_collections ADD COLUMN signature TEXT');
         }
       },
     );
@@ -179,6 +210,11 @@ class OfflineQueueRepository {
         'denomination_lines_json': jsonEncode(c.denominationLines.map((d) => d.toJson()).toList()),
         'pin': c.pin,
         'terminal_id': c.terminalId,
+        'installation_id': c.installationId,
+        'collection_counter': c.collectionCounter,
+        'previous_hash': c.previousHash,
+        'current_hash': c.currentHash,
+        'signature': c.signature,
       };
 
   PendingCollection _fromRow(Map<String, Object?> row) => PendingCollection(
@@ -195,6 +231,11 @@ class OfflineQueueRepository {
             .toList(),
         pin: row['pin'] as String? ?? '',
         terminalId: row['terminal_id'] as String? ?? '',
+        installationId: row['installation_id'] as String?,
+        collectionCounter: row['collection_counter'] as int?,
+        previousHash: row['previous_hash'] as String?,
+        currentHash: row['current_hash'] as String?,
+        signature: row['signature'] as String?,
       );
 
   Future<List<PendingCollection>> list() async {

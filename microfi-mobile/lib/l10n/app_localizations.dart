@@ -584,6 +584,12 @@ abstract class AppLocalizations {
   /// **'You\'re outside your branch\'s collection hours (based on your last connection — reconnect for a fresh check, or contact your branch).'**
   String get csScheduleBlockedOfflineMessage;
 
+  /// Collection stepper — flags (does not block) an offline collection whose device clock looks like it was wound backward since the last successful server contact.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s clock appears to have moved backward since it last connected — this collection was still saved, but may need review at sync.'**
+  String get csClockRolledBackWarning;
+
   /// Collection stepper — generic (non-PrinterUnavailable) print failure.
   ///
   /// In en, this message translates to:
@@ -1807,6 +1813,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offline'**
   String get asOfflineTooltip;
+
+  /// App shell / client shell — bell icon tooltip and accessibility label.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get asNotificationsTooltip;
+
+  /// Notification history screen — app bar title.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get nhTitle;
+
+  /// Notification history screen — shown when the list is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet.'**
+  String get nhEmpty;
+
+  /// Notification history screen — chip label distinguishing a branch notice from a broadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Notice'**
+  String get nhBranchNoticeLabel;
+
+  /// Notification history screen — chip label distinguishing a broadcast from a branch notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement'**
+  String get nhAnnouncementLabel;
+
+  /// Notification history screen — date label replacing the calendar date for items sent earlier today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get nhTodayLabel;
 
   /// Contact-branch action — SnackBar when the branch has no phone number recorded.
   ///

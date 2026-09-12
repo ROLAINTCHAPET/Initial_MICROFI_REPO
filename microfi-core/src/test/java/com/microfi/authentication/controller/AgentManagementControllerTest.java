@@ -9,12 +9,16 @@ import com.microfi.authentication.domain.AdminRole;
 import com.microfi.authentication.domain.AdminUser;
 import com.microfi.authentication.domain.AdminUserStatus;
 import com.microfi.authentication.domain.Agent;
+import com.microfi.authentication.domain.AgentInstallationBinding;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
+import com.microfi.authentication.repository.AgentInstallationBindingRepository;
 import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
 import com.microfi.authentication.service.AdminUserDetailsService;
 import com.microfi.authentication.service.AgentEnrollmentService;
+import com.microfi.authentication.service.InstallationBindingService;
+import com.microfi.authentication.service.SecurityEventService;
 import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
@@ -86,6 +90,15 @@ class AgentManagementControllerTest {
 
     @MockitoBean
     private OfjService ofjService;
+
+    @MockitoBean
+    private InstallationBindingService installationBindingService;
+
+    @MockitoBean
+    private SecurityEventService securityEventService;
+
+    @MockitoBean
+    private AgentInstallationBindingRepository agentInstallationBindingRepository;
 
     private Authentication adminAuthentication(AdminRole role) {
         return adminAuthentication(role, null);
@@ -388,8 +401,10 @@ class AgentManagementControllerTest {
     void testResetDeviceBindingClearsImeiAndRecordsReason() {
         UUID id = UUID.randomUUID();
         Agent agent = Agent.builder().id(id).employeeCode("AGT001").imei("OLD-DEVICE").status(AgentStatus.ACTIVE).build();
+        AgentInstallationBinding oldBinding = AgentInstallationBinding.builder().agentId(id).installationId("OLD-INSTALL").build();
         when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
         when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(installationBindingService.supersedeCurrent(id)).thenReturn(Optional.of(oldBinding));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
                 .patch()
@@ -400,10 +415,71 @@ class AgentManagementControllerTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.imei").isEmpty()
-                .jsonPath("$.deviceResetReason").isEqualTo("Lost phone, reported at branch");
+                .jsonPath("$.deviceResetReason").isEqualTo("Lost phone, reported at branch")
+                .jsonPath("$.status").isEqualTo("RESET_AUTHORIZED");
 
         org.mockito.Mockito.verify(agentRepository).save(org.mockito.ArgumentMatchers.argThat(
-                a -> a.getImei() == null && "Lost phone, reported at branch".equals(a.getDeviceResetReason()) && a.getDeviceResetAt() != null));
+                a -> a.getImei() == null && "Lost phone, reported at branch".equals(a.getDeviceResetReason())
+                        && a.getDeviceResetAt() != null && a.getStatus() == AgentStatus.RESET_AUTHORIZED));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getDetailsParam2()).isEqualTo("OLD-DEVICE");
+        assertThat(captor.getValue().getDetailsParam3()).isEqualTo("OLD-INSTALL");
+
+        verify(securityEventService).resolveAllOpenForAgent(eq(id), any(), anyString());
+    }
+
+    @Test
+    void testResetDeviceBindingLeavesSuspendedAgentSuspended() {
+        // A device-binding reset must never double as a silent reactivation of an agent an admin
+        // separately blocked.
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").imei("OLD-DEVICE").status(AgentStatus.SUSPENDED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any(Agent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/device-binding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reason\":\"Lost phone\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("SUSPENDED");
+    }
+
+    @Test
+    void testUpdateStatusToActiveFromReconciliationRequiredRejected() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").status(AgentStatus.RECONCILIATION_REQUIRED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
+
+        verify(agentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void testUpdateStatusToActiveFromResetAuthorizedRejected() {
+        UUID id = UUID.randomUUID();
+        Agent agent = Agent.builder().id(id).employeeCode("AGT001").status(AgentStatus.RESET_AUTHORIZED).build();
+        when(agentRepository.findById(id)).thenReturn(Optional.of(agent));
+
+        webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(adminAuthentication(AdminRole.ADMIN)))
+                .patch()
+                .uri("/api/v1/admin/agents/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"ACTIVE\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409);
     }
 
     @Test

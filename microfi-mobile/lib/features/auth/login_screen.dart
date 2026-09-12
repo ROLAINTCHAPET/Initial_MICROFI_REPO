@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/design_tokens.dart';
 import '../../core/device_id_service.dart';
+import '../../core/installation_id_service.dart';
 import '../../core/location.dart';
 import '../../core/session_entry.dart';
 import '../../core/session_storage.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authRepository = AuthRepository();
   final _sessionStorage = SessionStorage();
   final _deviceIdService = DeviceIdService();
+  final _installationIdService = InstallationIdService();
 
   bool _loading = false;
   String? _error;
@@ -48,15 +50,20 @@ class _LoginScreenState extends State<LoginScreen> {
       await captureCurrentLocation();
       // Device id is captured automatically, never typed by the agent — see DeviceIdService.
       final deviceId = await _deviceIdService.getDeviceId();
-      final token = await _authRepository.login(
+      final installationId = await _installationIdService.getInstallationId();
+      final result = await _authRepository.login(
         username: _usernameController.text.trim(),
         password: _passwordController.text,
         imei: deviceId,
+        installationId: installationId,
       );
-      await _sessionStorage.saveToken(token);
+      if (result.installationSecret != null) {
+        await _installationIdService.saveSecret(result.installationSecret!);
+      }
+      await _sessionStorage.saveToken(result.token);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SessionEntry(token: token)),
+        MaterialPageRoute(builder: (_) => SessionEntry(token: result.token)),
       );
     } on LocationUnavailable catch (e) {
       setState(() => _error = e.message(l10n));

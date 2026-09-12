@@ -360,7 +360,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final notices = await BranchNoticeRepository(widget.token).listMine();
       if (!mounted || notices.isEmpty) return;
       final latest = notices.first;
-      if (latest.id == _dismissedNoticeId) return;
+      // A notice only pops up on the Home screen the day it was sent — older ones are still
+      // reachable from the notification history screen, but re-surfacing them here on a later
+      // day would make a stale operational notice look like today's news.
+      if (!_isToday(latest.createdAt) || latest.id == _dismissedNoticeId) return;
       setState(() => _bannerNotice = latest);
     } catch (_) {
       // Best-effort — silently retried on the next poll/screen load.
@@ -377,11 +380,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final broadcasts = await BroadcastRepository(widget.token).listMine();
       if (!mounted || broadcasts.isEmpty) return;
       final latest = broadcasts.first;
-      if (latest.id == _dismissedBroadcastId) return;
+      if (!_isToday(latest.createdAt) || latest.id == _dismissedBroadcastId) return;
       setState(() => _bannerBroadcast = latest);
     } catch (_) {
       // Best-effort — silently retried on the next poll/screen load.
     }
+  }
+
+  bool _isToday(DateTime utc) {
+    final local = utc.toLocal();
+    final now = DateTime.now();
+    return local.year == now.year && local.month == now.month && local.day == now.day;
   }
 
   // Same no-push-infrastructure reasoning as branch notices/SOS above — a cashier's physical

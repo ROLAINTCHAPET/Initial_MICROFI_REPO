@@ -77,6 +77,12 @@ class CollectionRepository {
     required String terminalId,
     required List<DenominationLine> denominationLines,
     required String pin,
+    DateTime? collectedAt,
+    String? installationId,
+    int? collectionCounter,
+    String? previousHash,
+    String? currentHash,
+    String? signature,
   }) async {
     final client = ApiClient(token: token);
     final json = await client.post('/collections', {
@@ -85,11 +91,16 @@ class CollectionRepository {
       'lat': lat,
       'lon': lon,
       if (accuracyM != null) 'accuracyM': accuracyM,
-      'collectedAt': DateTime.now().toUtc().toIso8601String(),
+      'collectedAt': (collectedAt ?? DateTime.now().toUtc()).toIso8601String(),
       'deviceTxId': deviceTxId,
       'terminalId': terminalId,
       'denominationLines': denominationLines.map((d) => d.toJson()).toList(),
       'pin': pin,
+      if (installationId != null) 'installationId': installationId,
+      if (collectionCounter != null) 'collectionCounter': collectionCounter,
+      if (previousHash != null) 'previousHash': previousHash,
+      if (currentHash != null) 'currentHash': currentHash,
+      if (signature != null) 'signature': signature,
     });
     return CollectionResult.fromJson(json);
   }

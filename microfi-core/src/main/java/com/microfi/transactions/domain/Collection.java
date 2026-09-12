@@ -96,4 +96,21 @@ public class Collection {
 
     /** Set once a {@code CollectionRejectionRequest} against this collection is approved — the collection is excluded from every downstream financial view from this point on, but the row itself is kept (never deleted) for the audit trail. */
     private Instant voidedAt;
+
+    /**
+     * Offline Field Collection Security Algorithm v1.1 §5 hash-chain — monotonically increasing
+     * per {@code AgentInstallationBinding}, starting at 1. Null on every collection recorded
+     * before this shipped (and on one from an app build that never sent chain fields) — {@code
+     * CollectionService} skips chain validation entirely for those, back-compat rule 0.
+     */
+    private Long collectionCounter;
+
+    /** This collection's own {@code currentHash} for the record immediately before it in this installation's chain (GENESIS for counter 1) — see {@code CollectionChainCodec}. */
+    private String previousHash;
+
+    /** {@code SHA-256(canonical collection data + counter + previousHash)} — see {@code CollectionChainCodec}. */
+    private String currentHash;
+
+    /** {@code HMAC-SHA256(installation secret, currentHash)} — proves this record was produced by the authorized installation, not just internally self-consistent (see AgentInstallationBinding#hmacSecretBase64). */
+    private String signature;
 }

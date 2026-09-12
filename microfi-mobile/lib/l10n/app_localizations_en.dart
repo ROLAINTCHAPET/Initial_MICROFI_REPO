@@ -299,6 +299,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'You\'re outside your branch\'s collection hours (based on your last connection — reconnect for a fresh check, or contact your branch).';
 
   @override
+  String get csClockRolledBackWarning =>
+      'This device\'s clock appears to have moved backward since it last connected — this collection was still saved, but may need review at sync.';
+
+  @override
   String get csCouldNotPrintReceipt => 'Could not print the receipt.';
 
   @override
@@ -981,6 +985,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get asOfflineTooltip => 'Offline';
+
+  @override
+  String get asNotificationsTooltip => 'Notifications';
+
+  @override
+  String get nhTitle => 'Notifications';
+
+  @override
+  String get nhEmpty => 'No notifications yet.';
+
+  @override
+  String get nhBranchNoticeLabel => 'Branch Notice';
+
+  @override
+  String get nhAnnouncementLabel => 'Announcement';
+
+  @override
+  String get nhTodayLabel => 'Today';
 
   @override
   String cbNoPhoneOnFile(String branchName) {

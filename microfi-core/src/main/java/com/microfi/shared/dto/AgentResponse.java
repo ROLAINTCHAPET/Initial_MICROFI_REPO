@@ -17,6 +17,8 @@ public class AgentResponse {
     private String fullName;
     private String phone;
     private String imei;
+    /** Current AgentInstallationBinding's installationId, if any — see AgentInstallationBinding's doc comment for why this is tracked separately from imei. Null for an agent who has never logged in with an app build that sends one. */
+    private String currentInstallationId;
     private UUID branchId;
     private AgentStatus status;
     private boolean pinMustChange;

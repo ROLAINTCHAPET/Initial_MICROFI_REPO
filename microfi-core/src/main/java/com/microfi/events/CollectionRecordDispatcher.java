@@ -3,6 +3,7 @@ package com.microfi.events;
 import com.microfi.config.RabbitMQConfig;
 import com.microfi.shared.dto.CollectionRequest;
 import com.microfi.shared.dto.CollectionResponse;
+import com.microfi.transactions.domain.CollectionOrigin;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.ParameterizedTypeReference;
@@ -32,8 +33,8 @@ public class CollectionRecordDispatcher {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public Mono<CollectionResponse> dispatch(UUID agentId, CollectionRequest request) {
-        return Mono.fromCallable(() -> send(agentId, request))
+    public Mono<CollectionResponse> dispatch(UUID agentId, CollectionRequest request, CollectionOrigin origin) {
+        return Mono.fromCallable(() -> send(agentId, request, origin))
                 .subscribeOn(Schedulers.boundedElastic())
                 // Mono.fromCallable treats a null return as an empty completion, not a value —
                 // RabbitTemplate returns null on reply-timeout, so that case is handled below via
@@ -49,10 +50,10 @@ public class CollectionRecordDispatcher {
                         "Collection processing is temporarily backed up. Please retry")));
     }
 
-    private CollectionRecordReply send(UUID agentId, CollectionRequest request) {
+    private CollectionRecordReply send(UUID agentId, CollectionRequest request, CollectionOrigin origin) {
         return rabbitTemplate.convertSendAndReceiveAsType(
                 RabbitMQConfig.COLLECTION_EXCHANGE, RabbitMQConfig.COLLECTION_RECORD_KEY,
-                new CollectionRecordRequest(agentId, request),
+                new CollectionRecordRequest(agentId, request, origin),
                 new ParameterizedTypeReference<CollectionRecordReply>() {
                 });
     }

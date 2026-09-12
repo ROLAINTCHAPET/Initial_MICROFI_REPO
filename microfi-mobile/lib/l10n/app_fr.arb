@@ -95,6 +95,7 @@
   "csCeilingExceedOfflineMessage": "Cela vous ferait atteindre {projected} / {ceiling} XAF, au-delà de votre plafond journalier (d'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).",
   "csGeofenceBlockedOfflineMessage": "Vous semblez être en dehors de votre zone de collecte assignée (d'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).",
   "csScheduleBlockedOfflineMessage": "Vous êtes en dehors des heures de collecte de votre agence (d'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).",
+  "csClockRolledBackWarning": "L'horloge de cet appareil semble être revenue en arrière depuis sa dernière connexion — cette collecte a tout de même été enregistrée, mais pourrait nécessiter une vérification lors de la synchronisation.",
   "csCouldNotPrintReceipt": "Impossible d'imprimer le reçu.",
   "csReceiptSavedCouldNotOpen": "Reçu enregistré, mais impossible de l'ouvrir : {error}",
   "csCouldNotDownloadReceipt": "Impossible de télécharger le reçu.",
@@ -319,6 +320,13 @@
   "asHomeTab": "Accueil",
   "asHistoryTab": "Historique",
   "asOfflineTooltip": "Hors ligne",
+  "asNotificationsTooltip": "Notifications",
+
+  "nhTitle": "Notifications",
+  "nhEmpty": "Aucune notification pour le moment.",
+  "nhBranchNoticeLabel": "Avis d'agence",
+  "nhAnnouncementLabel": "Annonce",
+  "nhTodayLabel": "Aujourd'hui",
 
   "cbNoPhoneOnFile": "Aucun numéro de téléphone enregistré pour {branchName}.",
   "cbUnableToOpenDialer": "Impossible d'ouvrir le composeur téléphonique.",

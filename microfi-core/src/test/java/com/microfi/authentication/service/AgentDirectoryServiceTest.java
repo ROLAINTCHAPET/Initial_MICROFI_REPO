@@ -1,10 +1,12 @@
 package com.microfi.authentication.service;
 
 import com.microfi.authentication.domain.Agent;
+import com.microfi.authentication.domain.AgentInstallationBinding;
 import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.transactions.domain.CollectionOrigin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -35,6 +37,9 @@ class AgentDirectoryServiceTest {
     @Mock
     private BranchRepository branchRepository;
 
+    @Mock
+    private InstallationBindingService installationBindingService;
+
     private AgentDirectoryService agentDirectoryService;
 
     private final UUID agentId = UUID.randomUUID();
@@ -42,7 +47,7 @@ class AgentDirectoryServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        agentDirectoryService = new AgentDirectoryService(agentRepository, passwordEncoder, branchRepository);
+        agentDirectoryService = new AgentDirectoryService(agentRepository, passwordEncoder, branchRepository, installationBindingService);
         ReflectionTestUtils.setField(agentDirectoryService, "maxFailedTransactionPinAttempts", 3);
         ReflectionTestUtils.setField(agentDirectoryService, "transactionPinLockoutMinutes", 15L);
     }
@@ -481,5 +486,116 @@ class AgentDirectoryServiceTest {
         agentDirectoryService.markDayEnded(agentId, today);
 
         assertThat(agent.getDayEndedBusinessDate()).isEqualTo(today);
+    }
+
+    @Test
+    void verifyTransactionPinRejectsReconciliationRequiredWithSpecificMessage() {
+        Agent agent = Agent.builder().id(agentId).pinHash("hashed").pinMustChange(false).status(AgentStatus.RECONCILIATION_REQUIRED).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        assertThatThrownBy(() -> agentDirectoryService.verifyTransactionPin(agentId, "1234"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403")
+                .hasMessageContaining("no longer authorized");
+    }
+
+    @Test
+    void verifyTransactionPinAllowsResetAuthorizedAgent() {
+        Agent agent = Agent.builder().id(agentId).pinHash("hashed").pinMustChange(false).status(AgentStatus.RESET_AUTHORIZED).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(passwordEncoder.matches("1234", "hashed")).thenReturn(true);
+
+        agentDirectoryService.verifyTransactionPin(agentId, "1234");
+    }
+
+    @Test
+    void flipToReconciliationRequiredChangesStatus() {
+        Agent agent = Agent.builder().id(agentId).status(AgentStatus.ACTIVE).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        agentDirectoryService.flipToReconciliationRequired(agentId);
+
+        assertThat(agent.getStatus()).isEqualTo(AgentStatus.RECONCILIATION_REQUIRED);
+    }
+
+    @Test
+    void flipToReconciliationRequiredNoOpsForSuspendedAgent() {
+        Agent agent = Agent.builder().id(agentId).status(AgentStatus.SUSPENDED).build();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+
+        agentDirectoryService.flipToReconciliationRequired(agentId);
+
+        assertThat(agent.getStatus()).isEqualTo(AgentStatus.SUSPENDED);
+        verify(agentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void requireOnlineFirstCollectionCompletedForOfflineRejectsWhenBindingStillOwesOne() {
+        AgentInstallationBinding binding = AgentInstallationBinding.builder().agentId(agentId).installationId("inst-1").onlineFirstCollectionCompletedAt(null).build();
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(binding));
+
+        assertThatThrownBy(() -> agentDirectoryService.requireOnlineFirstCollectionCompletedForOffline(agentId, CollectionOrigin.OFFLINE_SYNC))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    void requireOnlineFirstCollectionCompletedForOfflineAllowsWhenAlreadyCompleted() {
+        AgentInstallationBinding binding = AgentInstallationBinding.builder().agentId(agentId).installationId("inst-1").onlineFirstCollectionCompletedAt(Instant.now()).build();
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(binding));
+
+        agentDirectoryService.requireOnlineFirstCollectionCompletedForOffline(agentId, CollectionOrigin.OFFLINE_SYNC);
+    }
+
+    @Test
+    void requireOnlineFirstCollectionCompletedForOfflineIsNoOpForOnlineOrigin() {
+        agentDirectoryService.requireOnlineFirstCollectionCompletedForOffline(agentId, CollectionOrigin.ONLINE);
+
+        verify(installationBindingService, org.mockito.Mockito.never()).findCurrent(any());
+    }
+
+    @Test
+    void completeOnlineFirstCollectionIfNeededFlipsResetAuthorizedAgentBackToActive() {
+        AgentInstallationBinding binding = AgentInstallationBinding.builder().agentId(agentId).installationId("inst-1").onlineFirstCollectionCompletedAt(null).build();
+        Agent agent = Agent.builder().id(agentId).status(AgentStatus.RESET_AUTHORIZED).build();
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(binding));
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        agentDirectoryService.completeOnlineFirstCollectionIfNeeded(agentId, CollectionOrigin.ONLINE);
+
+        verify(installationBindingService).markOnlineFirstCollectionCompleted(binding);
+        assertThat(agent.getStatus()).isEqualTo(AgentStatus.ACTIVE);
+    }
+
+    @Test
+    void completeOnlineFirstCollectionIfNeededIsNoOpForOfflineOrigin() {
+        agentDirectoryService.completeOnlineFirstCollectionIfNeeded(agentId, CollectionOrigin.OFFLINE_SYNC);
+
+        verify(installationBindingService, org.mockito.Mockito.never()).findCurrent(any());
+    }
+
+    @Test
+    void completeOnlineFirstCollectionIfNeededIsNoOpWhenAlreadyCompleted() {
+        AgentInstallationBinding binding = AgentInstallationBinding.builder().agentId(agentId).installationId("inst-1").onlineFirstCollectionCompletedAt(Instant.now()).build();
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(binding));
+
+        agentDirectoryService.completeOnlineFirstCollectionIfNeeded(agentId, CollectionOrigin.ONLINE);
+
+        verify(installationBindingService, org.mockito.Mockito.never()).markOnlineFirstCollectionCompleted(any());
+        verify(agentRepository, org.mockito.Mockito.never()).findById(agentId);
+    }
+
+    @Test
+    void requireCurrentInstallationBindingReturnsInstallationIdAndSecret() {
+        AgentInstallationBinding binding = AgentInstallationBinding.builder().agentId(agentId).installationId("inst-1").hmacSecretBase64("c2VjcmV0").build();
+        when(installationBindingService.findCurrent(agentId)).thenReturn(Optional.of(binding));
+
+        var result = agentDirectoryService.requireCurrentInstallationBinding(agentId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().installationId()).isEqualTo("inst-1");
+        assertThat(result.get().hmacSecretBase64()).isEqualTo("c2VjcmV0");
     }
 }

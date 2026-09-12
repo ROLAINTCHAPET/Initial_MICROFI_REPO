@@ -3,6 +3,7 @@ package com.microfi.transactions.service;
 import com.microfi.events.CollectionRecordRequest;
 import com.microfi.shared.dto.CollectionRequest;
 import com.microfi.shared.dto.CollectionResponse;
+import com.microfi.transactions.domain.CollectionOrigin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -37,9 +38,9 @@ class CollectionRecordListenerTest {
     void wrapsASuccessfulRecordingAsASuccessReply() {
         CollectionRequest request = new CollectionRequest();
         CollectionResponse response = CollectionResponse.builder().id(UUID.randomUUID()).agentId(agentId).amountXaf(5000).build();
-        when(collectionService.recordCollection(eq(agentId), any())).thenReturn(response);
+        when(collectionService.recordCollection(eq(agentId), any(), eq(CollectionOrigin.ONLINE))).thenReturn(response);
 
-        var reply = listener.onRecordRequest(new CollectionRecordRequest(agentId, request));
+        var reply = listener.onRecordRequest(new CollectionRecordRequest(agentId, request, CollectionOrigin.ONLINE));
 
         assertThat(reply.success()).isTrue();
         assertThat(reply.response()).isEqualTo(response);
@@ -50,9 +51,9 @@ class CollectionRecordListenerTest {
     void wrapsABusinessRuleRejectionAsAFailureReply_notAnException() {
         CollectionRequest request = new CollectionRequest();
         doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling"))
-                .when(collectionService).recordCollection(eq(agentId), any());
+                .when(collectionService).recordCollection(eq(agentId), any(), eq(CollectionOrigin.OFFLINE_SYNC));
 
-        var reply = listener.onRecordRequest(new CollectionRecordRequest(agentId, request));
+        var reply = listener.onRecordRequest(new CollectionRecordRequest(agentId, request, CollectionOrigin.OFFLINE_SYNC));
 
         assertThat(reply.success()).isFalse();
         assertThat(reply.statusCode()).isEqualTo(409);

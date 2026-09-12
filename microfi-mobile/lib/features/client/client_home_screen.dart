@@ -73,11 +73,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       final broadcasts = await _repository.fetchBroadcasts();
       if (!mounted || broadcasts.isEmpty) return;
       final latest = broadcasts.first;
-      if (latest.id == _dismissedBroadcastId) return;
+      // Only pop up an announcement the day it was sent — older ones stay reachable from the
+      // notification history screen instead of resurfacing here on a later day.
+      if (!_isToday(latest.createdAt) || latest.id == _dismissedBroadcastId) return;
       setState(() => _broadcast = latest);
     } catch (_) {
       // Best-effort — silently retried on the next load/pull-to-refresh.
     }
+  }
+
+  bool _isToday(DateTime utc) {
+    final local = utc.toLocal();
+    final now = DateTime.now();
+    return local.year == now.year && local.month == now.month && local.day == now.day;
   }
 
   void _dismissBroadcast() {

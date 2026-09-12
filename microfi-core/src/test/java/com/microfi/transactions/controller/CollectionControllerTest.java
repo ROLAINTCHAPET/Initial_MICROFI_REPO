@@ -10,6 +10,7 @@ import com.microfi.savings.service.ClientDetailsService;
 import com.microfi.authentication.service.AgentDetailsService;
 import com.microfi.authentication.service.JwtService;
 import com.microfi.shared.dto.CollectionResponse;
+import com.microfi.transactions.domain.CollectionOrigin;
 import com.microfi.transactions.service.CollectionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,7 +80,7 @@ class CollectionControllerTest {
     void testCreateSuccess_resolvesAgentFromPrincipal() {
         CollectionResponse response = CollectionResponse.builder()
                 .id(UUID.randomUUID()).agentId(agentId).clientId(clientId).amountXaf(5000).build();
-        when(collectionRecordDispatcher.dispatch(eq(agentId), any())).thenReturn(Mono.just(response));
+        when(collectionRecordDispatcher.dispatch(eq(agentId), any(), eq(CollectionOrigin.ONLINE))).thenReturn(Mono.just(response));
 
         webTestClient.mutateWith(SecurityMockServerConfigurers.mockAuthentication(agentAuthentication()))
                 .post()
@@ -121,8 +122,8 @@ class CollectionControllerTest {
     void testSyncProcessesEachItemIndependently() {
         CollectionResponse okResponse = CollectionResponse.builder()
                 .id(UUID.randomUUID()).agentId(agentId).clientId(clientId).amountXaf(5000).deviceTxId("DEV-OK").build();
-        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-OK"))).thenReturn(Mono.just(okResponse));
-        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-FAIL")))
+        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-OK"), eq(CollectionOrigin.OFFLINE_SYNC))).thenReturn(Mono.just(okResponse));
+        when(collectionRecordDispatcher.dispatch(eq(agentId), argThatDeviceTxId("DEV-FAIL"), eq(CollectionOrigin.OFFLINE_SYNC)))
                 .thenReturn(Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "would exceed ceiling")));
 
         String batch = "[" +

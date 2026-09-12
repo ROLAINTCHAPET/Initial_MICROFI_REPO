@@ -5,6 +5,7 @@ import com.microfi.authentication.domain.AgentStatus;
 import com.microfi.authentication.domain.Branch;
 import com.microfi.authentication.repository.AgentRepository;
 import com.microfi.authentication.repository.BranchRepository;
+import com.microfi.transactions.domain.CollectionOrigin;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -34,6 +36,7 @@ public class AgentDirectoryService {
     private final AgentRepository agentRepository;
     private final PasswordEncoder passwordEncoder;
     private final BranchRepository branchRepository;
+    private final InstallationBindingService installationBindingService;
 
     @Value("${agent.transaction-pin.max-failed-attempts:3}")
     private int maxFailedTransactionPinAttempts;
@@ -308,11 +311,22 @@ public class AgentDirectoryService {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found: " + agentId));
 
+        // RECONCILIATION_REQUIRED: a login presented an installation/device that didn't match this
+        // agent's current binding (see SecurityEventService#raise) — collection stays blocked until
+        // an admin resolves it via AgentManagementController#resetDeviceBinding. Login itself was
+        // never blocked for this status (see AgentDetails#isEnabled), only collection.
+        if (agent.getStatus() == AgentStatus.RECONCILIATION_REQUIRED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This device is no longer authorized. Contact your branch to reset your device binding");
+        }
         // A PENDING_CEILING agent can log in and use the app (AuthenticationController#login) but
         // can't collect until an admin funds their escrow account — collecting with a zero ceiling
         // would fail BR-03 anyway, but this gives a direct, unambiguous reason instead of a
         // confusing "exceeds ceiling" message on an agent who was never meant to transact yet.
-        if (agent.getStatus() != AgentStatus.ACTIVE) {
+        // RESET_AUTHORIZED is allowed through here too — an admin has cleared the block, but the
+        // newly (re)bound installation may still owe an online-first collection, enforced
+        // separately and earlier in CollectionService (see requireOnlineFirstCollectionCompletedForOffline).
+        if (agent.getStatus() != AgentStatus.ACTIVE && agent.getStatus() != AgentStatus.RESET_AUTHORIZED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Your account is awaiting setup. Ask your branch to fund your escrow account before you can collect");
         }
@@ -348,5 +362,72 @@ public class AgentDirectoryService {
                 agentRepository.save(agent);
             }
         });
+    }
+
+    /** Called by SecurityEventService#raise on an installation/device mismatch — blocks collection (see #verifyTransactionPin) until an admin resolves it. No-op for an agent already SUSPENDED/DELETED, since those are already a stricter block. */
+    public void flipToReconciliationRequired(UUID agentId) {
+        agentRepository.findById(agentId).ifPresent(agent -> {
+            if (agent.getStatus() != AgentStatus.SUSPENDED && agent.getStatus() != AgentStatus.DELETED) {
+                agent.setStatus(AgentStatus.RECONCILIATION_REQUIRED);
+                agentRepository.save(agent);
+            }
+        });
+    }
+
+    /**
+     * Spec's "newly authorized installation repeats the required online onboarding and
+     * first-collection procedure before offline collection is re-enabled" — an OFFLINE_SYNC
+     * request is rejected while the agent's current installation binding hasn't yet completed one
+     * ONLINE collection (see AgentInstallationBinding#onlineFirstCollectionCompletedAt). A missing
+     * binding (pre-Phase-1 agent, or an app build that never sent an installationId) fails open —
+     * nothing to gate against.
+     */
+    public void requireOnlineFirstCollectionCompletedForOffline(UUID agentId, CollectionOrigin origin) {
+        if (origin != CollectionOrigin.OFFLINE_SYNC) {
+            return;
+        }
+        installationBindingService.findCurrent(agentId).ifPresent(binding -> {
+            if (binding.getOnlineFirstCollectionCompletedAt() == null) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "This device must complete one online collection before offline collection is allowed");
+            }
+        });
+    }
+
+    /**
+     * Called once a collection actually commits — see CollectionService#recordCollection. No-op
+     * unless this is an ONLINE collection and the binding still owes its first one; stamps the
+     * binding and, if the agent was RESET_AUTHORIZED pending exactly this, flips them back to
+     * ACTIVE.
+     */
+    public void completeOnlineFirstCollectionIfNeeded(UUID agentId, CollectionOrigin origin) {
+        if (origin != CollectionOrigin.ONLINE) {
+            return;
+        }
+        installationBindingService.findCurrent(agentId).ifPresent(binding -> {
+            if (binding.getOnlineFirstCollectionCompletedAt() != null) {
+                return;
+            }
+            installationBindingService.markOnlineFirstCollectionCompleted(binding);
+            agentRepository.findById(agentId).ifPresent(agent -> {
+                if (agent.getStatus() == AgentStatus.RESET_AUTHORIZED) {
+                    agent.setStatus(AgentStatus.ACTIVE);
+                    agentRepository.save(agent);
+                }
+            });
+        });
+    }
+
+    /**
+     * Cross-module facade for {@code transactions.CollectionService}'s hash-chain verification —
+     * keeps that module off {@code authentication}'s repositories directly, per CLAUDE.md's module
+     * rule. Empty when the agent has no current installation binding at all (pre-Phase-1 agent).
+     */
+    public Optional<InstallationBindingInfo> requireCurrentInstallationBinding(UUID agentId) {
+        return installationBindingService.findCurrent(agentId)
+                .map(b -> new InstallationBindingInfo(b.getInstallationId(), b.getHmacSecretBase64()));
+    }
+
+    public record InstallationBindingInfo(String installationId, String hmacSecretBase64) {
     }
 }

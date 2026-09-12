@@ -5,14 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/api_client.dart';
+import '../../core/collection_chain_codec.dart';
 import '../../core/connectivity_service.dart';
 import '../../core/design_tokens.dart';
 import '../../core/device_id_service.dart';
 import '../../core/geofence_math.dart';
+import '../../core/installation_id_service.dart';
 import '../../core/local_ceiling_cache.dart';
+import '../../core/local_collection_chain_cache.dart';
 import '../../core/local_geofence_cache.dart';
 import '../../core/local_pin_verifier.dart';
 import '../../core/local_schedule_cache.dart';
+import '../../core/local_trusted_time_cache.dart';
 import '../../core/locale_preference.dart';
 import '../../core/schedule_window.dart';
 import '../../core/location.dart';
@@ -36,6 +40,16 @@ import 'receipt_models.dart';
 import '../../l10n/app_localizations.dart';
 
 const List<int> _denominations = [10000, 5000, 2000, 1000, 500, 200, 100, 50, 25];
+
+class _ChainFields {
+  final String installationId;
+  final int counter;
+  final String previousHash;
+  final String currentHash;
+  final String signature;
+
+  _ChainFields({required this.installationId, required this.counter, required this.previousHash, required this.currentHash, required this.signature});
+}
 
 /// Graphical Design/agent/collection_denominations — the 3-step Collection Wizard: find client,
 /// count denominations (with a live daily-ceiling preview), confirm and submit.
@@ -92,6 +106,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
   String? _submitError;
   CollectionResult? _result;
   bool _queuedOffline = false;
+  bool _clockRolledBackWarning = false;
   String? _receiptText;
   ReceiptData? _receiptData;
   /// Set only for an offline-queued collection — there's no server-confirmed CollectionResult.id
@@ -184,6 +199,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       if (!mounted) return;
       setState(() => _escrow = escrow);
       LocalCeilingCache(widget.agentId).save(effectiveCeilingXaf: escrow.effectiveCeilingXaf, cumulativeTodayXaf: escrow.cumulativeTodayXaf);
+      LocalTrustedTimeCache(widget.agentId).recordSuccessfulServerContact();
     } catch (_) {
       // No connectivity (or a transient failure) — fall back to the last snapshot the server
       // actually confirmed, so the offline path still has something to check against instead of
@@ -289,6 +305,44 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
     return (isOutsideWindow: !isWithinScheduleWindow(openTime, closeTime, DateTime.now()), hasInfo: true);
   }
 
+  /// Offline Field Collection Security Algorithm v1.1 §11: a flag, not a hard block — the server
+  /// remains the real enforcement boundary for the daily ceiling regardless of what this says.
+  /// Only meaningful once at least one successful server contact has ever anchored it.
+  Future<bool> _clockRolledBack() => LocalTrustedTimeCache(widget.agentId).hasClockRolledBackSinceLastServerContact();
+
+  /// Offline Field Collection Security Algorithm v1.1 §2/§5 hash-chain — builds the fields the
+  /// server's CollectionService#applyChainRules verifies, using this installation's own advancing
+  /// local state (LocalCollectionChainCache). Null when this installation has no HMAC secret yet
+  /// (a pre-chain app build's last login) — the request is then sent with no chain fields at all,
+  /// which the server treats as back-compat rule 0 rather than a validation failure.
+  Future<_ChainFields?> _buildChainFields({
+    required String deviceTxId,
+    required String clientId,
+    required int amountXaf,
+    required double lat,
+    required double lon,
+    required DateTime collectedAt,
+  }) async {
+    final installationId = await InstallationIdService().getInstallationId();
+    final secret = await InstallationIdService().readSecret();
+    if (secret == null) return null;
+
+    final link = await LocalCollectionChainCache(installationId).nextLink();
+    final hash = CollectionChainCodec.computeHash(
+      installationId: installationId,
+      deviceTxId: deviceTxId,
+      clientId: clientId,
+      amountXaf: amountXaf,
+      lat: lat,
+      lon: lon,
+      collectedAtEpochMilli: collectedAt.millisecondsSinceEpoch,
+      counter: link.counter,
+      previousHash: link.previousHash,
+    );
+    final signature = CollectionChainCodec.computeSignature(installationSecretBase64: secret, currentHash: hash);
+    return _ChainFields(installationId: installationId, counter: link.counter, previousHash: link.previousHash, currentHash: hash, signature: signature);
+  }
+
   int get _total => _denominations.fold(0, (sum, d) => sum + d * (_counts[d] ?? 0));
 
   Future<void> _submit() async {
@@ -313,6 +367,18 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         .where((d) => (_counts[d] ?? 0) > 0)
         .map((d) => DenominationLine(faceValueXaf: d, quantity: _counts[d]!))
         .toList();
+    // Captured once and reused for both the request body and the hash-chain computation below —
+    // the server verifies currentHash against exactly the collectedAt it receives, so the two
+    // must never be computed from two slightly different DateTime.now() calls.
+    final collectedAt = DateTime.now().toUtc();
+    final chainFields = await _buildChainFields(
+      deviceTxId: deviceTxId,
+      clientId: _client!.id,
+      amountXaf: _total,
+      lat: _position!.latitude,
+      lon: _position!.longitude,
+      collectedAt: collectedAt,
+    );
 
     final online = await ConnectivityService.instance.isOnline();
     if (!online) {
@@ -375,11 +441,16 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         return;
       }
 
+      // Offline Field Collection Security Algorithm v1.1 §11 — flag, not a hard block, a clock
+      // that appears to have moved backward since the last time this device actually talked to
+      // the server. The server remains the real enforcement boundary for the daily ceiling either
+      // way; this only annotates the submit for the eventual sync-time review.
+      final clockRolledBack = await _clockRolledBack();
+
       // The PIN entered just now travels with the queued item (encrypted, see
       // OfflineQueueRepository) so sync can upload it the moment connectivity returns with no
       // second prompt — this is the same one-time PIN confirmation an online collection already
       // requires, not a weaker check.
-      final collectedAt = DateTime.now().toUtc();
       await OfflineQueueRepository(widget.agentId).add(PendingCollection(
         deviceTxId: deviceTxId,
         clientId: _client!.id,
@@ -392,7 +463,18 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         denominationLines: lines,
         pin: _pinController.text,
         terminalId: terminalId,
+        installationId: chainFields?.installationId,
+        collectionCounter: chainFields?.counter,
+        previousHash: chainFields?.previousHash,
+        currentHash: chainFields?.currentHash,
+        signature: chainFields?.signature,
       ));
+      // An offline-queued item still advances what this installation believes it has recorded —
+      // the server verifies/catches any divergence at sync time (CollectionService#applyChainRules),
+      // it doesn't need this local state to be provisional.
+      if (chainFields != null) {
+        await LocalCollectionChainCache(chainFields.installationId).save(lastCounter: chainFields.counter, lastHash: chainFields.currentHash);
+      }
       await _refreshQueuedTodayTotal();
       _offlineDeviceTxId = deviceTxId;
       await _composeReceiptLocally(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
@@ -400,6 +482,7 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
       if (!mounted) return;
       setState(() {
         _queuedOffline = true;
+        _clockRolledBackWarning = clockRolledBack;
         _submitting = false;
       });
       return;
@@ -416,11 +499,20 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
         terminalId: terminalId,
         denominationLines: lines,
         pin: _pinController.text,
+        collectedAt: collectedAt,
+        installationId: chainFields?.installationId,
+        collectionCounter: chainFields?.counter,
+        previousHash: chainFields?.previousHash,
+        currentHash: chainFields?.currentHash,
+        signature: chainFields?.signature,
       );
       if (!mounted) return;
-      final collectedAt = DateTime.now().toUtc();
       setState(() => _result = result);
       LocalPinVerifier(widget.agentId).seed(_pinController.text);
+      LocalTrustedTimeCache(widget.agentId).recordSuccessfulServerContact();
+      if (chainFields != null) {
+        LocalCollectionChainCache(chainFields.installationId).save(lastCounter: chainFields.counter, lastHash: chainFields.currentHash);
+      }
       // Composed immediately, not awaited on the server's own response below — see
       // _composeReceiptLocally's doc for why this is safe and byte-for-byte identical either way.
       _composeReceiptLocally(deviceTxId: deviceTxId, collectedAt: collectedAt, lines: lines);
@@ -1081,6 +1173,23 @@ class _CollectionStepperScreenState extends State<CollectionStepperScreen> {
             ],
           ),
         ),
+        if (_clockRolledBackWarning) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: MicrofiColors.errorContainer,
+              borderRadius: BorderRadius.circular(MicrofiRadius.md),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time_rounded, color: MicrofiColors.onErrorContainer, size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text(l10n.csClockRolledBackWarning, style: const TextStyle(fontSize: 12, color: MicrofiColors.onErrorContainer))),
+              ],
+            ),
+          ),
+        ],
         ..._receiptActionWidgets(),
         const SizedBox(height: 20),
         SizedBox(

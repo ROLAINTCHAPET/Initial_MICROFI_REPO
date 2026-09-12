@@ -210,6 +210,8 @@
   "@csGeofenceBlockedOfflineMessage": {"description": "Collection stepper — offline-path geofence check failed, using the last-known assigned geofence snapshot."},
   "csScheduleBlockedOfflineMessage": "You're outside your branch's collection hours (based on your last connection — reconnect for a fresh check, or contact your branch).",
   "@csScheduleBlockedOfflineMessage": {"description": "Collection stepper — offline-path schedule-window check failed, using the last-known branch hours snapshot."},
+  "csClockRolledBackWarning": "This device's clock appears to have moved backward since it last connected — this collection was still saved, but may need review at sync.",
+  "@csClockRolledBackWarning": {"description": "Collection stepper — flags (does not block) an offline collection whose device clock looks like it was wound backward since the last successful server contact."},
   "csCouldNotPrintReceipt": "Could not print the receipt.",
   "@csCouldNotPrintReceipt": {"description": "Collection stepper — generic (non-PrinterUnavailable) print failure."},
   "csReceiptSavedCouldNotOpen": "Receipt saved, but could not open it: {error}",
@@ -698,6 +700,19 @@
   "@asHistoryTab": {"description": "App shell — bottom nav tab label."},
   "asOfflineTooltip": "Offline",
   "@asOfflineTooltip": {"description": "App shell — connectivity icon tooltip when offline."},
+  "asNotificationsTooltip": "Notifications",
+  "@asNotificationsTooltip": {"description": "App shell / client shell — bell icon tooltip and accessibility label."},
+
+  "nhTitle": "Notifications",
+  "@nhTitle": {"description": "Notification history screen — app bar title."},
+  "nhEmpty": "No notifications yet.",
+  "@nhEmpty": {"description": "Notification history screen — shown when the list is empty."},
+  "nhBranchNoticeLabel": "Branch Notice",
+  "@nhBranchNoticeLabel": {"description": "Notification history screen — chip label distinguishing a branch notice from a broadcast."},
+  "nhAnnouncementLabel": "Announcement",
+  "@nhAnnouncementLabel": {"description": "Notification history screen — chip label distinguishing a broadcast from a branch notice."},
+  "nhTodayLabel": "Today",
+  "@nhTodayLabel": {"description": "Notification history screen — date label replacing the calendar date for items sent earlier today."},
 
   "cbNoPhoneOnFile": "No phone number on file for {branchName}.",
   "@cbNoPhoneOnFile": {

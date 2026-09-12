@@ -7,11 +7,13 @@ import 'local_ceiling_cache.dart';
 import 'local_geofence_cache.dart';
 import 'local_pin_verifier.dart';
 import 'local_schedule_cache.dart';
+import 'local_trusted_time_cache.dart';
 import 'session_storage.dart';
 import '../features/auth/login_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/agent_profile.dart';
 import '../features/home/home_screen.dart';
+import '../features/home/notification_history_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/wallet/wallet_screen.dart';
 import '../l10n/app_localizations.dart';
@@ -66,6 +68,9 @@ class _AppShellState extends State<AppShell> {
     await LocalCeilingCache(widget.profile.id).clear();
     await LocalGeofenceCache(widget.profile.id).clear();
     await LocalScheduleCache(widget.profile.id).clear();
+    await LocalTrustedTimeCache(widget.profile.id).clear();
+    // LocalCollectionChainCache and the installation id/secret (InstallationIdService) are
+    // deliberately NOT cleared here — see that cache's own doc comment for why.
     await SessionStorage().clear();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
@@ -73,6 +78,17 @@ class _AppShellState extends State<AppShell> {
 
   void _openProfile() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileScreen(token: widget.token, profile: widget.profile)));
+  }
+
+  void _openNotifications() {
+    final l10n = AppLocalizations.of(context)!;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: Text(l10n.nhTitle)),
+        body: SafeArea(child: NotificationHistoryScreen(token: widget.token)),
+      ),
+    ));
   }
 
   @override
@@ -98,6 +114,21 @@ class _AppShellState extends State<AppShell> {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: 0.3),
         ),
         actions: [
+          Tooltip(
+            message: l10n.asNotificationsTooltip,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _openNotifications,
+              child: Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.only(right: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.notifications_outlined, size: 18, color: Colors.white),
+              ),
+            ),
+          ),
           Tooltip(
             message: _online ? l10n.hsStatusActive : l10n.asOfflineTooltip,
             child: Container(

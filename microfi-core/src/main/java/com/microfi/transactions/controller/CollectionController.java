@@ -2,6 +2,7 @@ package com.microfi.transactions.controller;
 
 import com.microfi.authentication.AgentDetails;
 import com.microfi.events.CollectionRecordDispatcher;
+import com.microfi.transactions.domain.CollectionOrigin;
 import com.microfi.transactions.service.CollectionService;
 import com.microfi.shared.dto.CollectionRequest;
 import com.microfi.shared.dto.CollectionResponse;
@@ -51,7 +52,7 @@ public class CollectionController {
     @Operation(summary = "Record a Collection", description = "Deposit + mandatory denomination breakdown + mandatory geotag (BR-05/FR-12); rejected if it would exceed the agent's escrow ceiling (FR-04). Idempotent on (agent, deviceTxId).")
     public Mono<CollectionResponse> create(@Valid @RequestBody CollectionRequest request, Mono<Authentication> authenticationMono) {
         return resolveAgentId(authenticationMono)
-                .flatMap(agentId -> collectionRecordDispatcher.dispatch(agentId, request));
+                .flatMap(agentId -> collectionRecordDispatcher.dispatch(agentId, request, CollectionOrigin.ONLINE));
     }
 
     @GetMapping
@@ -74,7 +75,7 @@ public class CollectionController {
                         // total before either commits and both pass individually even though their
                         // sum shouldn't. Cross-agent throttling now comes from the broker's bounded
                         // consumer pool instead, not from any ordering here.
-                        .concatMap(request -> collectionRecordDispatcher.dispatch(agentId, request)
+                        .concatMap(request -> collectionRecordDispatcher.dispatch(agentId, request, CollectionOrigin.OFFLINE_SYNC)
                                 .map(response -> CollectionSyncResult.builder()
                                         .deviceTxId(request.getDeviceTxId())
                                         .success(true)

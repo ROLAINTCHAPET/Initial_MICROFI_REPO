@@ -304,6 +304,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vous êtes en dehors des heures de collecte de votre agence (d\'après votre dernière connexion — reconnectez-vous pour une vérification à jour, ou contactez votre agence).';
 
   @override
+  String get csClockRolledBackWarning =>
+      'L\'horloge de cet appareil semble être revenue en arrière depuis sa dernière connexion — cette collecte a tout de même été enregistrée, mais pourrait nécessiter une vérification lors de la synchronisation.';
+
+  @override
   String get csCouldNotPrintReceipt => 'Impossible d\'imprimer le reçu.';
 
   @override
@@ -1001,6 +1005,24 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get asOfflineTooltip => 'Hors ligne';
+
+  @override
+  String get asNotificationsTooltip => 'Notifications';
+
+  @override
+  String get nhTitle => 'Notifications';
+
+  @override
+  String get nhEmpty => 'Aucune notification pour le moment.';
+
+  @override
+  String get nhBranchNoticeLabel => 'Avis d\'agence';
+
+  @override
+  String get nhAnnouncementLabel => 'Annonce';
+
+  @override
+  String get nhTodayLabel => 'Aujourd\'hui';
 
   @override
   String cbNoPhoneOnFile(String branchName) {
